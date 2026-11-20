@@ -2592,7 +2592,7 @@ async function loadSpotCams(L0){
 }
 function camTile(c, big){ const fav = favCams().some(x=>camKey(x)===camKey(c)); const src = c.img + (c.img.includes("?")?"&":"?") + "t=" + Math.floor(Date.now()/3e5);
   return `<figure class="cam ${big?"big":""}"><a href="${c.img}" target="_blank" rel="noopener"><img loading="lazy" src="${src}" alt="${c.name}" onerror="this.closest('figure').remove()"></a>
-    <figcaption><span><b>${c.name}</b><small>${c.route? c.route+" · " : ""}${isNum(c.mi)? c.mi+" mi away" : "ODOT"}</small></span><button class="cam-star ${fav?"on":""}" data-cam="${encodeURIComponent(JSON.stringify({id:c.id,name:c.name,img:c.img,lat:c.lat,lon:c.lon,route:c.route}))}" aria-label="Favorite camera">${fav?"★":"☆"}</button></figcaption></figure>`; }
+    <figcaption><span><b>${c.name}</b><small>${c.route && !/^(city|county|local|other)$/i.test(c.route)? c.route+" · " : ""}${isNum(c.mi)? c.mi+" mi away" : "ODOT"}</small></span><button class="cam-star ${fav?"on":""}" data-cam="${encodeURIComponent(JSON.stringify({id:c.id,name:c.name,img:c.img,lat:c.lat,lon:c.lon,route:c.route}))}" aria-label="Favorite camera">${fav?"★":"☆"}</button></figcaption></figure>`; }
 function wireCamStars(root, again){ root.querySelectorAll("[data-cam]").forEach(b=>b.onclick=(e)=>{ e.preventDefault(); const c=JSON.parse(decodeURIComponent(b.dataset.cam)); let f=favCams(); if(f.some(x=>camKey(x)===camKey(c))) f=f.filter(x=>camKey(x)!==camKey(c)); else { f.unshift(c); toast("Camera saved to Favorites"); } store.set("favCams", f.slice(0,12)); again(); }); }
 async function renderCamCard(){
   const card=$("#camCard"); if(!card || !S.loc) return; const L0=S.loc; const links = CAM_LINKS[L0.name]||[];
