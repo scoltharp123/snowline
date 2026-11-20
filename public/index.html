@@ -818,7 +818,7 @@ function render(){
   if(bigDay.v >= 6) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}. ${firstPowDay(C)}</div>`);
   if(rainHrs >= 6) callouts.push(`<div class="callout rain">🌧️ <b>Rain risk:</b> about ${rainHrs} wet hours in the next ${N} days at this elevation.</div>`);
   const days7 = C.days.slice(0,7);
-  if(S.mode!=="alpine"){ const cr = days7.filter(d=>crustCruise(C,SIM,d)); if(cr.length) callouts.push(`<div class="callout crust">✨ <b>Crust cruising ${cr.map(dow).join(", ")}:</b> skate off-trail from about 7–10am, before the sun softens the crust.</div>`); }
+  if(S.mode!=="alpine"){ const cr = days7.filter(d=>crustCruise(C,SIM,d)); if(cr.length) callouts.push(byMode("", `<div class="callout crust">✨ <b>Crust cruising ${cr.map(dow).join(", ")}:</b> skate off-trail from about 7–10am, before the sun softens the crust.</div>`, `<div class="callout crust">🧊 <b>Firm, icy tracks early ${cr.map(dow).join(", ")}:</b> klister for kick before about 10am, or wait for the tracks to soften. Tracks soften by late morning.</div>`)); }
   else { const corn = days7.filter(d=>at(C,SIM,d,12)?.sim?.key==="corn"); if(corn.length) callouts.push(`<div class="callout">🌽 <b>Corn cycle ${corn.map(dow).join(", ")}:</b> start on east-facing slopes around 10am and follow the sun.</div>`); }
   const sums = days7.map(d=>daySummary(C,SIM,d));
   let bestK = -1; sums.forEach((x,k)=>{ if(x && (bestK<0 || x.best.avg > sums[bestK].best.avg)) bestK=k; });
@@ -844,7 +844,7 @@ function render(){
   <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card" id="stormCard"></section>
   <section class="card"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div></section>
-  ${S.mode!=="alpine"? `<section class="card" id="birkiePanel"></section>`:""}
+  ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}
   <section class="card"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read more</button></section>
   ${SECTIONS.filter(s=>!s.nordic || S.mode!=="alpine").map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
@@ -856,7 +856,7 @@ function render(){
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
   renderRightNow(C, SIM, e); renderHourStrip(C, SIM); renderDailyList(C, SIM);
-  if(S.mode!=="alpine") renderBirkie();
+  if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
   renderReport(); renderStorm(C, SIM, e); loadDiscussion(C, SIM, e);
@@ -903,9 +903,9 @@ function renderRightNow(C, SIM, e){
       <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like ${fmtT(now.feels)}</div></div></div>
       <div class="rn-b"><div class="rn-w num"><span class="arr" style="transform:rotate(${(c.WD||0)+180}deg)">↑</span>${fmtWind(c.W)} <small>${windU()}</small></div><div class="muted">${compass(c.WD)} gusts to ${fmtWind(c.G)}</div></div>
     </div>
-    <div class="surf-row"><span class="ic">${now.icon}</span><div style="flex:1;min-width:0"><b>${now.label}</b><div class="muted">${now.d}</div></div><div style="text-align:right"><div class="num" style="font-size:26px;color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</div><div class="muted">${MODE_NAME[S.mode]}</div></div></div>
+    <div class="surf-row"><span class="ic">${now.icon}</span><div style="flex:1;min-width:0"><b>${now.label}</b><div class="muted">${descOf(now)}</div></div><div style="text-align:right"><div class="num" style="font-size:26px;color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</div><div class="muted">${MODE_NAME[S.mode]}</div></div></div>
     <div class="kv">
-      ${(()=>{ const an = aspectNote(C, todayStr()) || aspectNote(C, dateAdd(todayStr(),1)); return an? `<div class="full"><div class="l">Slopes ${aspectNote(C, todayStr())? "today":"tomorrow"}</div><div class="v">☀️ ${an.line}</div></div>` : ""; })()}
+      ${(()=>{ const an = aspectNote(C, todayStr()) || aspectNote(C, dateAdd(todayStr(),1)); return an? `<div class="full"><div class="l">${byMode("Slopes","Sun vs. shade")} ${aspectNote(C, todayStr())? "today":"tomorrow"}</div><div class="v">☀️ ${an.line}</div></div>` : ""; })()}
       ${S.mode!=="alpine"? (()=>{ const sg = waxSuggest(c, now); return sg?.text? `<div class="full"><div class="l">Your wax log</div><div class="v">🧠 ${sg.text}</div></div>` : ""; })() : ""}
       ${ts? `<div class="full"><div class="l">Best window ${tsDay}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
       ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
@@ -983,7 +983,7 @@ function renderDayDetail(C, SIM, el){
     <div><div class="l">Max gust</div><div class="v">${fmtWind(cd.gmax)} ${windU()}</div></div>
     ${S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
     ${x? `<div class="full"><div class="l">Surface · best window</div><div class="v">${x.am?`AM ${x.am.icon} ${x.am.label}`:""}${x.am&&x.pm?" → ":""}${x.pm?`PM ${x.pm.icon} ${x.pm.label}`:""}<br><b>${hl(x.best.from)}–${hl(x.best.to)}</b> ${scoreChip(x.best.avg)} · ${x.best.sim.light.icon} ${x.best.sim.light.label}</div></div>`:""}
-    ${(()=>{ const an=aspectNote(C,d); return an? `<div class="full"><div class="l">Slope aspects</div><div class="v">${an.line}</div></div>` : ""; })()}
+    ${(()=>{ const an=aspectNote(C,d); return an? `<div class="full"><div class="l">${byMode("Slope aspects","Sun vs. shade")}</div><div class="v">${an.line}</div></div>` : ""; })()}
     ${w? `<div class="full"><div class="l">Wax at 9am</div><div class="v">Glide: ${w.glide}${S.mode==="classic"?`<br>Kick: ${w.kick}`:""}</div></div>`:""}
   </div></div>`;
 }
@@ -1055,7 +1055,7 @@ async function renderFavs(force){
 }
 
 function firstPowDay(C){
-  for(let k=0;k<Math.min(7,C.days.length);k++){ const fresh = C.consDays[k].night; if(fresh >= 4 && k+1<C.days.length) return `Best first chair: <b>${dow(C.days[k+1])} morning</b> (${fmtSnow(fresh)} overnight).`; }
+  for(let k=0;k<Math.min(7,C.days.length);k++){ const fresh = C.consDays[k].night; if(fresh >= 4 && k+1<C.days.length) return byMode(`Best first chair: <b>${dow(C.days[k+1])} morning</b> (${fmtSnow(fresh)} overnight).`, `Fresh snow on the trails <b>${dow(C.days[k+1])} morning</b> (${fmtSnow(fresh)} overnight); best once it's groomed.`); }
   return "";
 }
 function powderScore(C,k){
@@ -1070,7 +1070,7 @@ function renderDisc(C, e, winTot, lo, hi, modelTots, SIM){
   const parts = [];
   if(SIM){ const keys = C.days.slice(0,Math.min(N,7)).map(d=>[at(C,SIM,d,10)?.sim, d]).filter(x=>x[0]);
     const seq = keys.map(([s,d])=>`${dow(d)} ${s.icon} ${s.label.toLowerCase()}`).join(" → ");
-    if(seq) parts.push(`<p><b>How it'll ski (${MODE_NAME[S.mode].toLowerCase()}):</b> ${seq}. Surfaces are modeled hour by hour from new snow, wind, sun, melt-freeze and rain at ${fmtEl(e)}. Shaded north aspects will stay colder and drier than the model shows, and sunny south aspects will soften sooner.</p>`); }
+    if(seq) parts.push(`<p><b>How it'll ski (${MODE_NAME[S.mode].toLowerCase()}):</b> ${seq}. Surfaces are modeled hour by hour from new snow, wind, sun, melt-freeze and rain at ${fmtEl(e)}. ${byMode("Shaded north aspects will stay colder and drier than the model shows, and sunny south aspects will soften sooner.", "Open, sunny stretches will soften sooner than shaded trail in the trees.")}</p>`); }
   // storm detection
   const storms = []; let cur=null;
   for(let k=0;k<daily.length;k++){ if(daily[k]>=1){ if(!cur) cur={s:k,e:k,tot:0}; cur.e=k; cur.tot+=daily[k]; } else if(cur){ storms.push(cur); cur=null; } }
@@ -1090,17 +1090,20 @@ function renderDisc(C, e, winTot, lo, hi, modelTots, SIM){
     if(slArr.length){ const sMin=Math.min(...slArr), sMax=Math.max(...slArr);
       const baseM=L.base/FT, topM=L.top/FT;
       let msg = `While it's precipitating, snow levels range from ${fmtEl(sMin)} to ${fmtEl(sMax)}. `;
-      if(sMax > topM) msg += `At times the rain line goes above the summit, so expect rain on the whole mountain during the warm part of the storm.`;
-      else if(sMax > baseM) msg += `At times the rain line climbs above the base, so lower runs may get wet while the upper mountain stays white.`;
-      else msg += `It stays below the base, so it's all snow top to bottom.`;
+      if(sMax > topM) msg += byMode(`At times the rain line goes above the summit, so expect rain on the whole mountain during the warm part of the storm.`, `At times the rain line goes above the highest trails, so expect rain on the whole trail system during the warm part of the storm.`);
+      else if(sMax > baseM) msg += byMode(`At times the rain line climbs above the base, so lower runs may get wet while the upper mountain stays white.`, `At times the rain line climbs above the trailhead, so lower trails may get wet while higher loops stay white.`);
+      else msg += byMode(`It stays below the base, so it's all snow top to bottom.`, `It stays below the trailhead, so it's all snow on the trails.`);
       parts.push(`<p><b>Snow level:</b> ${msg}</p>`);
     }
     // quality
     const totW = C.consDays.slice(0,N).reduce((a,d)=>a+d.slrW,0), totR = C.consDays.slice(0,N).reduce((a,d)=>a+d.slrSum,0);
-    if(totW>0.5){ const r = totR/totW; parts.push(`<p><b>Snow quality:</b> the average snow-to-liquid ratio is about ${Math.round(r)}:1. ${r>=15?"Expect light, cold smoke that skis deep.":r>=11?"Expect a fairly average density that skis well.":"Expect dense, heavy snow (Cascade concrete). Good for the base, but it'll be work on the legs."}</p>`); }
+    if(totW>0.5){ const r = totR/totW; parts.push(`<p><b>Snow quality:</b> the average snow-to-liquid ratio is about ${Math.round(r)}:1. ${byMode(
+      r>=15?"Expect light, cold smoke that skis deep.":r>=11?"Expect a fairly average density that skis well.":"Expect dense, heavy snow (Cascade concrete). Good for the base, but it'll be work on the legs.",
+      r>=15?"Light, dry snow: soft and slow until it's groomed, then fast corduroy.":r>=11?"Average density: it should groom up into firm, fast lanes.":"Dense, wet snow: slow and sticky until it's groomed and sets up.",
+      r>=15?"Light, dry snow: great kick in fresh tracks, with slower glide until they're set.":r>=11?"Average density: classic tracks should set nicely after grooming.":"Dense, wet snow: an icing risk for kick wax; think klister or skin skis.")}</p>`); }
   }
   const windy = C.consDays.slice(0,N).map((d,k)=>({k,g:d.gmax})).filter(x=>x.g>55);
-  if(windy.length) parts.push(`<p><b>Wind:</b> gusts above ${imp()?"35 mph":"55 km/h"} at the model's 10 m level on ${windy.map(x=>dow(C.days[x.k])).join(", ")}. Upper lifts could go on wind hold, and exposed terrain will get wind-affected.</p>`);
+  if(windy.length) parts.push(`<p><b>Wind:</b> gusts above ${imp()?"35 mph":"55 km/h"} at the model's 10 m level on ${windy.map(x=>dow(C.days[x.k])).join(", ")}. ${byMode("Upper lifts could go on wind hold, and exposed terrain will get wind-affected.", "Expect drifting in open sections and filled-in tracks; sheltered trails will ski best.")}</p>`);
   // long-range
   const lr = windowTotal(daily.slice(N), 15-N);
   if(N<10) parts.push(`<p><b>Further out (days ${N+1}–15):</b> the consensus adds about ${fmtSnow(lr)}. ${lr>12?"The pattern looks active.":lr>3?"There are some chances.":"It looks quiet."} Don't trust long-range amounts much; use the 10-day view and the ensembles for the trend.</p>`);
@@ -1228,22 +1231,23 @@ function renderHourly(C, SIM){
 
 /* ================= Ski surface model ================= */
 const SURF = {
-  rain:    {label:"Wet / raining",          icon:"🌧", a:1,   s:1,   c:1,   d:"Rain on snow: soaked and slow. Only go if it's snowing higher up."},
-  slush:   {label:"Slush",                  icon:"💧", a:3,   s:2,   c:2,   d:"Warm, saturated snow that's grabby and slow. Go early before it turns to mashed potatoes."},
-  corn:    {label:"Corn",                   icon:"🌽", a:7.5, s:5,   c:4,   d:"A melt-freeze surface softening in the sun. Smooth, edgeable spring snow, but the good window is short."},
-  soft:    {label:"Soft / wet",             icon:"💦", a:4,   s:4,   c:3,   d:"The surface is above freezing. Heavy and sticky, worst on sunny aspects."},
-  ice:     {label:"Ice / rain crust",       icon:"🧊", a:1.5, s:4.5, c:2.5, d:"Rain or meltwater refroze into a hard crust. Keep your edges sharp and stick to groomed runs."},
-  firm:    {label:"Firm / refrozen",        icon:"🪨", a:3,   s:7.5, c:4.5, d:"A melt-freeze crust. Chattery for alpine until the sun softens it; fast and stable for skate."},
-  powder:  {label:"Powder",                 icon:"❄️", a:7,   s:4,   c:6,   d:"Light, dry new snow. The good stuff."},
-  heavy:   {label:"Heavy new snow",         icon:"🌨", a:5, s:3.5, c:5.5, d:"Dense new snow with a lot of water in it. Supportive but tiring."},
-  fresh:   {label:"Fresh snow",             icon:"🌨", a:6.3,   s:5,   c:7,   d:"Medium-density new snow over the base. Skis well, and classic tracks set nicely once groomed."},
-  wind:    {label:"Wind-affected",          icon:"🌬", a:4.5, s:5.5, c:5,   d:"New snow moved by the wind: scoured, crusty or drifted. Look for sheltered trees and lee pockets."},
-  damp:    {label:"Heat-affected new snow", icon:"🌤", a:5,   s:4.5, c:4,   d:"New snow that got warmed. Sticky on sunny aspects, still decent on shaded ones."},
-  packed:  {label:"Packed powder",          icon:"🎿", a:6, s:8,   c:8,   d:"Settled, dry snow. Classic groomer conditions, fast and consistent."},
-  cold:    {label:"Cold packed",            icon:"🥶", a:5.5, s:6,   c:7.5, d:"Very cold, dry snow. Squeaky and grippy, but glide is slow (dry friction)."},
-  softpack:{label:"Soft packed",            icon:"🎿", a:6.2,   s:6.5, c:7.5, d:"A few inches of settled new snow over a firm base. Forgiving and fun."},
+  rain:    {label:"Wet / raining",          icon:"🌧", a:1,   s:1,   c:1,   d:"Rain on snow: soaked and slow. Only go if it's snowing higher up.", sk:"Rain on the trails: wet, slow tracks and soft skate lanes. Only worth it if it's snowing higher up.", cl:"Rain on the trails: wet, slow tracks. Wet klister or skin skis if you go."},
+  slush:   {label:"Slush",                  icon:"💧", a:3,   s:2,   c:2,   d:"Warm, saturated snow that's grabby and slow. Go early before it turns to mashed potatoes.", sk:"Saturated snow: slow and grabby. Ski early before the lanes break down; warm wax and coarse structure.", cl:"Saturated snow: slow and grabby, and the tracks break down fast. Universal or wet klister; ski early."},
+  corn:    {label:"Corn",                   icon:"🌽", a:7.5, s:5,   c:4,   d:"A melt-freeze surface softening in the sun. Smooth, edgeable spring snow, but the good window is short.", sk:"A softening crust: fast early, then slow and mushy. Ski it before late morning.", cl:"A softening crust: icy tracks early, mushy later. Klister for kick; best in the late morning window."},
+  soft:    {label:"Soft / wet",             icon:"💦", a:4,   s:4,   c:3,   d:"The surface is above freezing. Heavy and sticky, worst on sunny aspects.", sk:"Above freezing: soft, sticky lanes, slowest on sunny stretches. Warm glide wax.", cl:"Above freezing: soft, sticky tracks, slowest on sunny stretches. Klister for kick."},
+  ice:     {label:"Ice / rain crust",       icon:"🧊", a:1.5, s:4.5, c:2.5, d:"Rain or meltwater refroze into a hard crust. Keep your edges sharp and stick to groomed runs.", sk:"Refrozen and icy: very fast but hard to hold an edge. Careful on downhill corners.", cl:"Refrozen, icy tracks: fast glide, hard kick. Blue (ice) klister and careful on the descents."},
+  firm:    {label:"Firm / refrozen",        icon:"🪨", a:3,   s:7.5, c:4.5, d:"A melt-freeze crust. Chattery until the sun softens it, then it turns to corn.", sk:"A melt-freeze crust: fast and stable. Great for skating, and often supportive off-trail early in the day.", cl:"A melt-freeze crust: fast but icy in the tracks. Klister or klister binder for kick until it softens."},
+  powder:  {label:"Powder",                 icon:"❄️", a:7,   s:4,   c:6,   d:"Light, dry new snow. The good stuff.", sk:"Light, dry new snow: soft and slow until it's groomed, then excellent.", cl:"Light, dry new snow: easy kick in fresh tracks, slower glide until the tracks are set."},
+  heavy:   {label:"Heavy new snow",         icon:"🌨", a:5, s:3.5, c:5.5, d:"Dense new snow with a lot of water in it. Supportive but tiring.", sk:"Dense, wet new snow: slow and draggy until it's groomed and sets up.", cl:"Dense, wet new snow: slow, with an icing risk for kick wax. Better once it's groomed."},
+  fresh:   {label:"Fresh snow",             icon:"🌨", a:6.3,   s:5,   c:7,   d:"Medium-density new snow over the base. Skis well everywhere.", sk:"New snow over the base: soft lanes until they're groomed, then fast corduroy.", cl:"New snow over the base: classic tracks set nicely once groomed, with easy kick."},
+  wind:    {label:"Wind-affected",          icon:"🌬", a:4.5, s:5.5, c:5,   d:"New snow moved by the wind: scoured, crusty or drifted. Look for sheltered trees and lee pockets.", sk:"Wind-blown new snow: drifts across open sections. Sheltered, tree-lined trails ski best.", cl:"Wind-blown new snow: drifted and filled-in tracks in the open. Sheltered trails ski best."},
+  damp:    {label:"Heat-affected new snow", icon:"🌤", a:5,   s:4.5, c:4,   d:"New snow that got warmed. Sticky on sunny aspects, still decent on shaded ones.", sk:"New snow that got warmed: sticky in the sun, better in the shade.", cl:"New snow that got warmed: sticky in the sun and an icing risk for kick wax. Better in the shade."},
+  packed:  {label:"Packed powder",          icon:"🎿", a:6, s:8,   c:8,   d:"Settled, dry snow. Great groomer conditions, fast and consistent.", sk:"Settled, dry snow: firm, fast and consistent. Ideal skating conditions.", cl:"Settled, dry snow: firm, consistent tracks with reliable kick. Ideal classic conditions."},
+  cold:    {label:"Cold packed",            icon:"🥶", a:5.5, s:6,   c:7.5, d:"Very cold, dry snow. Squeaky and grippy, but glide is slow (dry friction).", sk:"Very cold, dry snow: squeaky and slow to glide (dry friction). Cold wax, fine structure.", cl:"Very cold, dry snow: great grip for kick but slow glide. Cold (green/polar) wax."},
+  softpack:{label:"Soft packed",            icon:"🎿", a:6.2,   s:6.5, c:7.5, d:"A few inches of settled new snow over a firm base. Forgiving and fun.", sk:"A few inches of settled snow over a firm base: forgiving, a little slower than packed.", cl:"A few inches of settled snow over a firm base: good kick, slightly slower glide."},
 };
 const MODE_KEY = {alpine:"a", skate:"s", classic:"c"};
+const byMode = (a, sk, cl) => S.mode==="alpine" ? a : S.mode==="skate" ? sk : (cl ?? sk);
 const MODE_NAME = {alpine:"Alpine", skate:"Skate", classic:"Classic"};
 function windChill(T, V){ if(!isNum(T)) return null; if(!isNum(V) || T>10 || V<4.8) return T; const v=Math.pow(V,0.16); return 13.12+0.6215*T-11.37*v+0.3965*T*v; }
 function lightOf(c){ const cc = c.CC; if(!isNum(cc)) return {k:"?",icon:"",label:"—"}; if(c.snow>0.08) return {k:"storm",icon:"🌨",label:"Storm"}; if(cc<25) return {k:"blue",icon:"☀️",label:"Bluebird"}; if(cc<65) return {k:"part",icon:"⛅",label:"Partly sunny"}; return {k:"flat",icon:"☁️",label:"Flat light"}; }
@@ -1300,6 +1304,7 @@ function classify(st, c, liquid, slrAvg){
   const r = x => Math.round(clamp(x,0,10)*10)/10;
   return { key, ...S0, a:r(a), s:r(s), c:r(cl), light, newSnow:st.newSnow, age:st.age, slrAvg, Te:c.Te, feels:windChill(c.Te, c.W), G };
 }
+const descOf = sim => sim ? byMode(sim.d, sim.sk || sim.d, sim.cl || sim.sk || sim.d) : "";
 const scoreOf = sim => sim ? sim[MODE_KEY[S.mode]] : null;
 function scoreColor(v){ if(!isNum(v)) return "#22304f"; if(v>=8) return "#a78bfa"; if(v>=6.5) return "#38bdf8"; if(v>=5) return "#86efac"; if(v>=3.5) return "#fde68a"; return "#fca5a5"; }
 const scoreChip = v => `<span class="sc" style="background:${scoreColor(v)}">${isNum(v)?v.toFixed(1):"—"}</span>`;
@@ -1520,7 +1525,7 @@ async function checkAlerts(){
   if(!alertRules().length){ $("#alertBanner").innerHTML=""; return; }
   try{ const F = await loadFinder(); const hits = evalAlerts(F);
     document.querySelector('#tabs a[data-v="alerts"]').classList.toggle("has", hits.length>0);
-    $("#alertBanner").innerHTML = hits.length? `<div class="callout gold" style="margin-top:0">🔔 <b>Powder alert${hits.length>1?"s":""}:</b> ${hits.slice(0,4).map(h=>`${h.x.spot.name} ${fmtSnow(h.v)} in ${h.w}`).join(" · ")} <a href="#alerts">Manage</a></div>` : "";
+    $("#alertBanner").innerHTML = hits.length? `<div class="callout gold" style="margin-top:0">🔔 <b>Snow alert${hits.length>1?"s":""}:</b> ${hits.slice(0,4).map(h=>`${h.x.spot.name} ${fmtSnow(h.v)} in ${h.w}`).join(" · ")} <a href="#alerts">Manage</a></div>` : "";
   }catch(e){}
 }
 function renderAlerts(){
@@ -1739,8 +1744,10 @@ function aspectNote(C, d){
     if(h===8){ sAM=q.sim; nAM=r.sim; }
     if(sWet==null && WETK.has(q.sim.key)) sWet={h, sim:q.sim}; if(nWet==null && WETK.has(r.sim.key)) nWet={h, sim:r.sim}; }
   if(!sAM) return null;
-  const sTxt = sWet ? `South faces ${sWet.sim.key==="corn"?"turn to corn":"soften"} by ${hl(sWet.h)}` : `South faces stay ${sAM.key==="firm"?"firm":"dry"}`;
-  const nTxt = nWet ? `north softens by ${hl(nWet.h)}` : (["powder","fresh","softpack","packed","cold","heavy","wind"].includes(nAM.key)? "north stays dry and cold" : `north stays ${nAM.label.toLowerCase()}`);
+  const nordic = S.mode!=="alpine";
+  const sTxt = sWet ? (nordic? `Sunny stretches soften by ${hl(sWet.h)}` : `South faces ${sWet.sim.key==="corn"?"turn to corn":"soften"} by ${hl(sWet.h)}`) : (nordic? `Sunny stretches stay ${sAM.key==="firm"?"firm":"dry"}` : `South faces stay ${sAM.key==="firm"?"firm":"dry"}`);
+  const dryN = ["powder","fresh","softpack","packed","cold","heavy","wind"].includes(nAM.key);
+  const nTxt = nWet ? (nordic? `shaded trail softens by ${hl(nWet.h)}` : `north softens by ${hl(nWet.h)}`) : (dryN? (nordic? "shaded trail stays dry and fast" : "north stays dry and cold") : `${nordic? "shaded trail" : "north"} stays ${nAM.label.toLowerCase()}`);
   return { line: `${sTxt}; ${nTxt}.`, sAM, nAM, sWet, nWet };
 }
 
@@ -1768,9 +1775,13 @@ function renderStorm(C, SIM, e){
   const endD = C.time[st.b].slice(0,10), endH = +C.time[st.b].slice(11,13);
   const after = endH < 7 ? endD : dateAdd(endD,1);
   const ratio = slrW? slrA/slrW : 10;
-  const verdict = dayHrs>=3 && maxG<70
-    ? `<b>Ski the storm:</b> about ${fmtSnow(dayTot)} falls during lift hours, ${ratio>=13?"light and deep":"heavier and supportive"}. Then hit the <b>morning after</b> on ${dow(after)}.`
-    : `<b>Wait for the morning after:</b> most of it falls ${dayHrs? "outside lift hours" : "overnight"}${maxG>=70? " with strong winds" : ""}. First chair ${dow(after)} is the call.`;
+  const verdict = S.mode==="alpine"
+    ? (dayHrs>=3 && maxG<70
+      ? `<b>Ski the storm:</b> about ${fmtSnow(dayTot)} falls during lift hours, ${ratio>=13?"light and deep":"heavier and supportive"}. Then hit the <b>morning after</b> on ${dow(after)}.`
+      : `<b>Wait for the morning after:</b> most of it falls ${dayHrs? "outside lift hours" : "overnight"}${maxG>=70? " with strong winds" : ""}. First chair ${dow(after)} is the call.`)
+    : (dayHrs>=3
+      ? `<b>Expect soft, slow trails while it snows</b> (about ${fmtSnow(dayTot)} during the day)${maxG>=60? ", with wind drifting the open sections" : ""}. The best ${S.mode==="skate"? "skating" : "classic skiing"} is <b>${dow(after)}</b>, once the trails are groomed.`
+      : `<b>Most of it falls overnight.</b> ${dow(after)} morning should bring fresh snow on the trails; it skis best once it's groomed${S.mode==="classic"? " and the tracks are set" : ""}.`);
   const rainNote = st.rainMm > 3 ? ` · <span style="color:${PT.rain}">some rain at this elevation</span>` : "";
   el.innerHTML = `<div class="card-h"><h2>Storm Timeline</h2><span class="muted">${fmtEl(e)}</span></div>
     <div class="storm-h"><div><div class="muted">Next storm</div><b>${tLabel(C,st.a)} → ${tLabel(C,st.b)}</b></div><div style="text-align:right"><div class="num" style="font-size:30px;color:var(--ice)">${fmtSnow(st.tot)}</div><div class="muted">storm total</div></div></div>
@@ -1861,19 +1872,19 @@ function renderReport(){
         ${R.new24!=null? `<div><div class="l">24h reported</div><div class="v num">${fmtSnow(R.new24)}</div></div>`:""}
         ${R.base!=null? `<div><div class="l">Base</div><div class="v num">${fmtSnow(R.base,0)}</div></div>`:""}
         ${R.summit!=null? `<div><div class="l">Summit</div><div class="v num">${fmtSnow(R.summit,0)}</div></div>`:""}
-        ${R.lifts? `<div><div class="l">Lifts</div><div class="v">${R.liftsOpen}/${R.lifts}</div></div>`:""}
-        ${R.runs? `<div><div class="l">Runs</div><div class="v">${R.runsOpen}/${R.runs}</div></div>`:""}
+        ${R.lifts && S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v">${R.liftsOpen}/${R.lifts}</div></div>`:""}
+        ${R.runs && S.mode==="alpine"? `<div><div class="l">Runs</div><div class="v">${R.runsOpen}/${R.runs}</div></div>`:""}
       </div>${R.comment? `<p class="clamp3 muted" style="margin:8px 0 0">${R.comment}</p>`:""}
       <a class="muted" href="${R.url}" target="_blank" rel="noopener">${R.source} ↗</a></div>`);
   } else if(R && R.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b></div><a href="${R.url}" target="_blank" rel="noopener">Open the latest resort report ↗</a></div>`);
-  const G = rep.grooming;
+  const G = S.mode!=="alpine" ? rep.grooming : null;
   if(G && (G.text || G.trails)){
     const groomed = (G.trails||[]).filter(t=>t.groomed).slice(0,8);
-    blocks.push(`<div class="rep"><div class="rep-h"><b>Grooming</b><span class="muted">${G.reported||""}${G.by? " · "+G.by : ""}</span></div>
+    blocks.push(`<div class="rep"><div class="rep-h"><b>Nordic grooming</b><span class="muted">${G.reported||""}${G.by? " · "+G.by : ""}</span></div>
       ${G.text? `<p class="clamp3" style="margin:4px 0 6px;font-size:14px;line-height:1.45">${G.text}</p>`:""}
       ${groomed.length? `<div class="list">${groomed.map(t=>`<div class="li" style="min-height:40px;padding:6px 0"><span class="nm"><b style="font-weight:500">${t.name}</b></span><span class="muted">${t.groomed}</span></div>`).join("")}</div>`:""}
       <a class="muted" href="${G.url}" target="_blank" rel="noopener">${G.source} ↗</a></div>`);
-  } else if(G && G.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Grooming</b></div><a href="${G.url}" target="_blank" rel="noopener">Open the grooming report ↗</a></div>`);
+  } else if(G && G.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Nordic grooming</b></div><a href="${G.url}" target="_blank" rel="noopener">Open the grooming report ↗</a></div>`);
   if(!blocks.length){ el.remove(); return; }
   el.innerHTML = `<div class="card-h"><h2>Snow Report</h2><span class="muted">observed</span></div>${blocks.join("")}`;
 }
@@ -1904,7 +1915,7 @@ function buildFacts(C, SIM, e){
     storm: st? { start: tLabel(C,st.a), end: tLabel(C,st.b), total: fmtSnow(st.tot), peak: `${fmtSnow(st.peak.v,1)}/hr ${tLabel(C,st.peak.i)}` } : null,
     measured: ob? { station: ob.name, last24: fmtSnow(ob.new24||0), depth: isNum(ob.depth)? fmtSnow(ob.depth,0) : null } : null,
     bestModel: v? MODELS.find(m=>m.id===v.best)?.name : null, nowSurface: SIM[C.nowIdx]?.label,
-    avalancheDanger: X.avy?.zone?.danger || null, mode: S.mode };
+    avalancheDanger: X.avy?.zone?.danger || null, mode: S.mode, modeDescription: byMode("alpine (downhill) skiing at a resort", "skate (nordic cross-country) skiing on groomed trails", "classic (nordic cross-country) skiing in set tracks") };
 }
 async function loadDiscussion(C, SIM, e){
   const key = `${S.loc.name}|${S.mode}|${S.band}|${Math.floor(Date.now()/(4*3600e3))}`;
@@ -2075,7 +2086,7 @@ async function renderPushCard(el){
     <div class="muted" style="margin-bottom:10px">For: ${pushSpots().map(x=>x.name.replace(/,\s*[A-Z]{2}$/,"")).join(", ") || "your favorites"}</div>
     ${on? `<div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn primary" id="pSave" style="flex:1">Update</button><button class="btn" id="pTest" style="flex:1">Send test</button><button class="btn" id="pOff" style="flex:1;color:#ff6b6b">Turn off</button></div>`
         : `<button class="btn primary wide" id="pOn">Turn on morning alerts</button>`}`;
-  el.innerHTML = `<div class="card-h"><h2>🔔 Morning powder alerts</h2>${on? `<span class="badge b-hi">On</span>`:""}</div>${body}`;
+  el.innerHTML = `<div class="card-h"><h2>🔔 Morning snow alerts</h2>${on? `<span class="badge b-hi">On</span>`:""}</div>${body}`;
   const prefsNow = () => { const k = imp()? 1 : 1/2.54; const p = {overnight: (+$("#pOver").value||4)*k, forecast: (+$("#pFc").value||8)*k}; store.set("pushPrefs", p); return p; };
   const post = (b) => api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(b)});
   const bOn = $("#pOn"); if(bOn) bOn.onclick = async () => {

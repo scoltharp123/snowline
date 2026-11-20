@@ -13,7 +13,10 @@ Rules:
 - Output exactly: a headline line (max 9 words), a blank line, then 2 or 3 short paragraphs.
 - Lead with what matters most: the next storm or the dry stretch, when to ski, and expected snow quality.
 - Mention snow levels or rain only if they matter at this elevation. Mention wind holds only if flagged.
-- Tailor to the mode: alpine (powder, groomers, lifts, aspects); skate or classic nordic (track speed, wax, crust skiing, grooming after storms).
+- Tailor to the mode, and keep the vocabulary strictly within it:
+  - alpine: powder, groomers, lifts, first chair, aspects, runs. Never mention wax, kick, tracks or track speed.
+  - skate: groomed trails, skate lanes, corduroy, glide wax, track speed, crust skating. Never mention lifts, chairs, runs, first chair, kick wax or set tracks.
+  - classic: set tracks, kick and glide, kick wax or klister, icing, grooming. Never mention lifts, chairs, runs, first chair, skate lanes or skating.
 - Use amounts as given (with units). Use ranges where given. Be honest about uncertainty when confidence is low.
 - No safety or avalanche advice beyond "check the avalanche forecast" if avalanche danger is 3 or higher.`;
 
@@ -23,7 +26,7 @@ export default async (req) => {
   const { spot, mode = "alpine", band = "summit", facts } = body || {};
   if (!spot || !facts || JSON.stringify(facts).length > 6000) return json({ error: "spot and facts required" }, { status: 400 });
   const bucket = Math.floor(Date.now() / (4 * 3600e3));
-  const key = `disc-${spot}-${mode}-${band}-${bucket}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const key = `disc-v2-${spot}-${mode}-${band}-${bucket}`.replace(/[^a-zA-Z0-9_-]/g, "_");
   const s = store("snowline-cache");
   try { const c = await s.get(key, { type: "json" }); if (c) return json({ ...c, cached: true }); } catch (e) {}
   if (!process.env.ANTHROPIC_BASE_URL && !process.env.ANTHROPIC_API_KEY) return json({ error: "ai-unavailable" }, { status: 503 });
