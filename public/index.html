@@ -2778,7 +2778,7 @@ let pdfjsP;
 function loadPdfJs(){
   return pdfjsP ||= new Promise((res, rej)=>{ const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
     // A worker from another site can't start directly, so load its code and start it from this page.
-    s.onload = async () => { try{ const code = await fetch("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js").then(r=>{ if(!r.ok) throw new Error("Map viewer didn't load"); return r.text(); });
+    s.onload = async () => { try{ const code = await fetch("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js?cors=1", {mode:"cors"}).then(r=>{ if(!r.ok) throw new Error("Map viewer didn't load"); return r.text(); });
       pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(URL.createObjectURL(new Blob([code], {type:"text/javascript"}))); res(pdfjsLib); }catch(e){ pdfjsP = null; rej(e); } }; s.onerror = () => { pdfjsP = null; rej(new Error("Map viewer didn't load")); }; document.head.appendChild(s); });
 }
 async function tmBytes(u, onProg){
