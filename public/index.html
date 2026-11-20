@@ -641,7 +641,7 @@ function snowAt(P, Tref, FLmodel, ref, e){
 async function getJSON(url, tries=3, wait=1500){
   let r; try{ r = await fetch(url); }catch(e){ if(tries>1){ await new Promise(z=>setTimeout(z, wait)); return getJSON(url, tries-1, wait*2.5); } throw e; }
   if((r.status===429 || r.status>=500) && tries>1){ await new Promise(z=>setTimeout(z, wait+Math.random()*800)); return getJSON(url, tries-1, wait*2.5); }
-  if(!r.ok) throw new Error(r.status); const j = await r.json(); if(j.error) throw new Error(j.reason||"error"); return j; }
+  if(r.status===429){ S.omLimited = Date.now(); } if(!r.ok) throw new Error(r.status); const j = await r.json(); if(j.error) throw new Error(j.reason||"error"); S.omLimited = 0; return j; }
 async function fetchDet(m, loc, ref){
   for(const api of m.api){
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&hourly=${DET_VARS}&models=${api}&timezone=auto&past_days=3&forecast_days=16`;
@@ -680,7 +680,7 @@ async function load(loc){
   const mem = MEM.get(loc.name);
   if(mem && Date.now()-mem.t < MEM_TTL){ loadExtras(loc); S.data = mem.data; S.season = mem.data.seasonCache || null; S.outlook = mem.data.outlookCache || null; $("#upd").classList.remove("on"); $("#app").classList.remove("stale"); render(); return; }
   const snap = (store.get("snap", {}) || {})[loc.name];
-  if(snap && Date.now()-snap.t < 8*3600e3){ $("#app").innerHTML = snap.html; $("#app").classList.add("stale"); }
+  if(snap && Date.now()-snap.t < 8*3600e3){ $("#app").innerHTML = snap.html; $("#app").classList.add("stale"); }   // a forecast older than 8 h only shows if the models can't be reached
   else $("#app").innerHTML = `<div class="skel" style="height:64px"></div><div class="skel" style="height:230px"></div><div class="skel" style="height:190px"></div><div class="skel" style="height:150px"></div>`;
   $("#upd").classList.add("on"); S.data = null; updateTop();
   // fire everything at once; show the forecast once most models are in (6s cap), let stragglers patch in
@@ -701,7 +701,13 @@ async function load(loc){
   const models = {}; det.forEach((d,i)=>{ if(d && d!==TIMEOUT) models[MODELS[i].id] = d; });
   const first = Object.values(models)[0];
   $("#upd").classList.remove("on"); $("#app").classList.remove("stale");
-  if(!first){ $("#app").innerHTML = `<div class="card"><h2>No connection</h2><div class="muted" style="margin-top:6px">Couldn't reach the forecast models. Pull down to try again.</div></div>`; return; }
+  if(!first){
+    const limited = S.omLimited && Date.now()-S.omLimited < 120e3, sn = (store.get("snap", {}) || {})[loc.name];
+    const why = limited ? "Open-Meteo, the free weather service Snowline uses, limits how many forecasts one network can ask for in an hour, and this network hit that limit. It resets within the hour, and Snowline will try again on its own." : "Couldn't reach the forecast models. Pull down to try again.";
+    if(sn && Date.now()-sn.t < 36*3600e3){ $("#app").innerHTML = `<div class="callout rain">⏳ <b>Showing the forecast from ${new Date(sn.t).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"})}.</b> ${why}</div>` + sn.html; $("#app").classList.add("stale"); }
+    else $("#app").innerHTML = `<div class="card"><h2>${limited? "Weather service busy" : "No connection"}</h2><div class="muted" style="margin-top:6px">${why}</div></div>`;
+    clearTimeout(S.reloadT); S.reloadT = setTimeout(()=>{ if(S.loc===loc && !S.data) load(loc); }, limited? 10*60e3 : 60e3);
+    return; }
   S.data = { ref, models, ens: [], ensNames: [], time:first.time, offset:first.offset, tz:first.tz, fetched:new Date(), ensPending:true };
   MEM.set(loc.name, {t:Date.now(), data:S.data});
   render(); saveSnap(loc); loadExtras(loc);
@@ -910,7 +916,7 @@ function render(){
   if(S.mode!=="alpine"){ const w = wax(SIM[C.nowIdx], C.cons[C.nowIdx]); if(w) sv.wax = S.mode==="classic"? w.kick.split(" (")[0] : w.glide.split(" (")[0] + " glide"; }
 
   const nIn = Object.keys(D.models).length, longIn = Object.keys(D.models).filter(id=>id!=="hrrr").length;
-  const modelNote = nIn < MODELS.length-2 ? `<div class="callout rain">⏳ <b>${nIn} of ${MODELS.length} models loaded.</b> ${longIn<3? "The forecast past 2 days is incomplete until more arrive." : "The rest are still coming in."} ${D.retrying? "Retrying now…" : `<a href="#" id="modelRetry">Try again</a>`}</div>` : "";
+  const modelNote = nIn < MODELS.length-2 ? `<div class="callout rain">⏳ <b>${nIn} of ${MODELS.length} models loaded.</b> ${longIn<3? "The forecast past 2 days is incomplete until more arrive." : "The rest are still coming in."}${S.omLimited && Date.now()-S.omLimited<15*60e3? " Open-Meteo, the free weather service, has hit its hourly limit for this network; it resets within the hour." : ""} ${D.retrying? "Retrying now…" : `<a href="#" id="modelRetry">Try again</a>`}</div>` : "";
   $("#app").innerHTML = `
   ${a2hsHTML()}${modelNote}
   ${callouts.slice(0,2).join("")}
@@ -1731,18 +1737,20 @@ async function drawGrid(){
   const span = Math.min(3.2, Math.max(0.5, Math.max(bnd.getNorth()-bnd.getSouth(), (bnd.getEast()-bnd.getWest())/1.35) * 1.1));
   const step = span/(N-1); const lat0 = c.lat - span/2, lon0 = c.lng - span*1.35/2;
   const pts = []; for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([lat0 + a*step, lon0 + b*step*1.35]);
+  const gk = [lat0.toFixed(2), lon0.toFixed(2), span.toFixed(2), new Date().toISOString().slice(0,13)].join(",");
+  if(S.gridCache?.k === gk){ S.grid = S.gridCache.g; paintField(); wireTimeline(); applyLayers(); return; }
   $("#mapStatus").textContent = "Modeling the snow map…";
   try{
     let j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&past_days=1&forecast_days=10`);
     if(!Array.isArray(j)) j=[j];
     const H0 = j[0].hourly; const nk = new Date(Date.now()+j[0].utc_offset_seconds*1000).toISOString().slice(0,13)+":00"; const i0 = Math.max(0, H0.time.findIndex(t=>t>=nk));
     const snow = j.map(r=>{ const H=r.hourly, ref=r.elevation; return H.time.map((_,k)=>{ const v=snowAt(H.precipitation[k],H.temperature_2m[k],H.freezing_level_height?.[k],ref,ref); return v? v.snow : 0; }); });
-    S.grid = { N, step, lat0, lon0, pts, snow, times:H0.time, i0, maxH: Math.min(240, H0.time.length - i0 - 1) };
+    S.grid = { N, step, lat0, lon0, pts, snow, times:H0.time, i0, maxH: Math.min(240, H0.time.length - i0 - 1) }; S.gridCache = {k:gk, g:S.grid};
     S.tl.h = Math.min(S.grid.maxH, S.tl.h || S.win*24);
     paintField(); wireTimeline();
     $("#mapStatus").textContent = "Each point is modeled at its real elevation. Move the map, then tap Model this view.";
     applyLayers();
-  }catch(e){ console.warn("snow map", e); $("#mapStatus").textContent = "Couldn't load the snow map."; }
+  }catch(e){ console.warn("snow map", e); $("#mapStatus").textContent = S.omLimited? "The free weather service has hit its hourly limit for this network. Try the snow map again later." : "Couldn't load the snow map."; }
 }
 
 async function startRadar(){
@@ -1837,7 +1845,8 @@ async function renderOutlook(){
 
 
 /* ================= Polish helpers ================= */
-function saveSnap(loc){ try{ const all = store.get("snap", {}) || {}; all[loc.name] = {t:Date.now(), html:$("#app").innerHTML};
+function saveSnap(loc){ if(S.data && Object.keys(S.data.models).filter(id=>id!=="hrrr").length < 4) return;   // only keep complete forecasts as the fallback copy
+  try{ const all = store.get("snap", {}) || {}; all[loc.name] = {t:Date.now(), html:$("#app").innerHTML};
   const keys = Object.keys(all).sort((a,b)=>all[b].t-all[a].t); keys.slice(4).forEach(k=>delete all[k]); store.set("snap", all); }catch(e){} }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
 const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
