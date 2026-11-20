@@ -2211,7 +2211,7 @@ async function renderRoads(){
         ${x.restriction? `<div style="color:var(--warn);font-size:14px">⛓️ ${x.restriction}</div>`:""}${x.comments? `<div style="font-size:14px">${x.comments}</div>`:""}</div>`).join("")}</div>` : ""}
     ${inc.length? `<div class="list">${inc.map(x=>`<div class="li" style="min-height:44px;padding:8px 0;display:block"><div style="font-size:14px">🚧 ${x.headline}</div><div class="muted" style="font-size:12px">${x.where} · ${x.mi} mi</div></div>`).join("")}</div>`
       : r?.configured? `<div class="muted" style="margin:6px 0">No incidents reported nearby.</div>` : ""}
-    ${cams.length? `<div class="cams">${cams.map(c=>`<figure><a href="${c.img}" target="_blank" rel="noopener"><img loading="lazy" src="${c.img}" alt="${c.name}" onerror="this.closest('figure').remove()"></a><figcaption>${c.name} · ${c.mi} mi</figcaption></figure>`).join("")}</div><div class="muted" style="font-size:11px">Road data and cameras courtesy of ODOT TripCheck</div>`:""}
+    ${cams.length? `<div class="cams">${cams.map(c=>`<figure><a href="${c.page||c.img}" target="_blank" rel="noopener"><img loading="lazy" src="${c.img}" alt="${c.name}" onerror="this.closest('figure').remove()"></a><figcaption>${c.name} · ${c.mi} mi</figcaption></figure>`).join("")}</div><div class="muted" style="font-size:11px">Road data and cameras courtesy of ODOT TripCheck</div>`:""}
     ${sno && season? `<div class="callout" style="margin:10px 0 0">🅿️ <b>Sno-Park permit required</b> Nov 1–Apr 30 ($4 day · $9 3-day · $25 season). <a href="${r?.links?.snopark || "https://www.oregon.gov/odot/DMV/Pages/Vehicle/sno_park_permits.aspx"}" target="_blank" rel="noopener">Buy online ↗</a></div>`:""}
     <div class="row" style="gap:8px;margin-top:10px;flex-wrap:nowrap"><a class="btn" style="flex:1;text-align:center;text-decoration:none" href="https://www.tripcheck.com/" target="_blank" rel="noopener">TripCheck map ↗</a><a class="btn" style="flex:1;text-align:center;text-decoration:none" href="https://www.tripcheck.com/Pages/Chain-Law" target="_blank" rel="noopener">Chain rules ↗</a></div>`;
 }
@@ -2584,7 +2584,16 @@ function nearbyStationsHTML(st){
 
 /* ---------- cams card (spot page) + favorite cams ---------- */
 const favCams = () => store.get("favCams", []);
-function camKey(c){ return c.id!=null? "odot-"+c.id : c.img; }
+// Resort cameras: live still images published on each resort's own webcam page, credited and linked back.
+const BACH = (n, name) => ({ id:"mtb-"+n, name, img:`https://api.mtbachelor.com/api/v1/cams/mtn/${n}`, src:"Mt. Bachelor", page:"https://www.mtbachelor.com/the-mountain/webcams/", lat:43.979, lon:-121.688 });
+const TIMB = (f, name) => ({ id:"tl-"+f, name, img:`https://timberlinelodge.com/snowcameras/${f}.jpg`, src:"Timberline", page:"https://www.timberlinelodge.com/conditions", lat:45.331, lon:-121.711 });
+const BACH_CAMS = [BACH(14,"West Village snow stake"), BACH(1,"Base of Pine Marten Lift"), BACH(12,"Tumalo Mtn & top of Pine Marten"), BACH(9,"Pine Marten Lodge"), BACH(11,"Outback lift line"), BACH(3,"The Cone"), BACH(5,"Sunrise Base"), BACH(13,"West Village base & parking"), BACH(2,"Rock Bar patio"), BACH(16,"Nordic Center")];
+const RESORT_CAMS = {
+  "Mt. Bachelor, OR": BACH_CAMS,
+  "Mt. Bachelor Nordic Center, OR": [BACH_CAMS.find(c=>c.id==="mtb-16"), BACH_CAMS[0], ...BACH_CAMS.filter(c=>!["mtb-16","mtb-14"].includes(c.id))],
+  "Timberline, OR": [TIMB("snowstake","Snow stake"), TIMB("lodge","Timberline Lodge"), TIMB("FloodEast","Magic Mile"), TIMB("FloodSouth","Jeff Flood"), TIMB("palmerbottom","Palmer / Silcox"), TIMB("pucci","Pucci"), TIMB("brunotop","Bruno's"), TIMB("summit","Summit Pass"), TIMB("SummitBus","Summit Pass shuttle")],
+};
+function camKey(c){ return c.id!=null? (String(c.id).includes("-")? c.id : "odot-"+c.id) : c.img; }
 async function loadSpotCams(L0){
   if(!OREGON(L0.name)) return [];
   const box=[L0.lon-0.4, L0.lat-0.3, L0.lon+0.4, L0.lat+0.3].map(v=>v.toFixed(2)).join(",");
@@ -2592,23 +2601,24 @@ async function loadSpotCams(L0){
 }
 function camTile(c, big){ const fav = favCams().some(x=>camKey(x)===camKey(c)); const src = c.img + (c.img.includes("?")?"&":"?") + "t=" + Math.floor(Date.now()/3e5);
   return `<figure class="cam ${big?"big":""}"><a href="${c.img}" target="_blank" rel="noopener"><img loading="lazy" src="${src}" alt="${c.name}" onerror="this.closest('figure').remove()"></a>
-    <figcaption><span><b>${c.name}</b><small>${c.route && !/^(city|county|local|other)$/i.test(c.route)? c.route+" · " : ""}${isNum(c.mi)? c.mi+" mi away" : "ODOT"}</small></span><button class="cam-star ${fav?"on":""}" data-cam="${encodeURIComponent(JSON.stringify({id:c.id,name:c.name,img:c.img,lat:c.lat,lon:c.lon,route:c.route}))}" aria-label="Favorite camera">${fav?"★":"☆"}</button></figcaption></figure>`; }
+    <figcaption><span><b>${c.name}</b><small>${c.src? c.src : `${c.route && !/^(city|county|local|other)$/i.test(c.route)? c.route+" · " : ""}${isNum(c.mi)? c.mi+" mi away" : "ODOT"}`}</small></span><button class="cam-star ${fav?"on":""}" data-cam="${encodeURIComponent(JSON.stringify({id:c.id,name:c.name,img:c.img,lat:c.lat,lon:c.lon,route:c.route,src:c.src,page:c.page}))}" aria-label="Favorite camera">${fav?"★":"☆"}</button></figcaption></figure>`; }
 function wireCamStars(root, again){ root.querySelectorAll("[data-cam]").forEach(b=>b.onclick=(e)=>{ e.preventDefault(); const c=JSON.parse(decodeURIComponent(b.dataset.cam)); let f=favCams(); if(f.some(x=>camKey(x)===camKey(c))) f=f.filter(x=>camKey(x)!==camKey(c)); else { f.unshift(c); toast("Camera saved to Favorites"); } store.set("favCams", f.slice(0,12)); again(); }); }
 async function renderCamCard(){
   const card=$("#camCard"); if(!card || !S.loc) return; const L0=S.loc; const links = CAM_LINKS[L0.name]||[];
-  const cams = await loadSpotCams(L0); if(S.loc!==L0) return;
+  const road = await loadSpotCams(L0); if(S.loc!==L0) return;
+  const rc = RESORT_CAMS[L0.name] || []; const cams = [...rc, ...road];
   if(!cams.length && !links.length){ card.remove(); return; }
   const view = store.get("camView","list");
-  const resort = links.map(([t,u])=>`<a class="cam-resort" href="${u}" target="_blank" rel="noopener"><span class="cam-ic">📷</span><span><b>${t}</b><small>Snow stake, summit and lift cams on the resort's site</small></span><span style="color:var(--ice)">↗</span></a>`).join("");
+  const resort = rc.length? "" : links.map(([t,u])=>`<a class="cam-resort" href="${u}" target="_blank" rel="noopener"><span class="cam-ic">📷</span><span><b>${t}</b><small>Snow stake, summit and lift cams on the resort's site</small></span><span style="color:var(--ice)">↗</span></a>`).join("");
   const draw = () => { const v = store.get("camView","list");
-    card.innerHTML = `<div class="card-h"><h2>Cams</h2>${cams.length? `<div class="seg sm" id="camSeg">${[["list","List"],["grid","Grid"],["map","Map"]].map(([k,l])=>`<button data-cv="${k}" class="${v===k?"on":""}">${l}</button>`).join("")}</div>`:""}</div>
+    card.innerHTML = `<div class="card-h"><h2>Cams</h2>${cams.length? `<div class="seg sm" id="camSeg">${[["list","List"],["grid","Grid"]].concat(road.length? [["map","Map"]] : []).map(([k,l])=>`<button data-cv="${k}" class="${v===k?"on":""}">${l}</button>`).join("")}</div>`:""}</div>
       ${resort}
       ${cams.length? (v==="map"? `<div id="camMini" style="height:240px;border-radius:12px;overflow:hidden;margin-top:8px"></div>` : `<div class="cams-${v}">${cams.map(c=>camTile(c, v==="list")).join("")}</div>`) : ""}
-      ${cams.length? `<div class="muted" style="font-size:11px;margin-top:6px">Road cameras courtesy of ODOT TripCheck · ☆ saves a camera to Favorites</div>`:""}`;
+      ${cams.length? `<div class="muted" style="font-size:11px;margin-top:6px">${rc.length? `Resort cams: <a href="${rc[0].page}" target="_blank" rel="noopener">${rc[0].src} ↗</a> · `:""}${road.length? "Road cams: ODOT TripCheck · ":""}☆ saves a camera to Favorites</div>`:""}`;
     card.querySelectorAll("[data-cv]").forEach(b=>b.onclick=()=>{ store.set("camView", b.dataset.cv); draw(); });
     wireCamStars(card, draw);
     if(v==="map" && window.L){ const m=L.map("camMini",{zoomControl:false,attributionControl:false}).setView([L0.lat,L0.lon],10); L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15}).addTo(m);
-      cams.forEach(c=>L.marker([c.lat,c.lon],{icon:L.divIcon({className:"",html:`<div class="cam-pin">📷</div>`,iconSize:null})}).bindPopup(`<b>${c.name}</b><br><img src="${c.img}" style="width:220px;max-width:65vw;border-radius:8px;margin-top:6px">`,{maxWidth:240}).addTo(m)); setTimeout(()=>m.invalidateSize(),60); }
+      road.forEach(c=>L.marker([c.lat,c.lon],{icon:L.divIcon({className:"",html:`<div class="cam-pin">📷</div>`,iconSize:null})}).bindPopup(`<b>${c.name}</b><br><img src="${c.img}" style="width:220px;max-width:65vw;border-radius:8px;margin-top:6px">`,{maxWidth:240}).addTo(m)); setTimeout(()=>m.invalidateSize(),60); }
   };
   draw();
 }
@@ -2636,10 +2646,10 @@ function favBodyHTML(view, sp, r){
     const nw = R && isNum(R.new24) ? [R.new24, provChip("rep", R.date)] : near && isNum(st.new24) ? [st.new24, provChip("meas", st.name)] : [r.last24, provChip("est")];
     return `<div class="fr"><div><b class="num">${fmtSnow(nw[0],0)}</b><small>New snow</small></div><div><b class="num">${R&&isNum(R.base)? fmtSnow(R.base,0) : near&&isNum(st.depth)? fmtSnow(st.depth,0) : "—"}</b><small>${R&&isNum(R.base)? "Base depth" : "Snow depth"}</small></div><div><b>${R&&R.lifts&&S.mode==="alpine"? `${R.liftsOpen}/${R.lifts}` : near&&isNum(st.new72)? fmtSnow(st.new72,0) : "—"}</b><small>${R&&R.lifts&&S.mode==="alpine"? "Lifts open" : "New 72h"}</small></div></div>
       <div class="fr-src">${nw[1]}${statusPill(X.rep)}</div>`; }
-  if(view==="cams"){ const mine=favCams().filter(c=>km(sp.lat,sp.lon,c.lat,c.lon)<=40); const X=S.favRep[sp.name]; const auto=(X?.cams||[]).filter(c=>!mine.some(m=>camKey(m)===camKey(c))).slice(0, Math.max(0,2-mine.length));
+  if(view==="cams"){ const mine=favCams().filter(c=>km(sp.lat,sp.lon,c.lat,c.lon)<=12); const X=S.favRep[sp.name]; const auto=[...(RESORT_CAMS[sp.name]||[]), ...(X?.cams||[])].filter(c=>!mine.some(m=>camKey(m)===camKey(c))).slice(0, Math.max(0,2-mine.length));
     const list=[...mine, ...auto]; const links=CAM_LINKS[sp.name]||[];
     if(!list.length && !links.length) return `<div class="muted">No cameras near this spot yet.</div>`;
-    return `${list.length? `<div class="cams-grid">${list.slice(0,4).map(c=>camTile({...c, mi:Math.round(km(sp.lat,sp.lon,c.lat,c.lon)*0.621*10)/10})).join("")}</div>`:""}${links.map(([t,u])=>`<a class="cam-resort" href="${u}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><span class="cam-ic">📷</span><span><b>${t}</b></span><span style="color:var(--ice)">↗</span></a>`).join("")}`; }
+    return `${list.length? `<div class="cams-grid">${list.slice(0,4).map(c=>camTile({...c, mi:Math.round(km(sp.lat,sp.lon,c.lat,c.lon)*0.621*10)/10})).join("")}</div>`:""}${(RESORT_CAMS[sp.name]? [] : links).map(([t,u])=>`<a class="cam-resort" href="${u}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><span class="cam-ic">📷</span><span><b>${t}</b></span><span style="color:var(--ice)">↗</span></a>`).join("")}`; }
   return null;
 }
 async function prepFavView(view, list){
