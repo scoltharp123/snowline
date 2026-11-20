@@ -305,25 +305,87 @@ button.card.fc{display:block;width:100%;text-align:left;padding:14px 14px 0;over
 .dh td.m,.dh th.m{background:#151517;color:var(--mute);font-size:12px;min-width:118px;max-width:118px;white-space:normal;border-right:1px solid #2a2a2e}
 .sec-b .card{background:none;border:0;padding:0;margin-bottom:16px}
 .wx{display:inline-block;vertical-align:middle}
+/* ---- polish layer ---- */
+html{-webkit-text-size-adjust:100%}
+button,a,.card.fc,.dl-day,.li{touch-action:manipulation;-webkit-user-select:none;user-select:none}
+button:active,.li:active,.dl-day:active,.card.fc:active{transform:scale(.985);transition:transform .08s}
+.ibtn{width:38px;height:38px;border-radius:50%;border:0;background:#1c1c1f;color:#e5e5ea}
+.ibtn.on{color:var(--warn);background:#2a2410}
+body:not([data-view="forecast"]) .ibtn.fo{display:none}
+.top{border-bottom-color:transparent;transition:border-color .2s,background .2s;background:rgba(0,0,0,.6)}
+.top.scrolled{border-bottom-color:#1c1c1f;background:rgba(10,10,12,.86)}
+.locbtn .t{opacity:0;transform:translateY(5px);transition:opacity .2s,transform .2s}
+.top.scrolled .locbtn .t{opacity:1;transform:none}
+.locbtn img{width:30px;height:30px;border-radius:8px}
+.lt{padding:2px 2px 10px}
+#ltBtn{background:none;border:0;padding:0;display:flex;align-items:center;gap:6px;color:var(--text);text-align:left;max-width:100%}
+#ltName{font-family:"Space Grotesk",Inter,system-ui,sans-serif;font-size:30px;font-weight:700;letter-spacing:-.7px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ltBtn svg{color:var(--mute);flex:0 0 auto;margin-top:4px}
+.lt-sub{color:var(--mute);font-size:13px;margin-top:3px}
+.ctrl{margin:0 -12px 6px;padding:6px 12px 8px;transition:transform .25s ease,opacity .2s;background:rgba(0,0,0,.86)}
+.ctrl.hide{transform:translateY(-130%);opacity:0;pointer-events:none}
+#ptr{height:0;overflow:hidden;display:grid;place-items:center;transition:height .2s}
+#ptr .spin{transition:transform .2s;opacity:.85}
+#ptr.ready .spin{transform:rotate(180deg);border-top-color:var(--warn)}
+#ptr.busy .spin{animation:s .8s linear infinite}
+#toast{position:fixed;left:50%;bottom:calc(var(--sab) + 96px);transform:translate(-50%,20px);background:#2c2c30;color:#fff;padding:10px 16px;border-radius:14px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:120;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#upd{position:fixed;left:50%;top:calc(var(--sat) + 15px);transform:translate(-50%,-10px);display:flex;gap:8px;align-items:center;background:#1f1f23;border:1px solid #2c2c31;color:#d1d1d6;padding:7px 12px;border-radius:99px;font-size:12.5px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:70}
+#upd .spin{width:12px;height:12px;border-width:2px}
+#upd.on{opacity:1;transform:translate(-50%,0)}
+#app.stale{opacity:.6;transition:opacity .3s}
+.enter{animation:fadein .22s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.callout{display:block;position:relative}
+.callout.tip{background:#13233b;border-color:#24446e;padding-right:40px}
+.callout.tip button{position:absolute;right:6px;top:6px;width:32px;height:32px;border:0;background:none;color:var(--mute);font-size:16px}
+.ss-r{-webkit-mask-image:linear-gradient(90deg,#000 86%,transparent);mask-image:linear-gradient(90deg,#000 86%,transparent)}
+.qleg{display:flex;gap:9px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--mute);margin-top:8px}
+.qleg span:first-child{color:#c7c7cc;font-weight:600}
+.qleg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.spark{flex:0 0 auto;margin-right:4px;opacity:.95}
+.fc-edit{display:flex;justify-content:flex-end;gap:8px;margin:-4px 0 8px}
+.fc-edit button{background:#2a2a2e;border:0;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600;color:#fff}
+.fc-edit button[data-rm]{color:#ff6b6b}
+.tabbar a{position:relative}
+.tabbar a.has::after{content:"";position:absolute;top:6px;left:calc(50% + 8px);width:8px;height:8px;border-radius:50%;background:#ff453a;box-shadow:0 0 0 2px #242428}
+.card{border-radius:18px}
+h2{font-size:18px}
+.dl-day{min-height:76px}
+.skel{border-radius:18px;background:linear-gradient(90deg,#141416,#1d1d20,#141416);background-size:200% 100%}
+@media (max-width:370px){
+  .spark{display:none}
+  .qleg{gap:7px;font-size:11px}
+  #ltName{font-size:26px}
+  .seg button{padding:7px 8px;font-size:13px}
+  .ctrl{gap:6px}
+  .dl-h,.dl-r{grid-template-columns:40px 28px 36px 36px 1fr}
+  .dl-h{grid-template-columns:44px 40px 28px 36px 36px 1fr}
+  .tabbar a{font-size:10px}
+}
+.pend{display:inline-flex;gap:6px;align-items:center}.pend .spin{width:11px;height:11px;border-width:2px}
 </style>
 </head>
 <body>
-<header class="top">
+<header class="top" id="top">
   <button class="locbtn" id="locBtn" aria-label="Change location">
     <img src="/icon.svg" alt="">
-    <span class="t"><b id="locName">Snowline</b><small id="locSub">Loading…</small></span>
-    <span class="chev">▾</span>
+    <span class="t"><b id="locName">Snowline</b><small id="locSub"></small></span>
   </button>
-  <button class="ibtn" id="favBtn" aria-label="Save favorite">☆</button>
-  <button class="ibtn" id="setBtn" aria-label="Settings">⚙︎</button>
+  <button class="ibtn fo" id="shareBtn" aria-label="Share forecast"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button>
+  <button class="ibtn fo" id="favBtn" aria-label="Save favorite"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></button>
+  <button class="ibtn" id="setBtn" aria-label="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 </header>
+
+
+<main>
+  <div id="ptr"><div class="spin"></div></div>
+  <div id="view-forecast"><div class="lt"><button id="ltBtn" aria-label="Change location"><span id="ltName">Snowline</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="lt-sub" id="ltSub"></div></div>
 <div class="ctrl" id="ctrl">
   <div class="seg" id="modeSeg"><button data-m="alpine">Alpine</button><button data-m="skate">Skate</button><button data-m="classic">Classic</button></div>
   <div class="seg" id="bandSeg" style="flex:.8"><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
 </div>
-
-<main>
-  <div id="view-forecast"><div id="alertBanner"></div><div id="app"><div class="skel"></div><div class="skel" style="height:120px"></div><div class="skel" style="height:240px"></div></div></div>
+  <div id="alertBanner"></div><div id="app"><div class="skel"></div><div class="skel" style="height:120px"></div><div class="skel" style="height:240px"></div></div></div>
   <div id="view-favs" style="display:none"></div>
   <div id="view-finder" style="display:none"></div>
   <div id="view-maps" style="display:none"><div class="card">
@@ -348,6 +410,7 @@ button.card.fc{display:block;width:100%;text-align:left;padding:14px 14px 0;over
   <a href="#alerts" data-v="alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2zM10 21h4"/></svg>Alerts</a>
 </nav>
 
+<div id="toast"></div><div id="upd"><div class="spin"></div>Updating</div>
 <div class="sheet" id="locSheet"><div class="sheet-b">
   <div class="grab"></div>
   <div class="sheet-h"><h2>Choose a spot</h2><button class="link" data-close>Done</button></div>
@@ -426,7 +489,7 @@ const ENS = [
   {id:"gfs_ens",   name:"GFS ENS",   api:["gfs025","gfs_seamless"]},
 ];
 const LAPSE = 0.0065, FT = 3.28084;
-const DET_VARS = "temperature_2m,precipitation,freezing_level_height,wind_speed_10m,wind_gusts_10m,snow_depth,cloud_cover,shortwave_radiation,wind_speed_850hPa,wind_speed_700hPa,relative_humidity_2m,wind_direction_10m";
+const DET_VARS = "temperature_2m,precipitation,freezing_level_height,wind_speed_10m,wind_gusts_10m,cloud_cover,shortwave_radiation,wind_speed_850hPa,wind_speed_700hPa,relative_humidity_2m,wind_direction_10m";
 
 /* ================= State ================= */
 const store = {
@@ -508,23 +571,51 @@ async function fetchEns(m, loc, ref){
   }
   return null;
 }
+// in-memory cache so hopping between spots is instant
+const MEM = new Map(); const MEM_TTL = 20*60e3;
+let renderTimer;
+function scheduleRender(loc){ clearTimeout(renderTimer); renderTimer = setTimeout(()=>{ if(S.loc===loc && S.data){ const y=scrollY; render(); scrollTo(0,y); saveSnap(loc); } }, 350); }
 async function load(loc){
-  S.loc = loc; store.set("last", loc);
-  $("#app").innerHTML = `<div class="loading"><div class="spin"></div>Pulling ${MODELS.length} models for ${loc.name}…</div><div class="skel"></div><div class="skel" style="height:240px"></div>`; S.selDay = null; S.avyMini = null; S.avyLabel = "";
-  updateFavBtn(); renderElevInfo();
+  S.loc = loc; store.set("last", loc); S.selDay = null; S.avyMini = null; S.avyLabel = ""; S.season = null; S.outlook = null;
   const ref = ((loc.base+loc.top)/2)/FT; // reference elevation (m) = mid-mountain
-  const [det, ens] = await Promise.all([
-    Promise.all(MODELS.map(m=>fetchDet(m, loc, ref))),
-    Promise.all(ENS.map(m=>fetchEns(m, loc, ref)))
-  ]);
+  const mem = MEM.get(loc.name);
+  if(mem && Date.now()-mem.t < MEM_TTL){ S.data = mem.data; S.season = mem.data.seasonCache || null; S.outlook = mem.data.outlookCache || null; $("#upd").classList.remove("on"); $("#app").classList.remove("stale"); render(); return; }
+  const snap = (store.get("snap", {}) || {})[loc.name];
+  if(snap && Date.now()-snap.t < 8*3600e3){ $("#app").innerHTML = snap.html; $("#app").classList.add("stale"); }
+  else $("#app").innerHTML = `<div class="skel" style="height:64px"></div><div class="skel" style="height:230px"></div><div class="skel" style="height:190px"></div><div class="skel" style="height:150px"></div>`;
+  $("#upd").classList.add("on"); S.data = null; updateTop();
+  // fire everything at once; show the forecast once most models are in (6s cap), let stragglers patch in
+  const detPs = MODELS.map(m=>fetchDet(m, loc, ref));
+  const ensPs = ENS.map(m=>fetchEns(m, loc, ref));
+  const TIMEOUT = Symbol("t"), t0 = Date.now(), got = new Array(detPs.length).fill(TIMEOUT); let done = 0;
+  // quorum: show as soon as 5+ models are in (≥1.2s), or whatever has arrived by 3s; all done → show immediately
+  await new Promise(resolve=>{
+    const check = () => { const ok = got.filter(d=>d && d!==TIMEOUT).length, el = Date.now()-t0;
+      if(done===detPs.length || (ok>=5 && el>=1200) || (ok>=1 && el>=3000)) resolve(); };
+    detPs.forEach((p,i)=>p.then(d=>{ got[i] = d; done++; check(); }));
+    const iv = setInterval(()=>{ check(); if(done===detPs.length || Date.now()-t0>3000 && got.some(d=>d && d!==TIMEOUT)) clearInterval(iv); }, 150);
+  });
+  let det = got.slice();
   if(S.loc !== loc) return;
-  const models = {}; det.forEach((d,i)=>{ if(d) models[MODELS[i].id] = d; });
+  if(S.loc !== loc) return;
+  const models = {}; det.forEach((d,i)=>{ if(d && d!==TIMEOUT) models[MODELS[i].id] = d; });
   const first = Object.values(models)[0];
-  if(!first){ $("#app").innerHTML = `<div class="panel err">Couldn't reach the forecast models right now. Check your connection and try again.</div>`; return; }
-  S.data = { ref, models, ens: ens.filter(Boolean), ensNames: ens.map((e,i)=>e?ENS[i].name:null).filter(Boolean), time:first.time, offset:first.offset, tz:first.tz, fetched:new Date() };
-  S.season = null;
-  render();
-  loadSeason(loc, ref).then(z=>{ if(S.loc!==loc) return; S.season = {...z, loc}; updateSeasonSummary(); if(S.open.has("season") && $("#seasonPanel")) renderSeason(S.ctx.C); });
+  $("#upd").classList.remove("on"); $("#app").classList.remove("stale");
+  if(!first){ $("#app").innerHTML = `<div class="card"><h2>No connection</h2><div class="muted" style="margin-top:6px">Couldn't reach the forecast models. Pull down to try again.</div></div>`; return; }
+  S.data = { ref, models, ens: [], ensNames: [], time:first.time, offset:first.offset, tz:first.tz, fetched:new Date(), ensPending:true };
+  MEM.set(loc.name, {t:Date.now(), data:S.data});
+  render(); saveSnap(loc);
+  const data = S.data;
+  det.forEach((d,i)=>{ if(d===TIMEOUT) detPs[i].then(x=>{ if(x){ data.models[MODELS[i].id] = x; scheduleRender(loc); } }); });
+  Promise.all(ensPs).then(ens=>{ data.ens = ens.filter(Boolean); data.ensNames = ens.map((e,i)=>e?ENS[i].name:null).filter(Boolean); data.ensPending = false; scheduleRender(loc); });
+}
+// season history is the biggest download (10 winters, hourly), so it loads only when needed
+function ensureSeason(){
+  const loc = S.loc; if(!loc || !S.data) return Promise.resolve();
+  if(S.season && S.season.loc===loc) return Promise.resolve();
+  if(S.seasonP && S.seasonP.loc===loc) return S.seasonP.p;
+  const p = loadSeason(loc, S.data.ref).then(z=>{ if(S.loc!==loc) return; S.season = {...z, loc}; if(S.data) S.data.seasonCache = S.season; updateSeasonSummary(); if($("#seasonPanel")) renderSeason(S.ctx.C); if($("#sb-outlook") && S.open.has("outlook")) renderOutlook(); });
+  S.seasonP = {loc, p}; return p;
 }
 
 /* ================= Compute ================= */
@@ -606,13 +697,18 @@ function confidence(vals){
 }
 
 /* ================= Render (OpenSnow-style) ================= */
+const VIEW_TITLE = {favs:"Favorites", finder:"Explore", maps:"Maps", alerts:"Alerts"};
 function updateTop(){
-  const L = S.loc; if(!L) return;
-  $("#locName").textContent = L.name;
+  const L = S.loc, v = S.view || "forecast";
+  document.body.dataset.view = v;
+  if(v !== "forecast"){ $("#locName").textContent = VIEW_TITLE[v]||"Snowline"; $("#locSub").textContent = ""; return; }
+  if(!L) return;
   const bandName = {base:"Base", mid:"Mid", summit:"Summit"}[S.band];
-  $("#locSub").textContent = `Forecast point · ${fmtEl(bandElev())} (${bandName.toLowerCase()})`;
+  $("#locName").textContent = L.name; $("#ltName").textContent = L.name;
+  $("#locSub").textContent = `${bandName} · ${fmtEl(bandElev())}`;
+  $("#ltSub").textContent = `Forecast point ${fmtEl(bandElev())} · ${bandName} · ${regionOf2(L.name)==="Other"? (L.lat.toFixed(2)+", "+L.lon.toFixed(2)) : regionOf2(L.name)}`;
   const fav = S.favs.some(f=>f.name===L.name);
-  $("#favBtn").textContent = fav ? "★" : "☆"; $("#favBtn").classList.toggle("on", fav);
+  $("#favBtn").classList.toggle("on", fav); $("#favBtn svg").setAttribute("fill", fav? "currentColor" : "none");
 }
 const renderElevInfo = updateTop, updateFavBtn = updateTop, fillSel = updateTop;
 function destroyCharts(){ Object.values(S.charts).forEach(c=>{ try{c.destroy()}catch(e){} }); S.charts = {}; }
@@ -647,6 +743,7 @@ function snowBarsSVG(vals, dates, o={}){
   const vv = vals.map(v=>isNum(v)? snowNum(v) : null);
   const mx = Math.max(imp()? 6 : 15, ...vv.map(v=>v||0));
   let g = "";
+  const ti = dates.indexOf(localToday()); if(ti>=0) g += `<rect x="${ti*cw+1}" y="${top-8}" width="${cw-2}" height="${H+46}" rx="7" fill="#232327"/>`;
   [[0,5,"Next 1–5 Days"],[5,10,"Next 6–10 Days"],[10,15,"Next 11–15 Days"]].forEach(([a,b,lab])=>{
     if(a >= n) return; const bb = Math.min(b,n); const tot = vals.slice(a,bb).reduce((x,y)=>x+(y||0),0);
     const x1 = a*cw+4, x2 = bb*cw-4, xm = (x1+x2)/2, t = fmtSnow(tot,0);
@@ -711,11 +808,12 @@ function render(){
   if(S.mode!=="alpine"){ const w = wax(SIM[C.nowIdx], C.cons[C.nowIdx]); if(w) sv.wax = S.mode==="classic"? w.kick.split(" (")[0] : w.glide.split(" (")[0] + " glide"; }
 
   $("#app").innerHTML = `
+  ${a2hsHTML()}
   ${callouts.slice(0,2).join("")}
   <section class="card">
-    <div class="card-h"><h2>Snow Summary</h2><span class="badge b-${conf.lvl}">${conf.label}</span></div>
+    <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend"><span class="spin"></span>ensembles</span>` : `<span class="badge b-${conf.lvl}">${conf.label}</span>`}</div>
     ${snowSummaryHTML(C.past24, consDaily, C.days, {labels:true, q:quality})}
-    <div class="legend" style="margin-top:6px"><span>Snow per day, 6am–6am · scroll for days 11–15</span><span>Bottom row: ${MODE_NAME[S.mode].toLowerCase()} ski quality</span></div>
+    <div class="qleg"><span>Ski quality</span><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
   </section>
   <section class="card" id="nowCard"></section>
   <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
@@ -760,7 +858,7 @@ function renderSection(id){
       <h3>Snow level, next 7 days</h3><div class="chartbox"><canvas id="cSL"></canvas></div><div class="legend"><span><i class="dot" style="background:#38bdf8"></i> snow at your elevation</span><span><i class="dot" style="background:#34d399"></i> rain</span></div>`;
     renderElevChart(C); renderSL(C); wireWinSeg(el, ()=>renderSection("elev")); }
   if(id==="outlook"){ renderOutlook(); }
-  if(id==="season"){ el.innerHTML = `<div id="seasonPanel"></div>`; renderSeason(C); }
+  if(id==="season"){ el.innerHTML = `<div id="seasonPanel"></div>`; renderSeason(C); ensureSeason(); }
   if(id==="avy"){ renderAvy(); }
 }
 
@@ -827,7 +925,7 @@ function renderDailyList(C, SIM){
         <span class="dl-sc">${part==="day" && x? scoreChip(x.best.avg) : ""}</span><span class="dl-slr">${slrP}</span>
         <span class="dl-b"><i style="width:${pctW}%;background:${ty==="none"?"#3d8bfd":PT[ty]}"></i><em>${txt}</em></span></div>`;
     };
-    return `<div class="dl-day ${S.selDay===d?"sel":""}" data-d="${d}"><div class="dl-l"><b>${d===todayStr()?"Today":dow(d)}</b><span>${+d.slice(8,10)}</span>${S.bestDay===d?'<span class="star">★</span>':""}</div><div class="dl-p">${per("day")}${per("night")}</div></div>
+    return `<div class="dl-day ${S.selDay===d?"sel":""}" data-d="${d}"><div class="dl-l"><b>${d===todayStr()?"Today":d===dateAdd(todayStr(),1)?"Tmrw":dow(d)}</b><span>${+d.slice(8,10)}</span>${S.bestDay===d?'<span class="star">★</span>':""}</div><div class="dl-p">${per("day")}${per("night")}</div></div>
       <div class="dl-x" id="dx-${d}">${S.selDay===d? "" : ""}</div>`;
   }).join("");
   $("#dailyList").innerHTML = `<div class="dl-h"><span></span><span>Temp</span><span></span><span>Ski</span><span>SLR</span><span>12-hr snowfall</span></div>` + rows;
@@ -897,7 +995,7 @@ function renderWax(C, SIM){
 
 function updateSeasonSummary(){
   const el = $("#sv-season"); if(!el) return;
-  if(!S.season || S.season.loc!==S.loc){ el.textContent = "Loading…"; return; }
+  if(!S.season || S.season.loc!==S.loc){ el.textContent = S.seasonP && S.seasonP.loc===S.loc ? "Loading…" : "% of normal, 10-yr history"; return; }
   const Z = seasonCalc(bandElev()); if(!Z){ el.textContent=""; return; }
   el.textContent = `${fmtSnow(Z.toDate,0)} so far${isNum(Z.pctNormal)? " · "+Z.pctNormal+"% of normal":""}`;
 }
@@ -910,14 +1008,17 @@ async function renderFavs(force){
   if(!S.finder || force) el.innerHTML = `<div class="vh"><h1>Favorites</h1></div>${list.map(()=>`<div class="skel" style="height:170px"></div>`).join("")}`;
   let F; try{ F = await loadFinder(force); }catch(e){ el.innerHTML = `<div class="vh"><h1>Favorites</h1></div><div class="card err">Couldn't load forecasts. Try again in a minute.</div>`; return; }
   const byName = new Map(F.rows.map(r=>[r.spot.name, r]));
-  el.innerHTML = `<div class="vh"><h1>Favorites</h1><button class="link" id="favRefresh">Refresh</button></div>
-    ${S.favs.length? "" : `<div class="callout">Tap ☆ on any forecast to add it here. These are suggestions for Bend.</div>`}
+  el.innerHTML = `<div class="vh"><h1>Favorites</h1>${S.favs.length? `<button class="link" id="favEdit">${S.favEdit?"Done":"Edit"}</button>`:""}</div>
+    ${a2hsHTML()}
+    ${S.favs.length? "" : `<div class="callout">Tap ☆ on any forecast to add it here. Until then, here are some spots near Bend.</div>`}
     ${list.map(sp=>{ const r = byName.get(sp.name); if(!r) return "";
-      return `<button class="card fc" data-n="${encodeURIComponent(sp.name)}"><div class="fc-h"><div><b>${sp.name}</b><div class="muted">${Math.round(sp.top).toLocaleString()} ft summit · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
-        ${snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</button>`; }).join("")}
+      return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${sp.name}</b><div class="muted">${Math.round(sp.top).toLocaleString()} ft summit · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
+        ${snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</div>`; }).join("")}
     <div class="muted" style="text-align:center;margin:10px 0">Summit forecasts · Open-Meteo best-match blend through Snowline's snow model</div>`;
-  el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
-  $("#favRefresh").onclick = () => renderFavs(true);
+  el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ if(S.favEdit) return; const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
+  const fe=$("#favEdit"); if(fe) fe.onclick = () => { S.favEdit=!S.favEdit; renderFavs(); };
+  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const n=decodeURIComponent(b.dataset.rm); S.favs=S.favs.filter(f=>f.name!==n); store.set("favs",S.favs); if(!S.favs.length) S.favEdit=false; updateTop(); renderFavs(); });
+  el.querySelectorAll("[data-up]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const n=decodeURIComponent(b.dataset.up); const i=S.favs.findIndex(f=>f.name===n); if(i>0){ const [x]=S.favs.splice(i,1); S.favs.splice(i-1,0,x); store.set("favs",S.favs); renderFavs(); } });
 }
 
 function firstPowDay(C){
@@ -1287,7 +1388,7 @@ function seasonCalc(e){
 function renderSeason(C){
   const el = $("#seasonPanel"); if(!el) return;
   if(S.charts.season){ S.charts.season.destroy(); delete S.charts.season; }
-  if(!S.season || S.season.loc !== S.loc){ el.innerHTML = `<div class="loading"><div class="spin"></div>Loading 10 winters of history…</div>`; return; }
+  if(!S.season || S.season.loc !== S.loc){ el.innerHTML = `<div class="loading"><div class="spin"></div>Loading 10 winters of history…</div>`; ensureSeason(); return; }
   const e = bandElev(), Z = seasonCalc(e);
   if(!Z || (!S.season.cur && !S.season.hist)){ el.innerHTML = `<div class="muted">Season history isn't available for this spot right now.</div>`; return; }
   const consDaily = C.consDays.map(d=>d.day+d.night);
@@ -1327,8 +1428,8 @@ function showView(){
   let v = (location.hash||"").slice(1); if(!VIEWS.includes(v)) v = "forecast";
   VIEWS.forEach(x=>{ const el=$("#view-"+x); if(el) el.style.display = x===v? "" : "none"; });
   document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===v));
-  $("#ctrl").style.display = v==="forecast" ? "" : "none";
-  window.scrollTo(0,0);
+  S.view = v; updateTop(); window.scrollTo(0,0);
+  const ve = $("#view-"+v); if(ve){ ve.classList.remove("enter"); void ve.offsetWidth; ve.classList.add("enter"); }
   if(v==="finder") renderFinder();
   if(v==="maps") initBigMap();
   if(v==="favs") renderFavs();
@@ -1383,7 +1484,7 @@ async function renderFinder(force){
     <div class="card-h"><h2>Powder Finder</h2><button class="link" id="fRefresh" style="padding:0">Refresh</button></div><div class="muted" style="margin:-4px 0 10px">Every resort and Nordic area, ranked by forecast snow</div>
     <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg sm" id="sortSeg">${Object.entries(W).map(([k,l])=>`<button data-s="${k}" class="${k===sortK?'on':''}">${l}</button>`).join("")}</div><span class="muted">summit snow</span></div>
     <div class="seg sm scroll" id="regSeg">${regions.map(r=>`<button data-r="${r}" class="${r===reg?'on':''}">${r}</button>`).join("")}</div>
-    <div class="list" style="margin-top:6px">${rows.map((r,i)=>`<button class="li" data-n="${encodeURIComponent(r.spot.name)}"><span class="rk">${i+1}</span><span class="nm"><b>${S.favs.some(f=>f.name===r.spot.name)?"★ ":""}${r.spot.name}</b><small>${r.peak.d&&r.peak.v>=0.5? `Peak ${dow(r.peak.d)} ${fmtSnow(r.peak.v)} · `:""}24h ${fmtSnow(r.h24)} · 10d ${fmtSnow(r.d10)} · base ${fmtSnow(r.b5)}</small></span><span class="num" style="font-size:20px;min-width:52px;text-align:right;color:${r[sortK]>=6?'var(--deep)':r[sortK]>=1?'var(--ice)':'var(--mute)'}">${fmtSnow(r[sortK])}</span></button>`).join("")}</div>
+    <div class="list" style="margin-top:6px">${rows.map((r,i)=>`<button class="li" data-n="${encodeURIComponent(r.spot.name)}"><span class="rk">${i+1}</span><span class="nm"><b>${S.favs.some(f=>f.name===r.spot.name)?"★ ":""}${r.spot.name}</b><small>${r.peak.d&&r.peak.v>=0.5? `Peak ${dow(r.peak.d)} ${fmtSnow(r.peak.v)} · `:""}10d ${fmtSnow(r.d10)}</small></span><span class="spark">${miniBars(r.days15.slice(0,10))}</span><span class="num" style="font-size:20px;min-width:52px;text-align:right;color:${r[sortK]>=6?'var(--deep)':r[sortK]>=1?'var(--ice)':'var(--mute)'}">${fmtSnow(r[sortK])}</span></button>`).join("")}</div>
     <div class="muted" style="margin-top:10px">Ranked using the Open-Meteo best-match model run through Snowline's snow model. Updated ${new Date(F.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}. Tap a spot for the full multi-model forecast.</div></div>`;
   el.querySelectorAll("#regSeg button").forEach(b=>b.onclick=()=>{ S.finderRegion=b.dataset.r; renderFinder(); });
   el.querySelectorAll("#sortSeg button").forEach(b=>b.onclick=()=>{ S.finderSort=b.dataset.s; renderFinder(); });
@@ -1405,6 +1506,7 @@ function evalAlerts(F){
 async function checkAlerts(){
   if(!alertRules().length){ $("#alertBanner").innerHTML=""; return; }
   try{ const F = await loadFinder(); const hits = evalAlerts(F);
+    document.querySelector('#tabs a[data-v="alerts"]').classList.toggle("has", hits.length>0);
     $("#alertBanner").innerHTML = hits.length? `<div class="callout gold" style="margin-top:0">🔔 <b>Powder alert${hits.length>1?"s":""}:</b> ${hits.slice(0,4).map(h=>`${h.x.spot.name} ${fmtSnow(h.v)} in ${h.w}`).join(" · ")} <a href="#alerts">Manage</a></div>` : "";
   }catch(e){}
 }
@@ -1526,9 +1628,10 @@ async function renderOutlook(){
   if(!S.data){ el.innerHTML = `<div class="card"><h2>Extended outlook</h2><div class="loading"><div class="spin"></div>Loading…</div></div>`; return; }
   if(!S.outlook || S.outlook.loc !== S.loc){
     el.innerHTML = `<div class="panel"><h2>Extended outlook</h2><div class="loading"><div class="spin"></div>Loading the 35-day ensemble and seasonal models…</div></div>`;
-    const L0 = S.loc; const o = await loadOutlook(L0); if(S.loc !== L0) return; S.outlook = o;
+    const L0 = S.loc; const o = await loadOutlook(L0); if(S.loc !== L0) return; S.outlook = o; if(S.data) S.data.outlookCache = o;
   }
   if(S.charts.week){ S.charts.week.destroy(); } if(S.charts.month){ S.charts.month.destroy(); }
+  ensureSeason();
   const O = S.outlook, e = bandElev(), today = todayStr();
   // weekly from GFS ensemble (35d)
   let weekHTML = `<div class="sub">The 35-day ensemble isn't available right now.</div>`, weeks = [];
@@ -1581,12 +1684,37 @@ async function renderOutlook(){
     ]}, options:o}); }
 }
 
+
+/* ================= Polish helpers ================= */
+function saveSnap(loc){ try{ const all = store.get("snap", {}) || {}; all[loc.name] = {t:Date.now(), html:$("#app").innerHTML};
+  const keys = Object.keys(all).sort((a,b)=>all[b].t-all[a].t); keys.slice(4).forEach(k=>delete all[k]); store.set("snap", all); }catch(e){} }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
+const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+function miniBars(vals){ const w=4, gap=2, H=18; const mx=Math.max(4,...vals); return `<svg width="${vals.length*(w+gap)}" height="${H}" viewBox="0 0 ${vals.length*(w+gap)} ${H}">${vals.map((v,i)=>{ const h=Math.max(1.5, v/mx*H); return `<rect x="${i*(w+gap)}" y="${H-h}" width="${w}" height="${h}" rx="1" fill="${v<0.05?'#3a3a3e':barColor(v)}"/>`; }).join("")}</svg>`; }
+function a2hsHTML(){ const ios=/iPhone|iPad|iPod/.test(navigator.userAgent); if(!ios || navigator.standalone || store.get("a2hs")) return "";
+  return `<div class="callout tip" id="a2hs"><b>Get the app:</b> tap <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> Share, then <b>Add to Home Screen</b>.<button aria-label="Dismiss" onclick="store.set('a2hs',1);this.parentElement.remove()">✕</button></div>`; }
+async function refreshView(){ const v=S.view||"forecast"; if(v==="forecast" && S.loc){ const all=store.get("snap",{})||{}; delete all[S.loc.name]; store.set("snap",all); await load(S.loc); } else if(v==="favs") await renderFavs(true); else if(v==="finder") await renderFinder(true); else if(v==="maps") await drawGrid(); }
+// scroll: compact title + auto-hide controls
+(function(){ let lastY=0; addEventListener("scroll",()=>{ const y=scrollY; $("#top").classList.toggle("scrolled", y>44);
+  const c=$("#ctrl"); if(c){ if(y>lastY+6 && y>220) c.classList.add("hide"); else if(y<lastY-6 || y<160) c.classList.remove("hide"); } lastY=y; }, {passive:true}); })();
+// pull to refresh
+(function(){ let y0=null, dy=0; const ind=$("#ptr");
+  addEventListener("touchstart",e=>{ if(scrollY<=0 && !document.querySelector(".sheet.on") && !e.target.closest("#bigmap,.ss-r,.hs,.dh,.tablewrap")){ y0=e.touches[0].clientY; dy=0; } else y0=null; },{passive:true});
+  addEventListener("touchmove",e=>{ if(y0==null) return; dy=e.touches[0].clientY-y0; if(dy>0){ const h=Math.min(84,dy*.45); ind.style.height=h+"px"; ind.classList.toggle("ready",h>=64); } },{passive:true});
+  addEventListener("touchend",()=>{ if(y0==null) return; const ready=ind.classList.contains("ready"); ind.classList.remove("ready"); y0=null;
+    if(ready){ ind.classList.add("busy"); ind.style.height="56px"; refreshView().catch(()=>{}).finally(()=>{ ind.classList.remove("busy"); ind.style.height="0"; }); } else ind.style.height="0"; });
+})();
+
 /* ================= Sheets ================= */
 function openSheet(id){ $("#"+id).classList.add("on"); document.body.style.overflow="hidden"; }
 function closeSheet(id){ $("#"+id).classList.remove("on"); document.body.style.overflow=""; }
 document.querySelectorAll(".sheet").forEach(sh=>{
   sh.addEventListener("click", e=>{ if(e.target===sh) closeSheet(sh.id); });
   sh.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>closeSheet(sh.id));
+  const b = sh.querySelector(".sheet-b"); let y0=null, dy=0;
+  b.addEventListener("touchstart",e=>{ if(b.scrollTop<=0 && !e.target.closest("#map,input,select")){ y0=e.touches[0].clientY; dy=0; b.style.transition="none"; } else y0=null; },{passive:true});
+  b.addEventListener("touchmove",e=>{ if(y0==null) return; dy=Math.max(0,e.touches[0].clientY-y0); b.style.transform=`translateY(${dy}px)`; },{passive:true});
+  b.addEventListener("touchend",()=>{ if(y0==null) return; b.style.transition=""; b.style.transform=""; if(dy>90) closeSheet(sh.id); y0=null; });
 });
 
 /* ================= Location sheet ================= */
@@ -1604,7 +1732,13 @@ function renderLocList(){
 }
 $("#locBtn").onclick = () => { renderLocList(); $("#q").value=""; $("#res").innerHTML=""; openSheet("locSheet"); };
 $("#setBtn").onclick = () => openSheet("setSheet");
-$("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.unshift({...S.loc}); store.set("favs",S.favs); updateTop(); };
+$("#ltBtn").onclick = () => $("#locBtn").click();
+$("#shareBtn").onclick = async () => { if(!S.ctx || !S.loc) return; const C=S.ctx.C; const d5=windowTotal(C.consDays.map(d=>d.day+d.night),5);
+  const L0=S.loc, preset=PRESETS.some(p=>p.name===L0.name);
+  const url = location.origin + location.pathname + (preset? `?s=${encodeURIComponent(L0.name)}` : `?n=${encodeURIComponent(L0.name)}&lat=${L0.lat.toFixed(4)}&lon=${L0.lon.toFixed(4)}&b=${Math.round(L0.base)}&t=${Math.round(L0.top)}`);
+  const text = `${L0.name}: ${fmtSnow(d5)} in the next 5 days at ${fmtEl(S.ctx.e)}${S.bestDay? `. Best ${MODE_NAME[S.mode].toLowerCase()} day: ${dayLabel(S.bestDay)}`:""}. via Snowline`;
+  try{ if(navigator.share) await navigator.share({title:"Snowline", text, url}); else { await navigator.clipboard.writeText(text+" "+url); toast("Link copied"); } }catch(e){} };
+$("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.unshift({...S.loc}); store.set("favs",S.favs); updateTop(); toast(i>=0? "Removed from Favorites" : "Saved to Favorites"); };
 
 let qT;
 $("#q").oninput = e => { clearTimeout(qT); const q=e.target.value.trim(); if(q.length<2){ $("#res").innerHTML=""; return; }
@@ -1647,7 +1781,10 @@ document.querySelectorAll("#mapLayers button").forEach(b=>b.onclick=()=>{ b.clas
 
 // boot
 const last = store.get("last", null);
-const startLoc = last || PRESETS[0];
+const qp = new URLSearchParams(location.search);
+const linked = qp.get("s") ? PRESETS.find(p=>p.name===qp.get("s")) : (qp.get("lat") ? {name:qp.get("n")||"Shared spot", lat:+qp.get("lat"), lon:+qp.get("lon"), base:+qp.get("b")||5000, top:+qp.get("t")||6500} : null);
+if(linked) history.replaceState(null, "", location.pathname + location.hash);
+const startLoc = linked || last || PRESETS[0];
 S.loc = startLoc; updateTop(); showView(); load(startLoc); checkAlerts();
 </script>
 </body>
