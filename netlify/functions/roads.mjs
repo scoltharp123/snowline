@@ -38,6 +38,7 @@ export default async (req) => {
     tc(`Cctv/Inventory?Bounds=${(lon - 0.45).toFixed(4)},${(lat - 0.33).toFixed(4)},${(lon + 0.45).toFixed(4)},${(lat + 0.33).toFixed(4)}`, key).catch(e => ({ error: String(e.message) })),
   ]);
   const pick = (data, r) => data.error ? [] : (arrays(data).sort((a, b) => b.length - a.length)[0] || []).filter(o => onRoute(o) || near(o, r));
+  if (q.get("raw") === "1") { const peek = (d) => { if (d.error) return d; const a = arrays(d).sort((x, y) => y.length - x.length)[0] || []; return { n: a.length, top: Object.keys(d), sample: a.slice(0, 2) }; }; return json({ inc: peek(inc), rw: peek(rw), cams: peek(cams) }); }
   out.incidents = pick(inc, 40).slice(0, 5).map(o => texts(o)).filter(Boolean);
   out.conditions = pick(rw, 40).slice(0, 4).map(o => texts(o)).filter(Boolean);
   out.cams = (cams.error ? [] : (arrays(cams).sort((a, b) => b.length - a.length)[0] || []))
