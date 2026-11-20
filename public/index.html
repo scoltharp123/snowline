@@ -2798,7 +2798,8 @@ async function tmRenderDoc(doc, pageNo, maxPx){
   const scale = Math.min(maxPx / Math.max(v1.width, v1.height), Math.sqrt(15e6 / (v1.width*v1.height)));
   const vp = page.getViewport({scale}); const cv = document.createElement("canvas"); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
   const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0,0,cv.width,cv.height);
-  await page.render({canvasContext:g, viewport:vp, intent:"print"}).promise;   // "print" draws in one go instead of frame by frame, so it finishes even if the app is in the background return {cv, pages: doc.numPages};
+  // "print" draws in one go instead of frame by frame, so it finishes even if the app is in the background.
+  await page.render({canvasContext:g, viewport:vp, intent:"print"}).promise; return {cv, pages: doc.numPages};
 }
 function tmThumbFrom(cv, u){ try{ const w = 520, t = document.createElement("canvas"); t.width = w; t.height = Math.round(cv.height * w / cv.width); t.getContext("2d").drawImage(cv,0,0,t.width,t.height); const d = t.toDataURL("image/jpeg",.72); localStorage.setItem(tmThumbKey(u), d); return d; }catch(e){ return null; } }
 async function tmSave(tm){
