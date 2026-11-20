@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Snowline — Multi-Model Snow Forecasts</title>
 <meta name="theme-color" content="#0b1220">
+<meta name="description" content="Multi-model snow forecasts by elevation: powder odds, ski surface quality, wax calls, season totals and extended outlooks.">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Snowline">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:title" content="Snowline: snow forecasts by elevation">
+<meta property="og:description" content="Nine weather models, ensemble powder odds, ski surface quality, wax calls and season totals.">
+<meta property="og:image" content="https://snowline-forecast.netlify.app/og-image.png">
+<meta property="og:url" content="https://snowline-forecast.netlify.app/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://snowline-forecast.netlify.app/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -25,7 +40,7 @@ header{display:flex;align-items:center;gap:10px;justify-content:space-between;pa
 .brand{display:flex;align-items:center;gap:8px}
 .brand h1{font-size:22px;letter-spacing:-.5px}
 .brand small{color:var(--mute);font-size:12px;display:block;margin-top:-2px}
-.logo{width:30px;height:30px}
+.logo{width:34px;height:34px}
 button,select,input{font:inherit;color:var(--text)}
 .btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
 .btn:hover{border-color:var(--ice2)}
@@ -136,7 +151,7 @@ tr.cons td{font-weight:700;border-top:2px solid var(--ice2)}
 <div class="wrap">
   <header>
     <div class="brand">
-      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M2 26 L11 11 L16 18 L21 9 L30 26 Z" fill="#16213a" stroke="#7dd3fc" stroke-width="1.6" stroke-linejoin="round"/><path d="M2 17 H30" stroke="#a78bfa" stroke-width="1.4" stroke-dasharray="2.5 2"/><path d="M8.7 15 L11 11 L13.3 14.3 M18.8 13 L21 9 L23.3 13" stroke="#e6edf7" stroke-width="1.6" fill="none"/></svg>
+      <img class="logo" src="/icon.svg" alt="" width="34" height="34" style="border-radius:8px">
       <div><h1>Snowline</h1><small>Multi-model snow forecasts by elevation</small></div>
     </div>
     <div class="row">

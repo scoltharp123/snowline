@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c2f5e"/>
+      <stop offset="0.55" stop-color="#111c38"/>
+      <stop offset="1" stop-color="#0b1220"/>
+    </linearGradient>
+    <linearGradient id="rock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f5596"/>
+      <stop offset="1" stop-color="#14254a"/>
+    </linearGradient>
+    <linearGradient id="snow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bfe6fb"/>
+    </linearGradient>
+    <linearGradient id="line" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="0">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0"/>
+      <stop offset="0.18" stop-color="#38bdf8"/>
+      <stop offset="0.82" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#a78bfa" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-200%" width="140%" height="500%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <clipPath id="tile"><rect width="512" height="512" rx="116"/></clipPath>
+    <clipPath id="peak"><path d="M40 430 L196 188 L246 250 L322 118 L472 430 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="512" height="512" fill="url(#sky)"/>
+    <!-- stars -->
+    <g fill="#e6edf7" opacity=".55">
+      <circle cx="92" cy="96" r="2.4"/><circle cx="150" cy="58" r="1.6"/><circle cx="226" cy="92" r="1.8"/><circle cx="118" cy="150" r="1.4"/>
+    </g>
+    <!-- snowflake -->
+    <g transform="translate(410 112)" stroke="#7dd3fc" stroke-width="6" stroke-linecap="round" fill="none">
+      <path d="M0 -30 V30 M-26 -15 L26 15 M-26 15 L26 -15"/>
+      <path d="M-8 -22 L0 -14 L8 -22 M-8 22 L0 14 L8 22" stroke-width="4.5"/>
+    </g>
+    <!-- back range -->
+    <path d="M-10 430 L110 286 L170 336 L250 262 L340 330 L420 270 L530 430 Z" fill="#1a2c55" opacity=".9"/>
+    <!-- main peak rock -->
+    <path d="M40 430 L196 188 L246 250 L322 118 L472 430 Z" fill="url(#rock)"/>
+    <!-- shaded right faces -->
+    <path d="M322 118 L472 430 L360 430 L300 300 Z" fill="#0d1a36" opacity=".45" clip-path="url(#peak)"/>
+    <path d="M196 188 L246 250 L214 300 L190 250 Z" fill="#0d1a36" opacity=".35"/>
+    <!-- snow cap above the snowline -->
+    <g clip-path="url(#peak)">
+      <path d="M0 0 H512 V284 L470 296 L430 280 L392 300 L350 282 L312 304 L270 284 L232 302 L196 282 L158 300 L120 284 L80 298 L0 284 Z" fill="url(#snow)"/>
+      <path d="M322 118 L512 0 V300 L392 300 L350 282 L330 290 Z" fill="#9ccbe8" opacity=".35"/>
+    </g>
+    <!-- the snowline -->
+    <rect x="0" y="306" width="512" height="12" fill="url(#line)" filter="url(#glow)" opacity=".9"/>
+    <path d="M30 312 H482" stroke="url(#line)" stroke-width="6" stroke-linecap="round" stroke-dasharray="22 12"/>
+    <!-- foreground -->
+    <path d="M-10 512 V438 Q128 410 256 432 T522 426 V512 Z" fill="#0b1220"/>
+  </g>
+</svg>
