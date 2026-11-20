@@ -996,7 +996,7 @@ function render(){
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
-  renderReport(); renderStorm(C, SIM, e); loadDiscussion(C, SIM, e);
+  renderReport(); renderStorm(C, SIM, e);
   S.open.forEach(id=>{ if($("#sb-"+id)) renderSection(id); });
   renderAvy(); updateSeasonSummary();
   if((location.hash||'')==='#maps') initBigMap();
@@ -1251,11 +1251,16 @@ function renderDisc(C, e, winTot, lo, hi, modelTots, SIM){
       r>=15?"Light, dry snow: great kick in fresh tracks, with slower glide until they're set.":r>=11?"Average density: classic tracks should set nicely after grooming.":"Dense, wet snow: an icing risk for kick wax; think klister or skin skis.")}</p>`); }
   }
   const windy = C.consDays.slice(0,N).map((d,k)=>({k,g:d.gmax})).filter(x=>x.g>55);
-  if(windy.length) parts.push(`<p><b>Wind:</b> gusts above ${imp()?"35 mph":"55 km/h"} at the model's 10 m level on ${windy.map(x=>dow(C.days[x.k])).join(", ")}. ${byMode("Upper lifts could go on wind hold, and exposed terrain will get wind-affected.", "Expect drifting in open sections and filled-in tracks; sheltered trails will ski best.")}</p>`);
+  if(windy.length) parts.push(`<p><b>Wind:</b> gusts above ${imp()?"35 mph":"55 km/h"} at the model's 10 m level on ${windy.map(x=>dow(C.days[x.k])).join(", ")}. ${S.mode==="bc"? "Strong wind moves snow onto lee slopes near ridgelines and strips windward ones." : byMode("Upper lifts could go on wind hold, and exposed terrain will get wind-affected.", "Expect drifting in open sections and filled-in tracks; sheltered trails will ski best.")}</p>`);
   // long-range
   const lr = windowTotal(daily.slice(N), 15-N);
   if(N<10) parts.push(`<p><b>Further out (days ${N+1}–15):</b> the consensus adds about ${fmtSnow(lr)}. ${lr>12?"The pattern looks active.":lr>3?"There are some chances.":"It looks quiet."} Don't trust long-range amounts much; use the 10-day view and the ensembles for the trend.</p>`);
-  $("#disc").innerHTML = parts.join("");
+  // headline, written from the same numbers
+  let head;
+  if(winTot < 0.5){ const nx = storms.find(s=>s.s>=N); head = nx? `Dry for now; snow returns around ${dow(C.days[nx.s])}` : `Dry stretch: little snow in the next ${N} days`; }
+  else { const s0 = storms[0]; head = s0? `${fmtSnow(s0.tot)} ${s0.e>s0.s? `${dow(C.days[s0.s])}–${dow(C.days[s0.e])}` : dow(C.days[s0.s])}, ${fmtSnow(winTot)} over ${N} days` : `${fmtSnow(winTot)} over the next ${N} days`; }
+  if(S.mode==="bc") parts.push(`<p class="bc-alert">⚠️ This write-up describes weather only. It does not assess avalanche danger or recommend where or whether to go. Read the avalanche center's forecast.</p>`);
+  $("#disc").innerHTML = `<p class="disc-h">${head}</p>` + parts.join("");
 }
 
 const chartBase = () => ({
@@ -2100,7 +2105,7 @@ function learnedHTML(){
     ${(()=>{ const mb = pct(rows.map(r=>r[1].bias),.5)||1; return rows.map(([id,s],k)=>{ const rb = s.bias/mb; return `<tr><td class="m">${k===0?"🏆 ":""}${nm(id)}</td><td>${(imp()? (s.mae/25.4).toFixed(2)+'"' : s.mae.toFixed(1)+" mm")}</td><td>${rb>1.15? `<span style="color:#f39a44">${Math.round((rb-1)*100)}% wetter</span>` : rb<0.87? `<span style="color:#5aa2ff">${Math.round((1-rb)*100)}% drier</span>` : "typical"}</td><td><b>×${(v.weights[id]||1).toFixed(2)}</b></td></tr>`; }).join(""); })()}</table></div><div class="muted" style="margin-top:6px">Bias is relative to the other models. Snow gauges under-catch, so every model looks wet in absolute terms.</div>`;
 }
 
-/* ---------- AI discussion ---------- */
+/* ---------- forecast facts (used by the Tour card and share text) ---------- */
 function buildFacts(C, SIM, e){
   const days = C.days.slice(0,7).map((d,k)=>{ const cd=C.consDays[k]; const x=daySummary(C,SIM,d); const memb=C.ensDays.filter(m=>m.cnt[k]>0).map(m=>m.tot[k]);
     return { day: dayLabel(d), snow: fmtSnow(cd.day+cd.night), dayPart: fmtSnow(cd.day), night: fmtSnow(cd.night), high: fmtT(cd.tmaxD), low: fmtT(cd.tminN),
@@ -2116,16 +2121,6 @@ function buildFacts(C, SIM, e){
     measured: ob? { station: ob.name, last24: fmtSnow(ob.new24||0), depth: isNum(ob.depth)? fmtSnow(ob.depth,0) : null } : null,
     bestModel: v? MODELS.find(m=>m.id===v.best)?.name : null, nowSurface: SIM[C.nowIdx]?.label,
     avalancheDanger: X.avy?.zone?.danger || null, mode: S.mode, modeDescription: S.mode==="bc"? "backcountry ski touring: climbing on skins with no lifts, in or near avalanche terrain" : byMode("alpine (downhill) skiing at a resort", "skate (nordic cross-country) skiing on groomed trails", "classic (nordic cross-country) skiing in set tracks") };
-}
-async function loadDiscussion(C, SIM, e){
-  const key = `${S.loc.name}|${S.mode}|${S.band}|${Math.floor(Date.now()/(4*3600e3))}`;
-  const show = (d) => { const el=$("#disc"); if(!el || !d) return; el.innerHTML = `<p class="disc-h">${d.headline}</p>` + d.body.split(/\n\s*\n/).map(p=>`<p>${p}</p>`).join("") + (S.mode==="bc"? `<p class="bc-alert">⚠️ This write-up describes weather only. It does not assess avalanche danger or recommend where or whether to go.</p>` : ""); const s=$("#discSrc"); if(s) s.textContent = "written by Snowline AI · " + new Date(d.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); };
-  if(S.disc[key]?.headline){ show(S.disc[key]); return; }
-  if(S.disc[key]?.pending) return;
-  S.disc[key] = {pending:true};
-  try{ const d = await api("/discussion", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({spot:S.loc.name, mode:S.mode, band:S.band, facts: buildFacts(C,SIM,e)})});
-    if(d.headline){ S.disc[key]=d; if(S.loc && key.startsWith(S.loc.name+"|"+S.mode+"|"+S.band)) show(d); } else S.disc[key]={failed:true};
-  }catch(err){ S.disc[key]={failed:true}; }
 }
 
 
