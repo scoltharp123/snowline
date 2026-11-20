@@ -3353,15 +3353,50 @@ function spotRow(sp, opts={}){
   const nordic = /Nordic|Trails|Lodge|XC|Birkie/i.test(sp.name);
   return `<button class="li" data-spot="${encodeURIComponent(sp.name)}">${opts.rank?`<span class="rk">${opts.rank}</span>`:""}<span class="nm"><b>${sp.name}${nordic?'<span class="tag">XC</span>':""}</b><small>${Math.round(sp.base).toLocaleString()}–${Math.round(sp.top).toLocaleString()} ft</small></span>${S.loc?.name===sp.name?'<span style="color:var(--ice)">●</span>':""}</button>`;
 }
+/* Central Oregon first: the spots most people here look for, plus easy search by everyday names */
+const CO_RESORTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Hoodoo, OR", "Willamette Pass, OR"];
+const SPOT_AKA = {
+  "Mt. Bachelor, OR": "mount bachelor mt bachelor mtb bachelor butte bend ski resort sunrise west village pine marten summit",
+  "Mt. Bachelor Nordic Center, OR": "mount bachelor nordic mt bachelor nordic cross country xc skate classic bachelor nordic lodge west village",
+  "Meissner Nordic (Bend), OR": "virginia meissner sno park snopark nordic cross country xc skate bend swampy wanoga",
+  "Hoodoo, OR": "hoodoo ski area santiam pass sisters",
+  "Willamette Pass, OR": "willamette pass odell lake crescent",
+  "Tumalo Mountain, OR": "tumalo mtn dutchman flat sno park backcountry tour bc",
+  "Ball Butte, OR": "ball butte dutchman flat backcountry tour bc",
+  "Broken Top, OR": "broken top dutchman flat backcountry tour bc",
+  "Tam McArthur Rim, OR": "tam mcarthur rim three creek lake sisters backcountry tour bc",
+  "South Sister, OR": "south sister three sisters devils lake backcountry tour bc",
+  "Paulina Peak, OR": "paulina peak newberry crater la pine backcountry tour bc",
+  "Mt. Hood Meadows, OR": "mount hood meadows mt hood", "Timberline, OR": "timberline lodge mount hood mt hood",
+  "Teacup Lake Nordic (Mt. Hood), OR": "teacup nordic mount hood mt hood cross country xc",
+  "Mt. Ashland, OR": "mount ashland", "Mt. Baker, WA": "mount baker", "Mt. Spokane, WA": "mount spokane",
+  "Birkie Trail (Cable, WI)": "american birkebeiner birkie cable hayward telemark",
+  "Methow Valley Trails, WA": "methow mazama winthrop cross country xc"
+};
+const normQ = s => s.toLowerCase().replace(/\bmount\b/g, "mt").replace(/\bmtn\b/g, "mountain").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+function matchSpots(q){
+  const words = normQ(q).split(" ").filter(Boolean); if(!words.length) return [];
+  const seen = new Set(), all = [...S.favs, ...PRESETS].filter(p=> !seen.has(p.name) && seen.add(p.name));
+  return all.map(p=>{ const hay = normQ(p.name + " " + (SPOT_AKA[p.name]||""));
+      if(!words.every(w=> hay.split(" ").some(h=>h.startsWith(w)))) return null;
+      const name = normQ(p.name); let sc = name.startsWith(words[0])? 3 : name.includes(words[0])? 2 : 1;
+      if(CO_RESORTS.includes(p.name)) sc += 1; if(S.favs.some(f=>f.name===p.name)) sc += 1;
+      return {p, sc}; }).filter(Boolean).sort((a,b)=>b.sc-a.sc).slice(0, 8).map(x=>x.p);
+}
+function bindSpotRows(root){
+  root.querySelectorAll("[data-spot]").forEach(b=>b.onclick=()=>{ const n=decodeURIComponent(b.dataset.spot); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); closeSheet("locSheet"); if(location.hash && location.hash!=="#forecast" && location.hash!=="#maps" && location.hash!=="#outlook") location.hash="forecast"; load(sp); });
+}
 function renderLocList(){
-  const groups = {}; PRESETS.forEach(p=>{ const r = regionOf2(p.name); (groups[r] ||= []).push(p); });
-  const order = ["Pacific NW","Rockies","California","Midwest","Other"];
+  const groups = {}; PRESETS.filter(p=>!CO_RESORTS.includes(p.name) && !p.bc).forEach(p=>{ const r = regionOf2(p.name); (groups[r] ||= []).push(p); });
+  groups["Central Oregon"] = CO_RESORTS.map(n=>PRESETS.find(p=>p.name===n)).filter(Boolean);
+  groups["Central Oregon backcountry"] = PRESETS.filter(p=>p.bc);
+  const order = ["Central Oregon","Central Oregon backcountry","Pacific NW","Rockies","California","Midwest","Other"];
   $("#locList").innerHTML =
     (S.favs.length? `<div class="grp">★ Favorites</div><div class="list">${S.favs.map(f=>spotRow(f)).join("")}</div>`:"") +
     order.filter(r=>groups[r]).map(r=>`<div class="grp">${r}</div><div class="list">${groups[r].map(p=>spotRow(p)).join("")}</div>`).join("");
   $("#locList").querySelectorAll("[data-spot]").forEach(b=>b.onclick=()=>{ const n=decodeURIComponent(b.dataset.spot); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); closeSheet("locSheet"); if(location.hash && location.hash!=="#forecast" && location.hash!=="#maps" && location.hash!=="#outlook") location.hash="forecast"; load(sp); });
 }
-$("#locBtn").onclick = () => { renderLocList(); $("#q").value=""; $("#res").innerHTML=""; openSheet("locSheet"); };
+$("#locBtn").onclick = () => { renderLocList(); $("#q").value=""; $("#res").innerHTML=""; $("#locList").hidden=false; openSheet("locSheet"); };
 $("#setBtn").onclick = () => openSheet("setSheet");
 $("#ltBtn").onclick = () => $("#locBtn").click();
 $("#shareBtn").onclick = () => openShareSheet();
@@ -3369,10 +3404,14 @@ $("#bellBtn").onclick = () => openBell();
 $("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.unshift({...S.loc}); store.set("favs",S.favs); updateTop(); pushSync(); toast(i>=0? "Removed from Favorites" : "Saved to Favorites"); };
 
 let qT;
-$("#q").oninput = e => { clearTimeout(qT); const q=e.target.value.trim(); if(q.length<2){ $("#res").innerHTML=""; return; }
+$("#q").oninput = e => { clearTimeout(qT); const q=e.target.value.trim(); if(q.length<2){ $("#res").innerHTML=""; $("#locList").hidden=false; return; }
+  const mine = matchSpots(q), localHTML = mine.length? `<div class="grp">Snowline spots</div><div class="list">${mine.map(p=>spotRow(p)).join("")}</div>` : "";
+  $("#res").innerHTML = localHTML; bindSpotRows($("#res")); $("#locList").hidden = true;
   qT = setTimeout(async()=>{ try{ const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en&format=json`);
-    const r = j.results||[];
-    $("#res").innerHTML = r.length? `<div class="grp">Search results</div>` + r.map((x,i)=>`<button class="li" data-i="${i}"><span class="nm"><b>${x.name}</b><small>${[x.admin1,x.country_code].filter(Boolean).join(", ")} · ${Math.round((x.elevation||0)*FT).toLocaleString()} ft</small></span></button>`).join("") : `<div class="muted" style="padding:10px 2px">No matches</div>`;
+    if($("#q").value.trim()!==q) return;
+    const r = (j.results||[]).filter(x=> !mine.some(p=>Math.abs(p.lat-x.latitude)<0.03 && Math.abs(p.lon-x.longitude)<0.03))
+      .sort((a,b)=>(b.admin1==="Oregon")-(a.admin1==="Oregon"));
+    $("#res").innerHTML = localHTML + (r.length? `<div class="grp">${mine.length? "Other places" : "Search results"}</div>` + r.map((x,i)=>`<button class="li" data-i="${i}"><span class="nm"><b>${x.name}</b><small>${[x.admin1,x.country_code].filter(Boolean).join(", ")} · ${Math.round((x.elevation||0)*FT).toLocaleString()} ft</small></span></button>`).join("") : mine.length? "" : `<div class="muted" style="padding:10px 2px">No matches</div>`); bindSpotRows($("#res"));
     $("#res").querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{ const x=r[+b.dataset.i]; closeSheet("locSheet"); openPicker(x.latitude, x.longitude, `${x.name}${x.admin1?", "+x.admin1:""}`, Math.round((x.elevation||0)*FT)); });
   }catch(err){} }, 300); };
 
