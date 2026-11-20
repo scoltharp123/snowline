@@ -435,6 +435,11 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .bc-alert{background:#2a1416;border:1px solid #6b2a2e;border-radius:12px;padding:10px 12px;margin:8px 0 0;font-size:13.5px;line-height:1.5;color:#ffd9d9}
 .bc-alert a{color:#ffb4b4}
 .bc-list{margin:6px 0 0;padding-left:18px;line-height:1.5;font-size:14px}.bc-list li{margin:0 0 6px}
+
+.nws-al{background:#1a1416;border:1px solid;border-radius:14px;padding:10px 12px;margin:0 0 10px}.nws-al summary{list-style:none;display:flex;flex-direction:column;gap:2px;cursor:pointer}.nws-al summary span{font-size:12.5px;color:var(--mute)}.nws-al p{font-size:13.5px;line-height:1.5;margin:8px 0 0}
+.afd p{font-size:14px;line-height:1.55;margin:0 0 8px}.clamp4{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.et-wrap{overflow-x:auto;margin:0 -4px}.et{border-collapse:collapse;width:100%;min-width:420px;font-size:13px;text-align:center}.et th{font-weight:600;font-size:12px;color:var(--mute);padding:4px 2px}.et th small,.et td small{color:var(--mute);font-size:11px}
+.et td{padding:5px 2px;border-top:1px solid var(--line)}.et .et-l{text-align:left;color:var(--mute);font-size:12px;white-space:nowrap;padding-right:6px}.et .et-h td{text-align:left;font-weight:700;padding-top:12px;border-top:0;color:var(--text)}
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -952,6 +957,7 @@ function render(){
   const modelNote = nIn < MODELS.length-2 ? `<div class="callout rain">⏳ <b>${nIn} of ${MODELS.length} models loaded.</b> ${longIn<3? "The forecast past 2 days is incomplete until more arrive." : "The rest are still coming in."}${S.omLimited && Date.now()-S.omLimited<15*60e3? " Open-Meteo, the free weather service, has hit its hourly limit for this network; it resets within the hour." : ""} ${D.retrying? "Retrying now…" : `<a href="#" id="modelRetry">Try again</a>`}</div>` : "";
   $("#app").innerHTML = `
   ${a2hsHTML()}${modelNote}
+  <div id="nwsAlerts"></div>
   ${callouts.slice(0,2).join("")}
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card">
@@ -969,12 +975,14 @@ function render(){
   <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card" id="stormCard"></section>
   <section class="card"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div></section>
+  <section class="card" id="elevCard"></section>
   <section class="card" id="miniMapCard"></section>
   <section class="card" id="trackCard"></section>
   <section class="card" id="roadCard"></section>
   ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}
   <section class="card"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read more</button></section>
+  <section class="card" id="afdCard" hidden></section>
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
   <div class="muted" style="text-align:center;margin:18px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
@@ -984,7 +992,7 @@ function render(){
   $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -2036,6 +2044,7 @@ function loadExtras(loc){
   api(`/verify?${q}`).then(r=>{ X.verify=r; done(); }).catch(()=>{});
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
   api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
+  api(`/nws?${q}`).then(r=>{ X.nws=r; if(S.loc===loc){ renderNwsAlerts(); renderAFD(); } }).catch(()=>{});
 }
 function nearObs(){ const X = S.loc && S.extras[S.loc.name]; const st = X?.obs?.stations?.[0]; return st && st.km <= SNOTEL_MAX_KM ? st : null; }
 function learned(){ const X = S.loc && S.extras[S.loc.name]; const v = X?.verify; return v && v.status==="ok" ? v : null; }
@@ -2106,17 +2115,78 @@ function buildFacts(C, SIM, e){
     storm: st? { start: tLabel(C,st.a), end: tLabel(C,st.b), total: fmtSnow(st.tot), peak: `${fmtSnow(st.peak.v,1)}/hr ${tLabel(C,st.peak.i)}` } : null,
     measured: ob? { station: ob.name, last24: fmtSnow(ob.new24||0), depth: isNum(ob.depth)? fmtSnow(ob.depth,0) : null } : null,
     bestModel: v? MODELS.find(m=>m.id===v.best)?.name : null, nowSurface: SIM[C.nowIdx]?.label,
-    avalancheDanger: X.avy?.zone?.danger || null, mode: S.mode, modeDescription: byMode("alpine (downhill) skiing at a resort", "skate (nordic cross-country) skiing on groomed trails", "classic (nordic cross-country) skiing in set tracks") };
+    avalancheDanger: X.avy?.zone?.danger || null, mode: S.mode, modeDescription: S.mode==="bc"? "backcountry ski touring: climbing on skins with no lifts, in or near avalanche terrain" : byMode("alpine (downhill) skiing at a resort", "skate (nordic cross-country) skiing on groomed trails", "classic (nordic cross-country) skiing in set tracks") };
 }
 async function loadDiscussion(C, SIM, e){
   const key = `${S.loc.name}|${S.mode}|${S.band}|${Math.floor(Date.now()/(4*3600e3))}`;
-  const show = (d) => { const el=$("#disc"); if(!el || !d) return; el.innerHTML = `<p class="disc-h">${d.headline}</p>` + d.body.split(/\n\s*\n/).map(p=>`<p>${p}</p>`).join(""); const s=$("#discSrc"); if(s) s.textContent = "written by Snowline AI · " + new Date(d.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); };
+  const show = (d) => { const el=$("#disc"); if(!el || !d) return; el.innerHTML = `<p class="disc-h">${d.headline}</p>` + d.body.split(/\n\s*\n/).map(p=>`<p>${p}</p>`).join("") + (S.mode==="bc"? `<p class="bc-alert">⚠️ This write-up describes weather only. It does not assess avalanche danger or recommend where or whether to go.</p>` : ""); const s=$("#discSrc"); if(s) s.textContent = "written by Snowline AI · " + new Date(d.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); };
   if(S.disc[key]?.headline){ show(S.disc[key]); return; }
   if(S.disc[key]?.pending) return;
   S.disc[key] = {pending:true};
   try{ const d = await api("/discussion", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({spot:S.loc.name, mode:S.mode, band:S.band, facts: buildFacts(C,SIM,e)})});
     if(d.headline){ S.disc[key]=d; if(S.loc && key.startsWith(S.loc.name+"|"+S.mode+"|"+S.band)) show(d); } else S.disc[key]={failed:true};
   }catch(err){ S.disc[key]={failed:true}; }
+}
+
+
+/* ================= Free "pro" extras: NWS meteorologists, warnings, top/mid/bottom table, cloud base ================= */
+const NWS_OFFICE = { PDT:"Pendleton", PQR:"Portland", MFR:"Medford", BOI:"Boise", SEW:"Seattle", OTX:"Spokane", MSO:"Missoula", DLH:"Duluth", MPX:"Twin Cities", EKA:"Eureka", STO:"Sacramento", REV:"Reno" };
+const nwsName = o => "NWS " + (NWS_OFFICE[o] || o);
+function renderNwsAlerts(){
+  const box = $("#nwsAlerts"); if(!box || !S.loc) return; const N = extrasFor(S.loc).nws; const A = (N?.alerts || []).slice(0, 3);
+  if(!A.length){ box.innerHTML = ""; return; }
+  const when = t => t? new Date(t).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}) : "";
+  const sev = s => /Extreme|Severe/.test(s)? "#ef4444" : /Moderate/.test(s)? "#f59e0b" : "#38bdf8";
+  box.innerHTML = A.map((a,i)=>`<details class="nws-al" style="border-color:${sev(a.severity)}"><summary><b style="color:${sev(a.severity)}">⚠ ${esc(a.event)}</b><span>${a.ends? "until "+when(a.ends) : a.onset? "from "+when(a.onset) : ""} · ${nwsName(N.office)}</span></summary>
+    <p>${esc(a.desc)}</p>${a.instr? `<p class="muted">${esc(a.instr)}</p>`:""}<p class="muted" style="font-size:11px">Issued by the National Weather Service.</p></details>`).join("");
+}
+function renderAFD(){
+  const card = $("#afdCard"); if(!card || !S.loc) return; const N = extrasFor(S.loc).nws, F = N?.afd;
+  if(!F || !(F.sections||[]).length){ card.hidden = true; return; }
+  card.hidden = false;
+  const lead = F.sections.find(s=>s.key==="KEY MESSAGES") || F.sections.find(s=>s.key==="SYNOPSIS") || F.sections[0];
+  const rest = F.sections.filter(s=>s!==lead && s.key!=="UPDATE");
+  const para = s => s.text.split(/\n\n/).map(p=>`<p>${esc(p)}</p>`).join("");
+  card.innerHTML = `<div class="card-h"><h2>Meteorologists' discussion</h2><span class="muted">${nwsName(F.office)} · ${F.issued? new Date(F.issued).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}) : ""}</span></div>
+    <div class="afd"><div class="grp" style="margin-top:4px">${esc(lead.title)}${lead.when? ` <span style="text-transform:none;letter-spacing:0">· ${esc(lead.when)}</span>`:""}</div><div class="clamp4" id="afdLead">${para(lead)}</div>
+    <div id="afdRest" hidden>${rest.map(s=>`<div class="grp">${esc(s.title)}${s.when? ` <span style="text-transform:none;letter-spacing:0">· ${esc(s.when)}</span>`:""}</div>${para(s)}`).join("")}</div></div>
+    <div class="row" style="justify-content:space-between;margin-top:6px"><button class="link" id="afdMore">Read the full discussion</button><a class="muted" href="${F.url}" target="_blank" rel="noopener" style="font-size:12px">Original ↗</a></div>
+    <div class="muted" style="font-size:11px;margin-top:6px">Written by the National Weather Service forecasters for the whole region, not just this spot. Technical terms are theirs.</div>`;
+  $("#afdMore").onclick = () => { const r=$("#afdRest"), l=$("#afdLead"); const open = r.hidden; r.hidden = !open; l.classList.toggle("clamp4", !open); $("#afdMore").textContent = open? "Show less" : "Read the full discussion"; };
+}
+// Dew point (Magnus) and the height where rising air reaches it (about 125 m per °C of spread).
+const dewPt = (T, RH) => { if(!isNum(T) || !isNum(RH) || RH <= 0) return null; const a=17.62, b=243.12, g=Math.log(RH/100)+a*T/(b+T); return b*g/(a-g); };
+function cloudBaseAt(C, i, refM){ const c = C.cons[i]; if(!c || !isNum(c.RH) || !isNum(c.CC) || c.CC < 60) return null; const td = dewPt(c.Te, c.RH); if(td==null) return null; return refM + Math.max(0, 125*(c.Te - td)); }
+function elevDays(ftElev, nDays){
+  const C = computeAt(ftElev/FT), out = [];
+  for(let k=0;k<nDays;k++){ const d = C.days[k]; let wmax=0, gmax=0, chill=99, n=0, slS=0, slN=0;
+    C.time.forEach((t,i)=>{ if(i < C.nowIdx && k===0) return; const [dd] = periodOf(t); if(dd!==d) return; const c=C.cons[i]; if(!c) return; n++;
+      if(isNum(c.W)) wmax=Math.max(wmax,c.W); if(isNum(c.G)) gmax=Math.max(gmax,c.G); const h=+t.slice(11,13); if(h>=8 && h<=16){ const wc=windChill(c.Te, c.W); if(isNum(wc)) chill=Math.min(chill,wc); } if(isNum(c.sl)){ slS+=c.sl; slN++; } });
+    const cd = C.consDays[k]; out.push({ d, n, snow: cd.n? cd.day+cd.night : null, hi: cd.tmax>-99? cd.tmax : null, lo: cd.tmin<99? cd.tmin : null, wmax, gmax, chill: chill<99? chill : null, sl: slN? slS/slN : null }); }
+  return { C, out };
+}
+function renderElevTable(){
+  const card = $("#elevCard"); if(!card || !S.loc || !S.data) return; const L0 = S.loc, nD = 6;
+  const bands = [["Top", L0.top], ["Mid", Math.round((L0.base+L0.top)/2)], ["Bottom", L0.base]];
+  const rows = bands.map(([lab, ft])=>({ lab, ft, ...elevDays(ft, nD) }));
+  const days = rows[0].out.map(x=>x.d);
+  // cloud base at midday, from the mid-mountain models
+  const Cr = computeAt(S.data.ref), cb = days.map(d=>{ const i = Cr.time.findIndex(t=>t.startsWith(d+"T13")); return i>=0? cloudBaseAt(Cr, i, S.data.ref) : null; });
+  const snowCell = v => v==null? "—" : v>=0.5? `<b style="color:${v>=6?"var(--deep)":"var(--ice)"}">${fmtSnow(v,0)}</b>` : "0";
+  const head = `<tr><th></th>${days.map(d=>`<th>${d===todayStr()? "Today" : dow(d)}<br><small>${md(d)}</small></th>`).join("")}</tr>`;
+  const body = rows.map(r=>`<tr class="et-h"><td colspan="${nD+1}">${r.lab} · ${fmtEl(r.ft/FT)}</td></tr>
+    <tr><td class="et-l">Snow</td>${r.out.map(x=>`<td>${snowCell(x.snow)}</td>`).join("")}</tr>
+    <tr><td class="et-l">High / low</td>${r.out.map(x=>`<td>${x.hi!=null? fmtT(x.hi) : "—"}<br><small>${x.lo!=null? fmtT(x.lo) : ""}</small></td>`).join("")}</tr>
+    <tr><td class="et-l">Wind / gust<br><small>${windU()}</small></td>${r.out.map(x=>`<td>${x.n? fmtWind(x.wmax) : "—"}<br><small>${x.n? fmtWind(x.gmax) : ""}</small></td>`).join("")}</tr>
+    <tr><td class="et-l">Wind chill<br><small>daytime low</small></td>${r.out.map(x=>`<td>${x.chill!=null? fmtT(x.chill) : "—"}</td>`).join("")}</tr>`).join("");
+  const fz = rows[0].out.map(x=>x.sl);
+  card.innerHTML = `<div class="card-h"><h2>By elevation</h2><span class="muted">next ${nD} days</span></div>
+    <div class="et-wrap"><table class="et">${head}${body}
+      <tr class="et-h"><td colspan="${nD+1}">Whole mountain</td></tr>
+      <tr><td class="et-l">Snow level</td>${fz.map(v=>`<td>${v!=null? fmtEl(v) : "—"}</td>`).join("")}</tr>
+      <tr><td class="et-l">Cloud base<br><small>~1pm</small></td>${cb.map(v=>`<td>${v==null? "<small>clear or broken</small>" : v <= L0.top/FT ? `${fmtEl(v)}<br><small style="color:var(--warn)">summit in cloud</small>` : fmtEl(v)}</td>`).join("")}</tr>
+    </table></div>
+    <div class="muted" style="font-size:11px;margin-top:6px">Each elevation is modeled separately: temperature adjusted for height, snow vs. rain at that height. Cloud base is estimated from temperature and humidity when skies are mostly cloudy.</div>`;
 }
 
 /* ---------- Wax log (learns what works for you) ---------- */

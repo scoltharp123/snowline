@@ -17,8 +17,9 @@ Rules:
   - alpine: powder, groomers, lifts, first chair, aspects, runs. Never mention wax, kick, tracks or track speed.
   - skate: groomed trails, skate lanes, corduroy, glide wax, track speed, crust skating. Never mention lifts, chairs, runs, first chair, kick wax or set tracks.
   - classic: set tracks, kick and glide, kick wax or klister, icing, grooming. Never mention lifts, chairs, runs, first chair, skate lanes or skating.
+  - bc (backcountry touring): describe the weather only (new snow, wind and which slopes it loads, warming, rain, snow level, visibility). Never recommend when, where or whether to go, never call any slope, route or day safe or good to ski, never mention lifts or first chair, and always end with exactly: "Read the avalanche center's forecast before you go; this write-up does not assess avalanche danger."
 - Use amounts as given (with units). Use ranges where given. Be honest about uncertainty when confidence is low.
-- No safety or avalanche advice beyond "check the avalanche forecast" if avalanche danger is 3 or higher.`;
+- No safety or avalanche advice beyond "check the avalanche forecast" if avalanche danger is 3 or higher (in bc mode, the required closing line instead).`;
 
 export default async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" }, { status: 405 });
