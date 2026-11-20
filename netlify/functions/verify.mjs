@@ -4,8 +4,8 @@
 import { json, nearestStations, awdbData, daysAgo, getJSON, store, FT } from "../lib/shared.mjs";
 
 const MODELS = {
-  ecmwf: ["ecmwf_ifs025"], aifs: ["ecmwf_aifs025_single", "ecmwf_aifs025"], gfs: ["gfs_seamless"],
-  hrrr: ["ncep_hrrr_conus", "gfs_hrrr"], nbm: ["ncep_nbm_conus"], gem: ["gem_seamless"],
+  ecmwf: ["ecmwf_ifs025"], aifs: ["ecmwf_aifs025_single"], gfs: ["gfs_seamless"],
+  hrrr: ["ncep_hrrr_conus"], nbm: ["ncep_nbm_conus"], gem: ["gem_seamless"],
   icon: ["icon_seamless"], ukmo: ["ukmo_seamless"], jma: ["jma_seamless"],
 };
 const DAYS = 30;
@@ -32,7 +32,7 @@ export default async (req) => {
     const [st] = await nearestStations(lat, lon, 1, 40);
     if (!st) return json({ status: "no-station" }, { cache: 86400 });
     const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `verify-${st.id}-${today}`;
+    const cacheKey = `verify-v2-${st.id}-${today}`;
     const s = store("snowline-cache");
     try { const c = await s.get(cacheKey, { type: "json" }); if (c) return json(c, { cache: 21600 }); } catch (e) {}
 
@@ -47,9 +47,11 @@ export default async (req) => {
     if (days.length < 10) return json({ status: "insufficient-obs", station: st }, { cache: 21600 });
 
     const results = await Promise.all(Object.entries(MODELS).map(async ([id, apis]) => [id, await modelDaily(st, apis, start, end)]));
-    const scores = {};
+    const scores = {}; const seen = new Set();
     for (const [id, f] of results) {
       if (!f) continue;
+      const sig = JSON.stringify(Object.values(f).slice(-10).map(v => Math.round(v * 10)));
+      if (seen.has(sig)) continue; seen.add(sig);
       let n = 0, ae = 0, sf = 0, so = 0, wet = 0;
       for (const d of days) {
         const fo = f[d], ob = daily[d]; if (fo == null || ob == null) continue;

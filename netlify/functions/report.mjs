@@ -44,7 +44,7 @@ async function grooming(path) {
   const out = { url, source: "Nordic Pulse" };
   const m = t.match(/Recent Report([\s\S]{0,4000}?)Reported on\s+([A-Z][a-z]{2,8}\.? \d{1,2},? \d{4})\s+at\s+([\d:]+\s*[AP]M)(?:\s+by\s+([^\n]+))?/);
   if (m) {
-    out.text = m[1].replace(/\b(About|POI|Historical Reports)\b/g, "").replace(/\n+/g, " ").replace(/\s+/g, " ").trim().slice(0, 900);
+    out.text = m[1].replace(/\b(About|POI|Historical Reports|Directions)\b/g, "").replace(/\n+/g, " ").replace(/\s+/g, " ").trim().slice(0, 900);
     out.reported = `${m[2]} ${m[3]}`; out.by = (m[4] || "").trim().slice(0, 40);
   }
   // trail rows: "Name 3.2 km Yes Nov 20 5:12 AM"

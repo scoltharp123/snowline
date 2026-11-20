@@ -1884,9 +1884,9 @@ function learnedHTML(){
   const rows = Object.entries(v.scores).sort((a,b)=>a[1].mae-b[1].mae);
   const nm = id => MODELS.find(m=>m.id===id)?.name || id;
   return `<div class="card-h" style="margin-top:14px"><h3 style="margin:0">How models score here</h3><label class="chip"><input type="checkbox" id="learnTog" ${S.learnOn?"checked":""}> Use learned blend</label></div>
-    <div class="muted" style="margin-bottom:8px">Each model's next-day precipitation forecast vs. what ${v.station.name} SNOTEL measured, over the last ${v.days} days (${v.wetDays} wet). Better scores get more weight in the blend.</div>
-    <div class="tablewrap"><table><tr><th class="m">Model</th><th>Avg miss</th><th>Bias</th><th>Weight</th></tr>
-    ${rows.map(([id,s],k)=>`<tr><td class="m">${k===0?"🏆 ":""}${nm(id)}</td><td>${(imp()? (s.mae/25.4).toFixed(2)+'"' : s.mae.toFixed(1)+" mm")}</td><td>${s.bias>1.15? `<span style="color:#f39a44">${Math.round((s.bias-1)*100)}% wet</span>` : s.bias<0.85? `<span style="color:#5aa2ff">${Math.round((1-s.bias)*100)}% dry</span>` : "on target"}</td><td><b>×${(v.weights[id]||1).toFixed(2)}</b></td></tr>`).join("")}</table></div>`;
+    <div class="muted" style="margin-bottom:8px">Each model's next-day forecast vs. what ${v.station.name} SNOTEL measured, over the last ${v.days} days (${v.wetDays} wet). Better scores get more weight in the blend.</div>
+    <div class="tablewrap"><table><tr><th class="m">Model</th><th>Avg miss</th><th>vs. others</th><th>Weight</th></tr>
+    ${(()=>{ const mb = pct(rows.map(r=>r[1].bias),.5)||1; return rows.map(([id,s],k)=>{ const rb = s.bias/mb; return `<tr><td class="m">${k===0?"🏆 ":""}${nm(id)}</td><td>${(imp()? (s.mae/25.4).toFixed(2)+'"' : s.mae.toFixed(1)+" mm")}</td><td>${rb>1.15? `<span style="color:#f39a44">${Math.round((rb-1)*100)}% wetter</span>` : rb<0.87? `<span style="color:#5aa2ff">${Math.round((1-rb)*100)}% drier</span>` : "typical"}</td><td><b>×${(v.weights[id]||1).toFixed(2)}</b></td></tr>`; }).join(""); })()}</table></div><div class="muted" style="margin-top:6px">Bias is relative to the other models. Snow gauges under-catch, so every model looks wet in absolute terms.</div>`;
 }
 
 /* ---------- AI discussion ---------- */
