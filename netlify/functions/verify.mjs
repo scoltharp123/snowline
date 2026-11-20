@@ -34,7 +34,7 @@ export default async (req) => {
     const [st] = await nearestStations(lat, lon, 1, 40);
     if (!st) return json({ status: "no-station" }, { cache: 86400 });
     const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `verify-v4-${st.id}-${today}`;
+    const cacheKey = `verify-v5-${st.id}-${today}`;
     const s = store("snowline-cache");
     try { const c = await s.get(cacheKey, { type: "json" }); if (c) return json(c, { cache: 21600 }); } catch (e) {}
 
@@ -88,14 +88,13 @@ export default async (req) => {
     const stormOut = storms.map(x => {
       const obsSnow = x.days.reduce((a, d) => a + (depthGain[d] || 0), 0), obsWater = x.days.reduce((a, d) => a + (daily[d] || 0), 0) / 25.4;
       const per = uniq.map(f => ({ s: x.days.reduce((a, d) => a + (f._snow[d] || 0), 0), w: x.days.reduce((a, d) => a + (f[d] || 0), 0) / 25.4 })).filter(v => isFinite(v.s));
-      if (per.length < 3) return null;
+      if (per.length < 2) return null;
       const ss = per.map(v => v.s).sort((a, b) => a - b), mean = ss.reduce((a, b) => a + b, 0) / ss.length;
       return { start: x.days[0], end: x.days[x.days.length - 1], ongoing: !!x.ongoing, obsSnow: Math.round(obsSnow * 10) / 10, obsWater: Math.round(obsWater * 100) / 100,
         fcstSnow: Math.round(mean * 10) / 10, fcstLo: Math.round(ss[0] * 10) / 10, fcstHi: Math.round(ss[ss.length - 1] * 10) / 10,
         fcstWater: Math.round(per.reduce((a, v) => a + v.w, 0) / per.length * 100) / 100, models: per.length };
-    }).filter(x => x && (x.obsSnow >= 2 || x.fcstSnow >= 2)).reverse().slice(0, 4);
-    const stormDebug = { detected: storms.length, models: uniq.length, raw: storms.map(x => x.days[0] + '..' + x.days.at(-1)) };
-    const out = { storms: stormOut, stormDebug, status, station: { id: st.id, name: st.name, km: Math.round(st.km), elevFt: st.elevFt }, days: days.length, wetDays: wetTotal, scores, weights, best, updated: new Date().toISOString() };
+    }).filter(x => x && (x.obsSnow >= 2 || x.fcstSnow >= 2) && (x.obsWater >= 0.1 || x.fcstWater >= 0.1)).reverse().slice(0, 4);
+    const out = { storms: stormOut, status, station: { id: st.id, name: st.name, km: Math.round(st.km), elevFt: st.elevFt }, days: days.length, wetDays: wetTotal, scores, weights, best, updated: new Date().toISOString() };
     try { await s.setJSON(cacheKey, out); } catch (e) {}
     return json(out, { cache: 21600 });
   } catch (e) {
