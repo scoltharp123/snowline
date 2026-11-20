@@ -3127,7 +3127,9 @@ document.querySelectorAll("#mapLayers button").forEach(b=>b.onclick=()=>{ b.clas
 // boot
 const last = store.get("last", null);
 const qp = new URLSearchParams(location.search);
-const linked = qp.get("s") ? PRESETS.find(p=>p.name===qp.get("s")) : (qp.get("lat") ? {name:qp.get("n")||"Shared spot", lat:+qp.get("lat"), lon:+qp.get("lon"), base:+qp.get("b")||5000, top:+qp.get("t")||6500} : null);
+const nearPreset = (la, lo) => PRESETS.map(p=>({p, d:km(la,lo,p.lat,p.lon)})).sort((a,b)=>a.d-b.d).find(x=>x.d<=4)?.p;   // a link from Route Forecast lands on the named Nordic area when it's close
+const linked = qp.get("s") ? PRESETS.find(p=>p.name===qp.get("s")) : (qp.get("lat") ? (nearPreset(+qp.get("lat"), +qp.get("lon")) || {name:qp.get("n")||"Shared spot", lat:+qp.get("lat"), lon:+qp.get("lon"), base:+qp.get("b")||5000, top:+qp.get("t")||6500}) : null);
+const linkMode = qp.get("m"); if(["alpine","skate","classic"].includes(linkMode)){ S.mode = linkMode; store.set("mode", linkMode); document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===linkMode)); }
 if(linked) history.replaceState(null, "", location.pathname + location.hash);
 updateOnline();
 const startLoc = linked || last || PRESETS[0];
