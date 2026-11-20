@@ -203,7 +203,7 @@ a.li{color:inherit;text-decoration:none}
 .field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute);margin-bottom:10px}
 .form2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #map{height:min(55vh,420px);border-radius:14px;margin:10px 0}
-#bigmap{height:calc(100vh - var(--top) - var(--tab) - var(--sat) - var(--sab) - 150px);min-height:340px;border-radius:14px}
+#bigmap{height:calc(100vh - var(--top) - var(--tab) - var(--sat) - var(--sab) - 300px);min-height:320px;border-radius:14px}
 .leaflet-container{background:#0a1020;font:inherit}
 .about{color:var(--mute);font-size:13px;line-height:1.6}
 
@@ -407,6 +407,28 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .fr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;text-align:center}.fr b{font-size:24px;display:block}.fr small{font-size:12px;color:var(--mute)}.fr-src{margin-top:8px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .cam-a{position:relative;display:block}.cam-live{position:absolute;left:8px;top:8px;background:#e5484d;color:#fff;font:700 11px/1 system-ui;padding:4px 7px;border-radius:6px;z-index:1}
 
+
+/* big map: timeline, legend bar, basemap toggle, full screen */
+.leaflet-control-attribution{font-size:10px!important;line-height:1.4}
+#mapWrap{position:relative}
+#mapWrap.full{position:fixed;inset:0;z-index:1200;background:#000;display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#mapWrap.full #bigmap{flex:1;height:auto;min-height:0;border-radius:0}
+#mapWrap.full .tl{margin:0;border-radius:16px 16px 0 0;border-left:0;border-right:0;border-bottom:0}
+.tl{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:10px 12px 8px;margin-top:10px}
+.tl-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+#tlLabel{min-width:0}#tlLabel b{font-size:14.5px;display:block}#tlLabel small{display:block;color:var(--mute);font-size:12px;margin-top:2px;line-height:1.35}
+#tlLabel .u{font-size:10px;font-weight:700;color:#fbbf24;border:1px solid #6b5a1f;border-radius:5px;padding:1px 5px;margin-left:4px;vertical-align:2px}
+.tl-row{display:flex;align-items:center;gap:6px;margin-top:8px}.tl-row.dim{opacity:.45}
+.tl-row button{width:36px;height:36px;border-radius:50%;border:0;background:#2b2b30;color:var(--text);display:grid;place-items:center;flex:0 0 auto}
+.tl-row #tlPlay{background:var(--ice2);color:#04121f}
+.tl-row input[type=range]{flex:1;min-width:0;accent-color:var(--ice);height:30px}
+.sbar{margin-top:6px}.sbar-g{height:9px;border-radius:5px}
+.sbar-t{position:relative;height:15px;font-size:10px;color:var(--mute)}.sbar-t span{position:absolute;top:2px;transform:translateX(-50%)}.sbar-t span:first-child{transform:none}.sbar-t span:last-child{transform:translateX(-100%)}
+.snowfield{image-rendering:auto;pointer-events:none}
+.map-base{display:flex;background:rgba(15,23,42,.85);border-radius:10px;padding:3px;gap:2px;backdrop-filter:blur(6px)}
+.map-base button{border:0;background:none;color:#cbd5e1;font:600 12px Inter,system-ui;padding:6px 9px;border-radius:8px;min-height:30px}.map-base button.on{background:#334155;color:#fff}
+.map-fsb{width:40px;height:40px;border-radius:50%;border:0;background:rgba(15,23,42,.85);color:#fff;font-size:18px;backdrop-filter:blur(6px)}
+
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -466,10 +488,12 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
     <div class="seg sm scroll" id="mapLayers" style="margin-bottom:10px">
       <button data-l="lyGrid" class="on">Snow forecast</button><button data-l="lyPowder">Powder finder</button><button data-l="lySnotel">Measured snow</button><button data-l="lyFcRadar">Forecast radar</button><button data-l="lyRadar">Radar</button><button data-l="lySat">Satellite</button><button data-l="lyCams">Cameras</button><button data-l="lyAvy">Avalanche</button><button data-l="lySlope">Slope angle</button><button data-l="lyAspect">Aspect</button><button data-l="lyWind">Wind loading</button>
     </div>
-    <div id="bigmap"></div>
+    <div id="mapWrap"><div id="bigmap"></div>
+      <div class="tl" id="tlBox"><div class="tl-top"><div id="tlLabel"><b>Forecast total snowfall</b><small>Loading…</small></div><div class="seg sm" id="tlMode"><button data-m="fc" class="on">Forecast</button><button data-m="past">Last 24h</button></div></div>
+        <div class="tl-row" id="tlRow"><button id="tlPlay" aria-label="Play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button><button id="tlBack" aria-label="Back a day"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button><button id="tlFwd" aria-label="Ahead a day"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button><input type="range" id="tlSlider" min="3" max="240" step="1" value="120" aria-label="Forecast time"></div>
+        <div id="tlLegend"></div></div></div>
     <div class="row" style="justify-content:space-between;margin-top:10px"><span class="muted" id="mapStatus"></span><button class="btn" id="gridGo">Model this view</button></div>
     <div class="muted" id="radarTime"></div><div class="muted" id="fcrTime"></div><div class="muted" id="satTime"></div><div class="legend" id="bcLegend"></div>
-    <div class="legend"><span><i class="dot" style="background:#14507a"></i> 1–3"</span><span><i class="dot" style="background:#1d6fb0"></i> 3–6"</span><span><i class="dot" style="background:#4f46e5"></i> 6–12"</span><span><i class="dot" style="background:#7c3aed"></i> 12–24"</span><span><i class="dot" style="background:#c026d3"></i> 24"+</span></div>
   </div></div>
   <div id="view-outlook" style="display:none"></div>
   <div id="view-alerts" style="display:none"></div>
@@ -1602,8 +1626,8 @@ const AVY = {1:["Low","#50b848"],2:["Moderate","#fff200"],3:["Considerable","#f7
 let bigMap, gridLayer, radarLayers = [], radarTimer, avyLayer, mapLegend;
 function initBigMap(){
   if(!bigMap){
-    bigMap = L.map("bigmap", {zoomControl:true}).setView([S.loc?.lat||44, S.loc?.lon||-121.6], 9);
-    L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15, attribution:"© OpenStreetMap, SRTM | © OpenTopoMap"}).addTo(bigMap);
+    bigMap = L.map("bigmap", {zoomControl:true, maxZoom:15}).setView([S.loc?.lat||44, S.loc?.lon||-121.6], 9);
+    bigMapChrome();
     $("#gridGo").onclick = () => drawGrid(true);
     bigMap.on("click", e=>{ openPicker(e.latlng.lat, e.latlng.lng, "Custom spot", null); });
     bigMap.on("zoomend", ()=>applyBackcountry()); bigMap.on("moveend", ()=>{ if(document.querySelector('#mapLayers [data-l="lyCams"]')?.classList.contains("on")) showCams(); if(document.querySelector('#mapLayers [data-l="lySnotel"]')?.classList.contains("on")) showSnotel(); });
@@ -1625,24 +1649,92 @@ function applyLayers(){
   on("lyFcRadar") ? startFcRadar() : stopFcRadar();
   applyBackcountry();
 }
-async function drawGrid(){
-  if(!S.loc) return; const c = bigMap.getCenter(); const N = 11, step = 0.07;
-  $("#mapStatus").textContent = "Modeling the snow grid…";
-  const pts = []; for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([c.lat + (a-(N-1)/2)*step, c.lng + (b-(N-1)/2)*step*1.35]);
-  const hours = S.win*24;
-  try{
-    let j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&forecast_days=${Math.min(16,S.win+1)}`);
-    if(!Array.isArray(j)) j=[j];
-    const vals = j.map(r=>{ const H=r.hourly, ref=r.elevation; const nk = new Date(Date.now()+r.utc_offset_seconds*1000).toISOString().slice(0,13)+":00"; const i0=Math.max(0,H.time.findIndex(t=>t>=nk)); let s=0; for(let k=i0;k<i0+hours&&k<H.time.length;k++){ const v=snowAt(H.precipitation[k],H.temperature_2m[k],H.freezing_level_height?.[k],ref,ref); if(v) s+=v.snow; } return {s, el:ref}; });
-    if(gridLayer) gridLayer.remove(); gridLayer = L.layerGroup();
-    pts.forEach((p,i)=>{ const v=vals[i]; if(!v) return; const col = snowColor(v.s); if(col==="transparent") return;
-      L.rectangle([[p[0]-step/2,p[1]-step*1.35/2],[p[0]+step/2,p[1]+step*1.35/2]], {stroke:false, fillColor:col, fillOpacity:.55})
-        .bindTooltip(`${fmtSnow(v.s)} · ${fmtEl(v.el)}`).addTo(gridLayer); });
-    const mx = Math.max(...vals.map(v=>v.s));
-    $("#mapStatus").innerHTML = `${S.win}-day snow · max ${fmtSnow(mx)} · each cell modeled at its real elevation`;
-    applyLayers();
-  }catch(e){ $("#mapStatus").textContent = "Couldn't load the snow grid."; }
+
+/* ---------- Big map: Topo / Satellite basemap and full screen ---------- */
+function bigMapChrome(){
+  const layers = { topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15, attribution:"© OpenStreetMap, SRTM | © OpenTopoMap"}),
+    sat: L.layerGroup([L.tileLayer(SAT_TILES,{maxZoom:15, attribution:SAT_ATTR}), L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, opacity:.9})]) };
+  let cur = store.get("bigBase","topo"); if(!layers[cur]) cur="topo"; layers[cur].addTo(bigMap);
+  const Base = L.Control.extend({ onAdd(){ const d=L.DomUtil.create("div","map-base"); L.DomEvent.disableClickPropagation(d);
+    d.innerHTML=[["topo","Topo"],["sat","Satellite"]].map(([k,l])=>`<button type="button" data-b="${k}">${l}</button>`).join("");
+    const paint=()=>d.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.b===cur));   // toggle classes only: replacing the buttons would let the tap fall through to the map
+    d.querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(b.dataset.b===cur) return; bigMap.removeLayer(layers[cur]); cur=b.dataset.b; store.set("bigBase",cur); layers[cur].addTo(bigMap); (layers[cur].eachLayer? layers[cur].eachLayer(x=>x.bringToBack()) : layers[cur].bringToBack()); paint(); });
+    paint(); return d; } });
+  new Base({position:"topright"}).addTo(bigMap);
+  const Fs = L.Control.extend({ onAdd(){ const b=L.DomUtil.create("button","map-fsb"); b.type="button"; b.setAttribute("aria-label","Full screen map"); b.textContent="⤢"; L.DomEvent.disableClickPropagation(b);
+    b.onclick=()=>{ const w=$("#mapWrap"), on=w.classList.toggle("full"); b.textContent = on? "✕" : "⤢"; document.body.style.overflow = on? "hidden" : ""; setTimeout(()=>{ bigMap.invalidateSize(); },80); }; return b; } });
+  new Fs({position:"topright"}).addTo(bigMap);
 }
+/* ---------- Big map: smooth snow field with a timeline you can scrub or play ---------- */
+const SNOW_STOPS = [[0.1,[125,211,252]],[1,[56,189,248]],[3,[29,111,176]],[6,[79,70,229]],[12,[124,58,237]],[24,[192,38,211]],[36,[244,63,94]],[60,[251,191,36]]];
+function snowRGBA(v){ if(!isNum(v) || v < 0.1) return null; let i=0; while(i<SNOW_STOPS.length-1 && v >= SNOW_STOPS[i+1][0]) i++;
+  const [a,ca]=SNOW_STOPS[i], nx=SNOW_STOPS[i+1]; let c=ca; if(nx){ const t=(v-a)/(nx[0]-a); c=ca.map((x,k)=>Math.round(x+(nx[1][k]-x)*t)); }
+  return [...c, Math.round(255*Math.min(.78, .3 + .48*Math.min(1, v/1.5)))]; }
+function snowLegendHTML(){ const unit = imp()? '"' : "cm"; const ticks=[1,3,6,12,24,36,60];
+  return `<div class="sbar"><div class="sbar-g" style="background:linear-gradient(90deg,${SNOW_STOPS.map((s,i)=>`rgb(${s[1].join(",")}) ${Math.round(i/(SNOW_STOPS.length-1)*100)}%`).join(",")})"></div><div class="sbar-t">${["in",...ticks].map((t,i)=>`<span style="left:${i? Math.round((SNOW_STOPS.findIndex(s=>s[0]===t))/(SNOW_STOPS.length-1)*100) : 0}%">${i? (imp()? t : Math.round(t*2.54)) : (imp()? "in":"cm")}</span>`).join("")}</div></div>`; }
+let snowField = null, snowFieldCanvas = null; S.tl = { mode:"fc", h:120, playing:false, timer:null };
+function fieldImage(G, valOf){
+  const N = G.N, sc = 12, W = (N-1)*sc+1; const cv = snowFieldCanvas ||= document.createElement("canvas"); cv.width=W; cv.height=W;
+  const g = cv.getContext("2d"), img = g.createImageData(W, W), D = img.data;
+  const vals = G.pts.map((_,i)=>valOf(i));
+  for(let y=0;y<W;y++){ const fy=y/sc, iy=Math.min(N-2,Math.floor(fy)), ty=fy-iy;
+    for(let x=0;x<W;x++){ const fx=x/sc, ix=Math.min(N-2,Math.floor(fx)), tx=fx-ix;
+      // row 0 of the canvas is the north edge
+      const r0=(N-1-iy), r1=(N-2-iy); const a=vals[r0*N+ix], b=vals[r0*N+ix+1], c=vals[r1*N+ix], d=vals[r1*N+ix+1];
+      const v = (a*(1-tx)+b*tx)*(1-ty) + (c*(1-tx)+d*tx)*ty; const col = snowRGBA(v); if(!col) continue; const o=(y*W+x)*4; D[o]=col[0]; D[o+1]=col[1]; D[o+2]=col[2]; D[o+3]=col[3]; } }
+  g.putImageData(img,0,0); return cv.toDataURL("image/png");
+}
+function tlTotals(G, h){ return G.pts.map((_,i)=>{ const s=G.snow[i]; if(S.tl.mode==="past"){ let t=0; for(let k=Math.max(0,G.i0-24);k<G.i0;k++) t+=s[k]||0; return t; } let t=0; for(let k=G.i0;k<G.i0+h && k<s.length;k++) t+=s[k]||0; return t; }); }
+function paintField(){
+  const G = S.grid; if(!G || !bigMap) return; const tot = tlTotals(G, S.tl.h);
+  const url = fieldImage(G, i=>tot[i]);
+  const b = [[G.lat0, G.lon0],[G.lat0 + (G.N-1)*G.step, G.lon0 + (G.N-1)*G.step*1.35]];
+  if(!snowField){ snowField = L.imageOverlay(url, b, {opacity:1, interactive:false, className:"snowfield"}); }
+  else { snowField.setUrl(url); snowField.setBounds(L.latLngBounds(b)); }
+  if(document.querySelector('#mapLayers [data-l="lyGrid"]')?.classList.contains("on")) snowField.addTo(bigMap);
+  gridLayer = snowField;
+  const mx = Math.max(...tot), t = G.times[Math.min(G.times.length-1, G.i0 + S.tl.h)];
+  const lab = $("#tlLabel"); if(lab) lab.innerHTML = S.tl.mode==="past"
+    ? `<b>Snowfall, last 24 hours</b> <span class="u">Estimated</span><small>From the model's last 24 hours · up to ${fmtSnow(mx)}</small>`
+    : `<b>Forecast total snowfall</b><small>Now to ${t? `${dow(t.slice(0,10))} ${md(t.slice(0,10))} ${hl(+t.slice(11,13))}`:"—"} · up to ${fmtSnow(mx)}</small>`;
+  const sl = $("#tlSlider"); if(sl){ sl.max = G.maxH; if(+sl.value !== S.tl.h) sl.value = S.tl.h; }
+  const lg = $("#tlLegend"); if(lg && lg.dataset.u !== S.units){ lg.innerHTML = snowLegendHTML(); lg.dataset.u = S.units; }
+  document.querySelectorAll("#mapWin button").forEach(b=>b.classList.toggle("on", S.tl.mode==="fc" && +b.dataset.w*24===S.tl.h));
+}
+function tlStop(){ if(S.tl.playing) S.tl.paused = true; S.tl.playing=false; clearInterval(S.tl.timer); const p=$("#tlPlay"); if(p) p.innerHTML = PLAY_SVG; }
+const PLAY_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>`, PAUSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+function tlPlay(){ if(S.tl.playing) return tlStop(); if(!S.grid) return; if(S.tl.mode==="past") setTlMode("fc");
+  const max = S.grid.maxH; if(!S.tl.paused || S.tl.h >= max) S.tl.h = 3; S.tl.paused = false; S.tl.playing = true; $("#tlPlay").innerHTML = PAUSE_SVG;
+  S.tl.timer = setInterval(()=>{ S.tl.h = Math.min(max, S.tl.h + 6); paintField(); if(S.tl.h >= max) tlStop(); }, 180); }
+function setTlMode(m){ S.tl.mode = m; document.querySelectorAll("#tlMode button").forEach(b=>b.classList.toggle("on", b.dataset.m===m)); const tl=$("#tlRow"); if(tl) tl.classList.toggle("dim", m==="past"); paintField(); }
+function wireTimeline(){
+  const sl = $("#tlSlider"); if(!sl || sl.dataset.w) return; sl.dataset.w = 1;
+  sl.oninput = ()=>{ tlStop(); S.tl.paused = false; if(S.tl.mode!=="fc") setTlMode("fc"); S.tl.h = +sl.value; paintField(); };
+  $("#tlPlay").onclick = tlPlay;
+  $("#tlBack").onclick = ()=>{ tlStop(); S.tl.h = Math.max(3, S.tl.h - 24); paintField(); };
+  $("#tlFwd").onclick = ()=>{ tlStop(); S.tl.h = Math.min(S.grid?.maxH||240, S.tl.h + 24); paintField(); };
+  document.querySelectorAll("#tlMode button").forEach(b=>b.onclick=()=>{ tlStop(); setTlMode(b.dataset.m); });
+}
+async function drawGrid(){
+  if(!S.loc || !bigMap) return; tlStop();
+  const bnd = bigMap.getBounds(), c = bigMap.getCenter(); const N = 13;
+  const span = Math.min(3.2, Math.max(0.5, Math.max(bnd.getNorth()-bnd.getSouth(), (bnd.getEast()-bnd.getWest())/1.35) * 1.1));
+  const step = span/(N-1); const lat0 = c.lat - span/2, lon0 = c.lng - span*1.35/2;
+  const pts = []; for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([lat0 + a*step, lon0 + b*step*1.35]);
+  $("#mapStatus").textContent = "Modeling the snow map…";
+  try{
+    let j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&past_days=1&forecast_days=11`);
+    if(!Array.isArray(j)) j=[j];
+    const H0 = j[0].hourly; const nk = new Date(Date.now()+j[0].utc_offset_seconds*1000).toISOString().slice(0,13)+":00"; const i0 = Math.max(0, H0.time.findIndex(t=>t>=nk));
+    const snow = j.map(r=>{ const H=r.hourly, ref=r.elevation; return H.time.map((_,k)=>{ const v=snowAt(H.precipitation[k],H.temperature_2m[k],H.freezing_level_height?.[k],ref,ref); return v? v.snow : 0; }); });
+    S.grid = { N, step, lat0, lon0, pts, snow, times:H0.time, i0, maxH: Math.min(240, H0.time.length - i0 - 1) };
+    S.tl.h = Math.min(S.grid.maxH, S.tl.h || S.win*24);
+    paintField(); wireTimeline();
+    $("#mapStatus").textContent = "Each point is modeled at its real elevation. Move the map, then tap Model this view.";
+    applyLayers();
+  }catch(e){ console.warn("snow map", e); $("#mapStatus").textContent = "Couldn't load the snow map."; }
+}
+
 async function startRadar(){
   if(radarTimer) return;
   try{
@@ -2451,10 +2543,10 @@ async function showCams(){
   if(b.getEast()-b.getWest() > 6){ $("#mapStatus").textContent = "Zoom in to see road cameras"; return; }
   let j; try{ j = await api(`/cams?bounds=${box.join(",")}`); }catch(e){ return; }
   if(!document.querySelector('#mapLayers [data-l="lyCams"]')?.classList.contains("on")) return;
-  if(camLayer) camLayer.remove(); camLayer=L.layerGroup(); camFor=key;
-  (j.cams||[]).forEach(c=>{ L.marker([c.lat,c.lon],{icon:L.divIcon({className:"", html:`<div class="cam-pin">📷</div>`, iconSize:null})})
-    .bindPopup(`<b>${c.name}</b><br><img src="${c.img}?t=${Math.floor(Date.now()/3e5)}" style="width:240px;max-width:70vw;border-radius:8px;margin-top:6px" alt="${c.name}"><br><span style="color:#888;font-size:11px">ODOT TripCheck</span>`, {maxWidth:260}).addTo(camLayer); });
-  camLayer.addTo(bigMap); $("#mapStatus").textContent = `${(j.cams||[]).length} ODOT road cameras in view · tap one to see it`;
+  if(camLayer){ camLayer.remove(); camLayer._off?.(); } camFor=key;
+  const seen = new Set(), rc = Object.values(RESORT_CAMS).flat().filter(c=>c && isNum(c.lat) && !seen.has(c.id) && seen.add(c.id) && b.pad(.2).contains([c.lat,c.lon]));
+  const all = [...rc, ...(j.cams||[])]; camLayer = camCallouts(bigMap, all);
+  $("#mapStatus").textContent = `${all.length} cameras in view · tap one to see it, or a group to zoom in`;
 }
 
 /* ---------- Share a favorites list ---------- */
@@ -2703,7 +2795,7 @@ function camCallouts(m, cams){
         .addTo(layer);
     });
   };
-  m.on("zoomend", draw); draw(); return layer;
+  m.on("zoomend", draw); draw(); layer._off = () => m.off("zoomend", draw); return layer;
 }
 function camLightbox(c, list){
   let i = list? list.indexOf(c) : 0; const all = list || [c];
@@ -3010,7 +3102,7 @@ $("#pGo").onclick = () => { const [lat,lon] = $("#pLL").value.split(",").map(Num
 /* ================= Controls ================= */
 function seg(id, attr, key, cb){ const el=$(id); el.querySelectorAll("button").forEach(b=>{ b.classList.toggle("on", String(S[key])===b.dataset[attr]); b.onclick=()=>{ S[key] = key==="win"? +b.dataset[attr] : b.dataset[attr]; store.set(key,S[key]); el.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); cb(); }; }); }
 seg("#modeSeg","m","mode",render); seg("#bandSeg","b","band",render); seg("#unitSeg","u","units",()=>{ render(); if(location.hash==="#finder") renderFinder(); });
-seg("#mapWin","w","win",()=>{ render(); drawGrid(); });
+seg("#mapWin","w","win",()=>{ render(); tlStop(); S.tl.h = Math.min(S.grid?.maxH||240, S.win*24); if(S.tl.mode!=="fc") setTlMode("fc"); else paintField(); });
 document.querySelectorAll("#mapLayers button").forEach(b=>b.onclick=()=>{ b.classList.toggle("on"); applyLayers(); });
 
 // boot
