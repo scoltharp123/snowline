@@ -1,6 +1,6 @@
-// GET /api/report?spot=... → links to the official resort and grooming reports.
-// No third-party pages are fetched or parsed: Snowline links out instead.
-import { json } from "../lib/shared.mjs";
+// GET /api/report?spot=Mt.%20Bachelor%2C%20OR → { resort, grooming }
+// Resort reports: best-effort parsing of OnTheSnow pages. Nordic Pulse grooming: link only, never fetched.
+import { json, getText } from "../lib/shared.mjs";
 
 const RESORT = {
   "Mt. Bachelor, OR": "oregon/mt-bachelor", "Hoodoo, OR": "oregon/hoodoo-ski-area", "Willamette Pass, OR": "oregon/willamette-pass",
@@ -16,11 +16,35 @@ const GROOM = {
   "Mt. Bachelor, OR": "US/OR/Mt-Bachelor-Nordic-Center",
 };
 
+const text = (html) => html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+  .replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h\d|tr|td|span)>/gi, "\n").replace(/<[^>]+>/g, " ")
+  .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&rsquo;/g, "'").replace(/&ldquo;|&rdquo;/g, '"')
+  .replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
+
+async function resortReport(slug) {
+  const url = `https://www.onthesnow.com/${slug}/skireport`;
+  const html = await getText(url);
+  const t = text(html).replace(/\n/g, " ");
+  const out = { url, source: "OnTheSnow (resort-reported)" };
+  let m;
+  if ((m = t.match(/snow report for ([A-Z][a-z]{2} \d{1,2}) is an? (\d+)" base depth(?: with (\d+) of (\d+) lifts open)?/))) { out.date = m[1]; out.base = +m[2]; if (m[3]) { out.liftsOpen = +m[3]; out.lifts = +m[4]; } }
+  if ((m = t.match(/Summit\s+(\d+)"/))) out.summit = +m[1];
+  if (out.base == null && (m = t.match(/Base\s+(\d+)"/))) out.base = +m[1];
+  if ((m = t.match(/(\d+)\/(\d+) open/))) { out.runsOpen = +m[1]; out.runs = +m[2]; }
+  if ((m = t.match(/Snow Reporter Comments:\s*(.{20,600}?)(?=\s(?:Acres Open|Runs Open|Firsthand|Nordic Open|Terrain Park)|$)/))) out.comment = m[1].trim();
+  if ((m = t.match(/Recent Snowfall\s+((?:\d+"\s*){1,8})/))) { const v = m[1].match(/\d+/g).map(Number); out.recent = v; out.new24 = v[v.length - 1]; }
+  if (/\bClosed\b/.test(t.slice(0, 600)) && !/\bOpen\b/.test(t.slice(0, 300))) out.status = "Closed";
+  else if (/Mt\.?[^.]{0,40}\bOpen\b/.test(t.slice(0, 1500))) out.status = "Open";
+  return out;
+}
 export default async (req) => {
   const spot = new URL(req.url).searchParams.get("spot") || "";
   const res = {};
-  if (RESORT[spot]) res.resort = { url: `https://www.onthesnow.com/${RESORT[spot]}/skireport`, source: "OnTheSnow" };
+  const jobs = [];
+  if (RESORT[spot]) jobs.push(resortReport(RESORT[spot]).then(r => res.resort = r).catch(e => res.resort = { error: String(e.message || e), url: `https://www.onthesnow.com/${RESORT[spot]}/skireport` }));
+  // Nordic Pulse: link only (their terms don't allow scraping or redistribution)
   if (GROOM[spot]) res.grooming = { url: `https://nordic-pulse.com/ski-areas/${GROOM[spot]}`, source: "Nordic Pulse" };
-  return json(res, { cache: 86400 });
+  await Promise.all(jobs);
+  return json(res, { cache: 1800 });
 };
 export const config = { path: "/api/report" };

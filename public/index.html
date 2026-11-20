@@ -1866,11 +1866,20 @@ function renderReport(){
       </div>${spark? `<div class="row" style="margin-top:8px;gap:8px"><span class="muted">Depth, last week</span>${spark}</div>`:""}
       <div class="muted" style="margin-top:6px">Station is ${s.elevFt < S.loc.top - 800 ? "below the summit, so expect more up high" : "near this elevation"} · updated ${s.updated? String(s.updated).slice(5,16).replace("-","/") : "—"}</div></div>`);
   }
-  const links = [];
-  const R = rep.resort, G = S.mode!=="alpine" ? rep.grooming : null;
-  if(G) links.push(`<a class="li" href="${G.url}" target="_blank" rel="noopener"><span class="nm"><b>Nordic grooming report</b><small>Today's grooming on ${G.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
-  if(R) links.push(`<a class="li" href="${R.url}" target="_blank" rel="noopener"><span class="nm"><b>Resort snow report</b><small>Reported snowfall, base and ${S.mode==="alpine"? "lifts" : "conditions"} on ${R.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
-  if(links.length) blocks.push(`<div class="list" style="margin-top:2px">${links.join("")}</div>`);
+  const R = rep.resort;
+  if(R && !R.error && (R.base!=null || R.comment)){
+    blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b><span class="muted">${R.date||""}${R.status? " · "+R.status : ""}</span></div>
+      <div class="kv k3">
+        ${R.new24!=null? `<div><div class="l">24h reported</div><div class="v num">${fmtSnow(R.new24)}</div></div>`:""}
+        ${R.base!=null? `<div><div class="l">Base</div><div class="v num">${fmtSnow(R.base,0)}</div></div>`:""}
+        ${R.summit!=null? `<div><div class="l">Summit</div><div class="v num">${fmtSnow(R.summit,0)}</div></div>`:""}
+        ${R.lifts && S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v">${R.liftsOpen}/${R.lifts}</div></div>`:""}
+        ${R.runs && S.mode==="alpine"? `<div><div class="l">Runs</div><div class="v">${R.runsOpen}/${R.runs}</div></div>`:""}
+      </div>${R.comment? `<p class="clamp3 muted" style="margin:8px 0 0">${R.comment}</p>`:""}
+      <a class="muted" href="${R.url}" target="_blank" rel="noopener">${R.source} ↗</a></div>`);
+  } else if(R && R.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b></div><a href="${R.url}" target="_blank" rel="noopener">Open the latest resort report ↗</a></div>`);
+  const G = S.mode!=="alpine" ? rep.grooming : null;
+  if(G) blocks.push(`<a class="li" href="${G.url}" target="_blank" rel="noopener"><span class="nm"><b>Nordic grooming report</b><small>Today's grooming on ${G.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
   if(!blocks.length){ el.remove(); return; }
   el.innerHTML = `<div class="card-h"><h2>Snow Report</h2><span class="muted">observed</span></div>${blocks.join("")}`;
 }
