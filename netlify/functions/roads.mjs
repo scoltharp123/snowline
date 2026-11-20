@@ -35,7 +35,7 @@ export default async (req) => {
   const [inc, rw, cams] = await Promise.all([
     tc("Incidents", key).catch(e => ({ error: String(e.message) })),
     tc("RW/Reports", key).catch(() => tc("RWReports", key)).catch(e => ({ error: String(e.message) })),
-    tc("Cctv/Inventory", key).catch(() => tc("CctvInventory", key)).catch(e => ({ error: String(e.message) })),
+    tc(`Cctv/Inventory?Bounds=${(lon - 0.45).toFixed(4)},${(lat - 0.33).toFixed(4)},${(lon + 0.45).toFixed(4)},${(lat + 0.33).toFixed(4)}`, key).catch(e => ({ error: String(e.message) })),
   ]);
   const pick = (data, r) => data.error ? [] : (arrays(data).sort((a, b) => b.length - a.length)[0] || []).filter(o => onRoute(o) || near(o, r));
   out.incidents = pick(inc, 40).slice(0, 5).map(o => texts(o)).filter(Boolean);
