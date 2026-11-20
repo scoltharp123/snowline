@@ -2589,10 +2589,10 @@ const favCams = () => store.get("favCams", []);
 const BACH = (n, name) => ({ id:"mtb-"+n, name, img:`https://api.mtbachelor.com/api/v1/cams/mtn/${n}`, src:"Mt. Bachelor", live:true, page:`https://www.mtbachelor.com/the-mountain/webcams/webcam-modal/#${n===14? "snow-stake" : "live-cam-"+n}`, lat:43.979, lon:-121.688 });
 const TIMB = (f, name) => ({ id:"tl-"+f, name, img:`https://timberlinelodge.com/snowcameras/${f}.jpg`, src:"Timberline", page:"https://www.timberlinelodge.com/conditions", lat:45.331, lon:-121.711 });
 const BACH_CAMS = [BACH(14,"West Village snow stake"), BACH(1,"Base of Pine Marten Lift"), BACH(12,"Tumalo Mtn & top of Pine Marten"), BACH(9,"Pine Marten Lodge"), BACH(11,"Outback lift line"), BACH(3,"The Cone"), BACH(5,"Sunrise Base"), BACH(13,"West Village base & parking"), BACH(2,"Rock Bar patio"), BACH(16,"Nordic Center")];
-const ROAD_CAM_FILTER = { "Mt. Bachelor, OR": /^Century Dr/i, "Mt. Bachelor Nordic Center, OR": /^Century Dr/i };
+const ROAD_CAM_FILTER = { "Mt. Bachelor, OR": /^Century Dr/i, "Mt. Bachelor Nordic Center, OR": /^Century Dr/i, "Meissner Nordic (Bend), OR": /^Century Dr/i };
 const RESORT_CAMS = {
   "Mt. Bachelor, OR": BACH_CAMS,
-  "Mt. Bachelor Nordic Center, OR": [BACH_CAMS.find(c=>c.id==="mtb-16"), BACH_CAMS[0], ...BACH_CAMS.filter(c=>!["mtb-16","mtb-14"].includes(c.id))],
+  "Mt. Bachelor Nordic Center, OR": [BACH_CAMS.find(c=>c.id==="mtb-16")],
   "Timberline, OR": [TIMB("snowstake","Snow stake"), TIMB("lodge","Timberline Lodge"), TIMB("FloodEast","Magic Mile"), TIMB("FloodSouth","Jeff Flood"), TIMB("palmerbottom","Palmer / Silcox"), TIMB("pucci","Pucci"), TIMB("brunotop","Bruno's"), TIMB("summit","Summit Pass"), TIMB("SummitBus","Summit Pass shuttle")],
 };
 function camKey(c){ return c.id!=null? (String(c.id).includes("-")? c.id : "odot-"+c.id) : c.img; }
