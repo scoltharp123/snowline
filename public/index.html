@@ -175,6 +175,7 @@ tr.cons td{font-weight:700;border-top:2px solid var(--ice2)}
 /* lists (finder, sheets) */
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .list{display:flex;flex-direction:column}
+a.li{color:inherit;text-decoration:none}
 .li{display:flex;align-items:center;gap:10px;padding:12px 2px;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%;min-height:52px}
 .li .nm{flex:1;min-width:0}
 .li .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1865,26 +1866,11 @@ function renderReport(){
       </div>${spark? `<div class="row" style="margin-top:8px;gap:8px"><span class="muted">Depth, last week</span>${spark}</div>`:""}
       <div class="muted" style="margin-top:6px">Station is ${s.elevFt < S.loc.top - 800 ? "below the summit, so expect more up high" : "near this elevation"} · updated ${s.updated? String(s.updated).slice(5,16).replace("-","/") : "—"}</div></div>`);
   }
-  const R = rep.resort;
-  if(R && !R.error && (R.base!=null || R.comment)){
-    blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b><span class="muted">${R.date||""}${R.status? " · "+R.status : ""}</span></div>
-      <div class="kv k3">
-        ${R.new24!=null? `<div><div class="l">24h reported</div><div class="v num">${fmtSnow(R.new24)}</div></div>`:""}
-        ${R.base!=null? `<div><div class="l">Base</div><div class="v num">${fmtSnow(R.base,0)}</div></div>`:""}
-        ${R.summit!=null? `<div><div class="l">Summit</div><div class="v num">${fmtSnow(R.summit,0)}</div></div>`:""}
-        ${R.lifts && S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v">${R.liftsOpen}/${R.lifts}</div></div>`:""}
-        ${R.runs && S.mode==="alpine"? `<div><div class="l">Runs</div><div class="v">${R.runsOpen}/${R.runs}</div></div>`:""}
-      </div>${R.comment? `<p class="clamp3 muted" style="margin:8px 0 0">${R.comment}</p>`:""}
-      <a class="muted" href="${R.url}" target="_blank" rel="noopener">${R.source} ↗</a></div>`);
-  } else if(R && R.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b></div><a href="${R.url}" target="_blank" rel="noopener">Open the latest resort report ↗</a></div>`);
-  const G = S.mode!=="alpine" ? rep.grooming : null;
-  if(G && (G.text || G.trails)){
-    const groomed = (G.trails||[]).filter(t=>t.groomed).slice(0,8);
-    blocks.push(`<div class="rep"><div class="rep-h"><b>Nordic grooming</b><span class="muted">${G.reported||""}${G.by? " · "+G.by : ""}</span></div>
-      ${G.text? `<p class="clamp3" style="margin:4px 0 6px;font-size:14px;line-height:1.45">${G.text}</p>`:""}
-      ${groomed.length? `<div class="list">${groomed.map(t=>`<div class="li" style="min-height:40px;padding:6px 0"><span class="nm"><b style="font-weight:500">${t.name}</b></span><span class="muted">${t.groomed}</span></div>`).join("")}</div>`:""}
-      <a class="muted" href="${G.url}" target="_blank" rel="noopener">${G.source} ↗</a></div>`);
-  } else if(G && G.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Nordic grooming</b></div><a href="${G.url}" target="_blank" rel="noopener">Open the grooming report ↗</a></div>`);
+  const links = [];
+  const R = rep.resort, G = S.mode!=="alpine" ? rep.grooming : null;
+  if(G) links.push(`<a class="li" href="${G.url}" target="_blank" rel="noopener"><span class="nm"><b>Nordic grooming report</b><small>Today's grooming on ${G.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
+  if(R) links.push(`<a class="li" href="${R.url}" target="_blank" rel="noopener"><span class="nm"><b>Resort snow report</b><small>Reported snowfall, base and ${S.mode==="alpine"? "lifts" : "conditions"} on ${R.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
+  if(links.length) blocks.push(`<div class="list" style="margin-top:2px">${links.join("")}</div>`);
   if(!blocks.length){ el.remove(); return; }
   el.innerHTML = `<div class="card-h"><h2>Snow Report</h2><span class="muted">observed</span></div>${blocks.join("")}`;
 }
