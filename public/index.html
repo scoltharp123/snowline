@@ -391,6 +391,8 @@ input[type=range]{accent-color:var(--ice2)}
 .kv.k3{grid-template-columns:repeat(3,1fr)}
 .tk-row{display:flex;align-items:center;gap:10px;margin:6px 0}.tk-l{width:72px;font-size:13px;color:var(--mute)}.tk-bar{flex:1;height:12px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}.tk-bar i{display:block;height:100%;border-radius:99px}.tk-row b{width:44px;text-align:right}
 .sn-pin{transform:translate(-50%,-50%);padding:2px 6px;border-radius:99px;font:700 11px/1.3 system-ui;color:#04121f;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.5);border:1px solid rgba(0,0,0,.25)}
+.pw-pin{transform:translate(-50%,-50%);border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui;color:#04121f;border:2px solid rgba(255,255,255,.85);box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.cam-pin{transform:translate(-50%,-50%);font-size:18px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
 </style>
 </head>
 <body>
@@ -418,11 +420,11 @@ input[type=range]{accent-color:var(--ice2)}
   <div id="view-maps" style="display:none"><div class="card">
     <div class="card-h"><h2>Snow forecast map</h2><div class="seg sm" id="mapWin"><button data-w="3">3d</button><button data-w="5">5d</button><button data-w="10">10d</button></div></div>
     <div class="seg sm scroll" id="mapLayers" style="margin-bottom:10px">
-      <button data-l="lyGrid" class="on">Snow forecast</button><button data-l="lySnotel">Measured snow</button><button data-l="lyRadar">Radar</button><button data-l="lyAvy">Avalanche</button><button data-l="lySlope">Slope angle</button><button data-l="lyWind">Wind loading</button>
+      <button data-l="lyGrid" class="on">Snow forecast</button><button data-l="lyPowder">Powder finder</button><button data-l="lySnotel">Measured snow</button><button data-l="lyFcRadar">Forecast radar</button><button data-l="lyRadar">Radar</button><button data-l="lySat">Satellite</button><button data-l="lyCams">Cameras</button><button data-l="lyAvy">Avalanche</button><button data-l="lySlope">Slope angle</button><button data-l="lyAspect">Aspect</button><button data-l="lyWind">Wind loading</button>
     </div>
     <div id="bigmap"></div>
     <div class="row" style="justify-content:space-between;margin-top:10px"><span class="muted" id="mapStatus"></span><button class="btn" id="gridGo">Model this view</button></div>
-    <div class="muted" id="radarTime"></div><div class="legend" id="bcLegend"></div>
+    <div class="muted" id="radarTime"></div><div class="muted" id="fcrTime"></div><div class="muted" id="satTime"></div><div class="legend" id="bcLegend"></div>
     <div class="legend"><span><i class="dot" style="background:#14507a"></i> 1–3"</span><span><i class="dot" style="background:#1d6fb0"></i> 3–6"</span><span><i class="dot" style="background:#4f46e5"></i> 6–12"</span><span><i class="dot" style="background:#7c3aed"></i> 12–24"</span><span><i class="dot" style="background:#c026d3"></i> 24"+</span></div>
   </div></div>
   <div id="view-outlook" style="display:none"></div>
@@ -447,6 +449,7 @@ input[type=range]{accent-color:var(--ice2)}
   <div id="locList"></div>
 </div></div>
 
+<div class="sheet" id="miniSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2 id="miniTitle"></h2><button class="link" data-close>Close</button></div><div id="miniBox"></div></div></div>
 <div class="sheet" id="repSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2>Check in</h2><button class="link" data-close>Cancel</button></div><div id="repBox"></div></div></div>
 <div class="sheet" id="shareSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2>Share</h2><button class="link" data-close>Done</button></div><div id="shareBox"></div></div></div>
 <div id="offPill">Offline · showing saved forecast</div>
@@ -454,6 +457,7 @@ input[type=range]{accent-color:var(--ice2)}
   <div class="grab"></div>
   <div class="sheet-h"><h2>Settings</h2><button class="link" data-close>Done</button></div>
   <div class="field">Units<div class="seg" id="unitSeg"><button data-u="imp">Inches · °F · ft</button><button data-u="met">cm · °C · m</button></div></div>
+  <h3 style="margin:18px 0 6px">Sync across devices</h3><div id="syncBox"></div>
   <h3 style="margin:18px 0 6px">How Snowline works</h3>
   <div class="about">
     <p>Snowline blends up to nine weather models (ECMWF IFS and AIFS, GFS, HRRR, NBM, GEM, ICON, UKMO, JMA) with the ECMWF and GFS ensembles. It doesn't use each model's built-in snowfall. It re-models snow at your elevation instead: it adjusts temperature for altitude, finds the rain/snow line from the freezing level, and applies a temperature-based snow-to-liquid ratio. ECMWF, HRRR and NBM get extra weight in the blend.</p>
@@ -1050,7 +1054,7 @@ async function renderFavs(force){
   if(!S.finder || force) el.innerHTML = `<div class="vh"><h1>Favorites</h1></div>${list.map(()=>`<div class="skel" style="height:170px"></div>`).join("")}`;
   let F; try{ F = await loadFinder(force); }catch(e){ el.innerHTML = `<div class="vh"><h1>Favorites</h1></div><div class="card err">Couldn't load forecasts. Try again in a minute.</div>`; return; }
   const byName = new Map(F.rows.map(r=>[r.spot.name, r]));
-  el.innerHTML = `<div class="vh"><h1>Favorites</h1>${S.favs.length? `<button class="link" id="favEdit">${S.favEdit?"Done":"Edit"}</button>`:""}</div>
+  el.innerHTML = `<div class="vh"><h1>Favorites</h1>${S.favs.length? `<span class="row" style="gap:14px;flex-wrap:nowrap"><button class="link" id="favShare">Share</button><button class="link" id="favEdit">${S.favEdit?"Done":"Edit"}</button></span>`:""}</div>
     ${a2hsHTML()}
     ${S.favs.length? "" : `<div class="callout">Tap ☆ on any forecast to add it here. Until then, here are some spots near Bend.</div>`}
     ${list.map(sp=>{ const r = byName.get(sp.name); if(!r) return "";
@@ -1059,6 +1063,7 @@ async function renderFavs(force){
     <div class="muted" style="text-align:center;margin:10px 0">Summit forecasts · Open-Meteo best-match blend through Snowline's snow model</div>`;
   el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ if(S.favEdit) return; const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
   const fe=$("#favEdit"); if(fe) fe.onclick = () => { S.favEdit=!S.favEdit; renderFavs(); };
+  const fs=$("#favShare"); if(fs) fs.onclick = () => shareFavs();
   el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const n=decodeURIComponent(b.dataset.rm); S.favs=S.favs.filter(f=>f.name!==n); store.set("favs",S.favs); if(!S.favs.length) S.favEdit=false; updateTop(); renderFavs(); });
   el.querySelectorAll("[data-up]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const n=decodeURIComponent(b.dataset.up); const i=S.favs.findIndex(f=>f.name===n); if(i>0){ const [x]=S.favs.splice(i,1); S.favs.splice(i-1,0,x); store.set("favs",S.favs); renderFavs(); } });
 }
@@ -1545,7 +1550,7 @@ function initBigMap(){
     L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15, attribution:"© OpenStreetMap, SRTM | © OpenTopoMap"}).addTo(bigMap);
     $("#gridGo").onclick = () => drawGrid(true);
     bigMap.on("click", e=>{ openPicker(e.latlng.lat, e.latlng.lng, "Custom spot", null); });
-    bigMap.on("zoomend", ()=>applyBackcountry()); bigMap.on("moveend", ()=>{ if(document.querySelector('#mapLayers [data-l="lySnotel"]')?.classList.contains("on")) showSnotel(); });
+    bigMap.on("zoomend", ()=>applyBackcountry()); bigMap.on("moveend", ()=>{ if(document.querySelector('#mapLayers [data-l="lyCams"]')?.classList.contains("on")) showCams(); if(document.querySelector('#mapLayers [data-l="lySnotel"]')?.classList.contains("on")) showSnotel(); });
   }
   setTimeout(()=>bigMap.invalidateSize(), 60);
   document.querySelectorAll("#mapWin button").forEach(b=>b.classList.toggle("on", +b.dataset.w===S.win));
@@ -1558,6 +1563,10 @@ function applyLayers(){
   on("lyRadar") ? startRadar() : stopRadar();
   on("lyAvy") ? showAvy() : (avyLayer && avyLayer.remove());
   on("lySnotel") ? showSnotel() : (snotelLayer && snotelLayer.remove());
+  on("lyPowder") ? showPowder() : (powderLayer && powderLayer.remove());
+  on("lyCams") ? showCams() : (camLayer && camLayer.remove());
+  on("lySat") ? startSat() : stopSat();
+  on("lyFcRadar") ? startFcRadar() : stopFcRadar();
   applyBackcountry();
 }
 async function drawGrid(){
@@ -1861,8 +1870,9 @@ function renderReport(){
   } else if(R && R.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b></div><a href="${R.url}" target="_blank" rel="noopener">Open the latest resort report ↗</a></div>`);
   const G = S.mode!=="alpine" ? rep.grooming : null;
   if(G) blocks.push(`<a class="li" href="${G.url}" target="_blank" rel="noopener"><span class="nm"><b>Nordic grooming report</b><small>Today's grooming on ${G.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
-  if(!blocks.length){ el.remove(); return; }
-  el.innerHTML = `<div class="card-h"><h2>Snow Report</h2><span class="muted">observed</span></div>${blocks.join("")}`;
+  const cl = camLinksHTML();
+  if(!blocks.length && !cl){ el.remove(); return; }
+  el.innerHTML = `<div class="card-h"><h2>Snow Report</h2><span class="muted">observed</span></div>${blocks.join("")}${cl}`; wireCamLinks();
 }
 
 function learnedHTML(){
@@ -2033,6 +2043,7 @@ function windLoadInfo(){
 function applyBackcountry(){
   const on = id => !!document.querySelector(`#mapLayers [data-l="${id}"]`)?.classList.contains("on");
   if(on("lySlope")){ if(!slopeLayer) slopeLayer = makeDemLayer((s)=>{ for(const [a,b,c] of SLOPE_COLORS) if(s>=a && s<b) return [...c,190]; return null; }); slopeLayer.addTo(bigMap); } else if(slopeLayer) slopeLayer.remove();
+  if(on("lyAspect")){ if(!aspectLayer) aspectLayer = makeDemLayer(aspectPaint); aspectLayer.addTo(bigMap); } else if(aspectLayer) aspectLayer.remove();
   const wi = windLoadInfo();
   if(on("lyWind") && wi){ if(windLayer) windLayer.remove();
     windLayer = makeDemLayer((s,a)=>{ if(s<25) return null; let d=Math.abs(a-wi.lee); d=Math.min(d,360-d); if(d>60) return null; const k=(1-d/60)*wi.strength; return [180,140,255, Math.round(60+170*k)]; }).addTo(bigMap); }
@@ -2040,7 +2051,8 @@ function applyBackcountry(){
   const leg = $("#bcLegend"); if(leg){
     leg.innerHTML = (on("lySlope")? `<span><b>Slope</b></span>${SLOPE_COLORS.map(([a,b,c])=>`<span><i class="dot" style="background:rgb(${c})"></i>${a}${b<90?"–"+b:"+"}°</span>`).join("")}` : "") +
       (on("lyWind") && wi? `<span style="flex-basis:100%"><i class="dot" style="background:#b48cff"></i> Wind-loaded: <b>${compass(wi.lee)}</b>-facing slopes ≥25° (wind from ${compass(wi.from)}, ~${fmtWind(wi.speed)} ${windU()}${wi.snow>=1? `, ${fmtSnow(wi.snow)} new snow`:""})</span>` : "") +
-      ((on("lySlope")||on("lyWind")) && bigMap.getZoom()<11? `<span style="color:var(--warn)">Zoom in to see terrain layers</span>`:"");
+      (on("lyAspect")? `<span style="flex-basis:100%"><b>Aspect</b> (slopes ≥12°, bolder ≥30°)</span>${ASPECT_COLORS.map(([n,c])=>`<span><i class="dot" style="background:rgb(${c})"></i>${n}</span>`).join("")}` : "") +
+      ((on("lySlope")||on("lyWind")||on("lyAspect")) && bigMap.getZoom()<11? `<span style="color:var(--warn)">Zoom in to see terrain layers</span>`:"");
   }
 }
 
@@ -2296,6 +2308,151 @@ async function showSnotel(){
 }
 document.addEventListener("click", e=>{ const a=e.target.closest?.(".sn-go"); if(!a) return; e.preventDefault(); const el=+a.dataset.e; location.hash="forecast"; load({name:decodeURIComponent(a.dataset.n), lat:+a.dataset.lat, lon:+a.dataset.lon, base:el, top:el+300}); });
 
+/* ================= FEATURES v6 ================= */
+/* ---------- Resort webcam links (link out; resorts own their images) ---------- */
+const CAM_LINKS = {
+  "Mt. Bachelor, OR": [["Mt. Bachelor webcams","https://www.mtbachelor.com/the-mountain/webcams/"]],
+  "Mt. Bachelor Nordic Center, OR": [["Mt. Bachelor webcams (incl. Nordic Center)","https://www.mtbachelor.com/the-mountain/webcams/"]],
+  "Timberline, OR": [["Timberline webcams","https://www.timberlinelodge.com/conditions"]],
+  "Mt. Washington Alpine, BC": [["Mt. Washington webcams","https://www.mountwashington.ca/mtn-cams.html"]],
+  "Hoodoo, OR": [["Hoodoo webcams","https://www.onthesnow.com/oregon/hoodoo-ski-area/webcams"]],
+  "Willamette Pass, OR": [["Willamette Pass webcams","https://www.onthesnow.com/oregon/willamette-pass/webcams"]],
+  "Mt. Hood Meadows, OR": [["Mt. Hood Meadows webcams","https://www.onthesnow.com/oregon/mt-hood-meadows/webcams"]],
+  "Mt. Ashland, OR": [["Mt. Ashland webcams","https://www.onthesnow.com/oregon/mount-ashland/webcams"]],
+  "Crystal Mountain, WA": [["Crystal webcams","https://www.onthesnow.com/washington/crystal-mountain-wa/webcams"]],
+  "Stevens Pass, WA": [["Stevens Pass webcams","https://www.onthesnow.com/washington/stevens-pass-resort/webcams"]],
+  "Mt. Baker, WA": [["Mt. Baker webcams","https://www.onthesnow.com/washington/mt-baker/webcams"]],
+  "Whistler Blackcomb, BC": [["Whistler webcams","https://www.onthesnow.com/british-columbia/whistler-blackcomb/webcams"]],
+};
+function camLinksHTML(){ const L0=S.loc; const links = CAM_LINKS[L0?.name]||[]; const road = OREGON(L0?.name||"");
+  if(!links.length && !road) return "";
+  return `<div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">${links.map(([t,u])=>`<a class="btn" style="text-decoration:none" href="${u}" target="_blank" rel="noopener">📷 ${t} ↗</a>`).join("")}${road? `<button class="btn" id="camMapBtn">🗺️ Cameras on map</button>`:""}</div>`; }
+function wireCamLinks(){ const b=$("#camMapBtn"); if(b) b.onclick=()=>{ const ch=document.querySelector('#mapLayers [data-l="lyCams"]'); if(ch && !ch.classList.contains("on")) ch.classList.add("on"); location.hash="maps"; setTimeout(()=>{ if(bigMap){ bigMap.setView([S.loc.lat,S.loc.lon],10); applyLayers(); } },350); }; }
+
+/* ---------- Slope aspect ---------- */
+const ASPECT_COLORS = [["N",[37,99,235]],["NE",[56,189,248]],["E",[52,211,153]],["SE",[250,204,21]],["S",[249,115,22]],["SW",[239,68,68]],["W",[168,85,247]],["NW",[99,102,241]]];
+let aspectLayer;
+function aspectPaint(s,a){ if(s<12) return null; const k=Math.round(a/45)%8; return [...ASPECT_COLORS[k][1], s>=30? 200 : 140]; }
+
+/* ---------- Satellite (NASA GIBS GOES-West GeoColor) ---------- */
+let satLayers=[], satTimer=null;
+function startSat(){
+  if(satTimer || !bigMap) return;
+  const base = Date.now()-35*60e3; const frames=[];
+  for(let k=5;k>=0;k--){ const t=new Date(base-k*10*60e3); t.setUTCMinutes(Math.floor(t.getUTCMinutes()/10)*10,0,0); frames.push(t); }
+  satLayers = frames.map(t=>L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/${t.toISOString().slice(0,19)}Z/GoogleMapsCompatible_Level7/{z}/{y}/{x}.jpg`, {opacity:0, maxNativeZoom:7, maxZoom:15, attribution:"Satellite: NASA GIBS / NOAA GOES-West"}).addTo(bigMap));
+  let k=0; const lab=$("#satTime");
+  satTimer = setInterval(()=>{ satLayers.forEach((l,i)=>l.setOpacity(i===k? .85 : 0)); if(lab) lab.textContent = "Satellite " + frames[k].toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}) + (k===frames.length-1? " (latest)" : ""); k=(k+1)%frames.length; }, 800);
+}
+function stopSat(){ clearInterval(satTimer); satTimer=null; satLayers.forEach(l=>l.remove()); satLayers=[]; const t=$("#satTime"); if(t) t.textContent=""; }
+
+/* ---------- Forecast radar (model precipitation, next 24h) ---------- */
+let fcrLayer=null, fcrTimer=null, fcrFor=null;
+async function startFcRadar(){
+  if(!bigMap) return; const c=bigMap.getCenter(); const key=`${c.lat.toFixed(1)},${c.lng.toFixed(1)}`;
+  if(fcrLayer && fcrFor===key){ fcrLayer.g.addTo(bigMap); if(!fcrTimer) playFc(); return; }
+  stopFcRadar(true); const lab=$("#fcrTime"); if(lab) lab.textContent="Loading forecast radar…";
+  const N=14, dLat=0.13, dLon=0.18, pts=[];
+  for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([c.lat+(a-(N-1)/2)*dLat, c.lng+(b-(N-1)/2)*dLon]);
+  let j; try{ j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=precipitation,temperature_2m&forecast_hours=24&timezone=auto`); }catch(e){ if(lab) lab.textContent="Forecast radar unavailable"; return; }
+  if(!document.querySelector('#mapLayers [data-l="lyFcRadar"]')?.classList.contains("on")) return;
+  if(!Array.isArray(j)) j=[j];
+  const g=L.layerGroup(); const rects=pts.map((p,i)=>L.rectangle([[p[0]-dLat/2,p[1]-dLon/2],[p[0]+dLat/2,p[1]+dLon/2]],{stroke:false, fillOpacity:0, interactive:false}).addTo(g));
+  fcrLayer={g, rects, data:j, times:j[0].hourly.time}; fcrFor=key; g.addTo(bigMap); playFc();
+}
+function fcColor(p,t){ if(p<0.1) return null; const snow=t<=0.5; const lv = p<0.5?0:p<1.5?1:p<3?2:3;
+  return snow? ["#bfdbfe","#60a5fa","#3b82f6","#a78bfa"][lv] : ["#bbf7d0","#4ade80","#facc15","#f97316"][lv]; }
+function playFc(){
+  if(!fcrLayer) return; let k=0; const T=fcrLayer.times.length; const lab=$("#fcrTime");
+  const step=()=>{ fcrLayer.rects.forEach((r,i)=>{ const H=fcrLayer.data[i]?.hourly; const p=H?.precipitation?.[k]??0, t=H?.temperature_2m?.[k]??5; const col=fcColor(p,t); r.setStyle(col? {fillColor:col, fillOpacity:Math.min(.75,.35+p/6)} : {fillOpacity:0}); });
+    const tt=fcrLayer.times[k]; if(lab) lab.innerHTML = `Forecast radar · <b>${dow(tt.slice(0,10))} ${hl(+tt.slice(11,13))}</b> <span style="color:#60a5fa">■</span> snow <span style="color:#4ade80">■</span> rain`;
+    k=(k+1)%T; };
+  step(); fcrTimer=setInterval(step, 650);
+}
+function stopFcRadar(keep){ clearInterval(fcrTimer); fcrTimer=null; if(fcrLayer){ fcrLayer.g.remove(); if(!keep){} } const t=$("#fcrTime"); if(t && !keep) t.textContent=""; }
+
+/* ---------- Powder finder map ---------- */
+let powderLayer=null;
+async function showPowder(){
+  if(!bigMap) return; let F; try{ F = await loadFinder(); }catch(e){ toast("Couldn't load the powder finder"); return; }
+  if(!document.querySelector('#mapLayers [data-l="lyPowder"]')?.classList.contains("on")) return;
+  if(powderLayer) powderLayer.remove(); powderLayer=L.layerGroup();
+  const k = "d"+S.win; const mx = Math.max(1, ...F.rows.map(r=>r[k]||0));
+  F.rows.forEach(r=>{ const v=r[k]||0; const sz = 26 + 26*Math.sqrt(v/mx);
+    const icon=L.divIcon({className:"", html:`<div class="pw-pin" style="width:${sz}px;height:${sz}px;background:${snowColor(v)==="transparent"? "rgba(148,163,184,.6)" : snowColor(v)}">${fmtSnow(v,0)}</div>`, iconSize:null});
+    L.marker([r.spot.lat, r.spot.lon], {icon}).bindPopup(`<b>${r.spot.name}</b><br>${S.win}-day snow: <b>${fmtSnow(v)}</b> (summit)<br>Last 24h: ${fmtSnow(r.last24||0)}<br><a href="#" class="pw-go" data-n="${encodeURIComponent(r.spot.name)}">Open forecast →</a>`).addTo(powderLayer); });
+  powderLayer.addTo(bigMap);
+  const best = [...F.rows].sort((a,b)=>(b[k]||0)-(a[k]||0))[0];
+  $("#mapStatus").innerHTML = best? `Most snow in ${S.win} days: <b>${best.spot.name.replace(/,\s*[A-Z]{2}$/,"")}</b> · ${fmtSnow(best[k])}` : "";
+}
+document.addEventListener("click", e=>{ const a=e.target.closest?.(".pw-go"); if(!a) return; e.preventDefault(); const n=decodeURIComponent(a.dataset.n); const sp=finderSpots().find(x=>x.name===n); if(sp){ location.hash="forecast"; load(sp); } });
+
+/* ---------- ODOT cameras on the map ---------- */
+let camLayer=null, camFor=null;
+async function showCams(){
+  if(!bigMap) return; const b=bigMap.getBounds(); const box=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v=>v.toFixed(2));
+  const key=box.map(v=>Math.round(v*4)/4).join(","); if(camLayer && camFor===key){ camLayer.addTo(bigMap); return; }
+  if(b.getEast()-b.getWest() > 6){ $("#mapStatus").textContent = "Zoom in to see road cameras"; return; }
+  let j; try{ j = await api(`/cams?bounds=${box.join(",")}`); }catch(e){ return; }
+  if(!document.querySelector('#mapLayers [data-l="lyCams"]')?.classList.contains("on")) return;
+  if(camLayer) camLayer.remove(); camLayer=L.layerGroup(); camFor=key;
+  (j.cams||[]).forEach(c=>{ L.marker([c.lat,c.lon],{icon:L.divIcon({className:"", html:`<div class="cam-pin">📷</div>`, iconSize:null})})
+    .bindPopup(`<b>${c.name}</b><br><img src="${c.img}?t=${Math.floor(Date.now()/3e5)}" style="width:240px;max-width:70vw;border-radius:8px;margin-top:6px" alt="${c.name}"><br><span style="color:#888;font-size:11px">ODOT TripCheck</span>`, {maxWidth:260}).addTo(camLayer); });
+  camLayer.addTo(bigMap); $("#mapStatus").textContent = `${(j.cams||[]).length} ODOT road cameras in view · tap one to see it`;
+}
+
+/* ---------- Share a favorites list ---------- */
+const b64e = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const b64d = s => decodeURIComponent(escape(atob(s.replace(/-/g,"+").replace(/_/g,"/"))));
+async function shareFavs(){
+  const list = S.favs.length? S.favs : []; if(!list.length){ toast("Add some favorites first"); return; }
+  const url = `${location.origin}/?list=${b64e(JSON.stringify(list.slice(0,20).map(f=>[f.name, +f.lat.toFixed(4), +f.lon.toFixed(4), Math.round(f.base), Math.round(f.top)])))}`;
+  try{ if(navigator.share){ await navigator.share({title:"My Snowline spots", text:`${list.length} spots I watch on Snowline`, url}); return; } }catch(e){ if(e.name==="AbortError") return; }
+  try{ await navigator.clipboard.writeText(url); toast("Link copied"); }catch(e){ prompt("Copy this link", url); }
+}
+function checkSharedList(){
+  const q=new URLSearchParams(location.search).get("list"); if(!q) return;
+  let L0; try{ L0 = JSON.parse(b64d(q)).filter(x=>Array.isArray(x) && x.length===5).map(([name,lat,lon,base,top])=>({name:String(name).slice(0,80), lat:+lat, lon:+lon, base:+base, top:+top})).filter(x=>isFinite(x.lat)&&isFinite(x.lon)); }catch(e){ return; }
+  history.replaceState(null,"",location.pathname+location.hash); if(!L0.length) return;
+  const fresh = L0.filter(x=>!S.favs.some(f=>f.name===x.name));
+  $("#miniBox").innerHTML = `<div class="muted" style="margin-bottom:10px">Someone shared ${L0.length} spot${L0.length>1?"s":""} with you.</div><div class="list">${L0.map(x=>`<div class="li" style="min-height:40px"><span class="nm"><b>${x.name}</b></span>${S.favs.some(f=>f.name===x.name)? `<span class="muted">already saved</span>`:""}</div>`).join("")}</div>
+    <button class="btn primary wide" id="slAdd" style="margin-top:12px" ${fresh.length?"":"disabled"}>${fresh.length? `Add ${fresh.length} to my Favorites` : "You already have all of these"}</button>`;
+  $("#miniTitle").textContent = "Shared spots"; openSheet("miniSheet");
+  $("#slAdd").onclick = () => { S.favs = [...S.favs, ...fresh]; store.set("favs", S.favs); updateTop(); pushSync(); closeSheet("miniSheet"); toast(`Added ${fresh.length} spot${fresh.length>1?"s":""}`); if((location.hash||"")==="#favs") renderFavs(true); };
+}
+
+/* ---------- Sync across devices (no accounts) ---------- */
+const SYNC_KEYS = ["favs","waxkit","waxlog","alerts","units","repName","myReports","mode"];
+const syncCode = () => store.get("syncCode", null);
+function syncPayload(){ const d={}; SYNC_KEYS.forEach(k=>{ const v=store.get(k, undefined); if(v!==undefined) d[k]=v; }); return d; }
+let syncTimer=null;
+function syncSoon(){ if(!syncCode()) return; clearTimeout(syncTimer); syncTimer=setTimeout(syncPush, 1500); }
+async function syncPush(){ const code=syncCode(); if(!code) return; try{ const r = await api("/sync", {method:"PUT", headers:{"content-type":"application/json"}, body:JSON.stringify({code, data:syncPayload()})}); store.set("syncT", r.t); }catch(e){ if(e.status===404){ store.set("syncCode", null); } } }
+function applySync(d){ SYNC_KEYS.forEach(k=>{ if(d[k]!==undefined) localStorage.setItem("snowline_"+k, JSON.stringify(d[k])); });
+  S.favs = store.get("favs", []); S.units = store.get("units", S.units); S.mode = store.get("mode", S.mode); }
+async function syncPull(){ const code=syncCode(); if(!code) return false; try{ const r = await api(`/sync?code=${encodeURIComponent(code)}`); if(r.t > (store.get("syncT",0)||0)){ applySync(r.data||{}); store.set("syncT", r.t); updateTop(); if(S.data) render(); if((location.hash||"")==="#favs") renderFavs(true); return true; } }catch(e){} return false; }
+// any write to a synced key schedules a push
+{ const _set = store.set; store.set = function(k,v){ _set.call(store,k,v); if(SYNC_KEYS.includes(k)) syncSoon(); }; }
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") syncPull(); });
+function renderSyncBox(){
+  const el=$("#syncBox"); if(!el) return; const code=syncCode();
+  el.innerHTML = code? `<div class="muted">This device syncs favorites, wax box, wax log, alerts and settings with code:</div>
+      <div class="num" style="font-size:30px;letter-spacing:3px;margin:6px 0;color:var(--ice)">${code}</div>
+      <div class="muted" style="margin-bottom:10px">Enter it on your other phone or computer under Settings → Sync. Anyone with the code can see and change these, so keep it to yourself.</div>
+      <div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn" id="syCopy" style="flex:1">Copy code</button><button class="btn" id="syNow" style="flex:1">Sync now</button></div>
+      <button class="link" id="syOff" style="color:#ff6b6b;margin-top:8px">Stop syncing on this device</button>`
+    : `<div class="muted" style="margin-bottom:10px">Keep your favorites, wax box, wax log and alerts the same on every device. No account needed.</div>
+      <button class="btn primary wide" id="syNew">Create a sync code</button>
+      <div class="field" style="margin-top:12px">Already have a code?<div class="row" style="gap:8px;flex-wrap:nowrap"><input id="syIn" placeholder="ABCD-1234" autocapitalize="characters" style="min-width:0;flex:1"><button class="btn" id="syJoin">Join</button></div></div>`;
+  const on=(id,f)=>{ const b=$("#"+id); if(b) b.onclick=f; };
+  on("syNew", async()=>{ try{ const r = await api("/sync",{method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({data:syncPayload()})}); store.set("syncCode", r.code); store.set("syncT", r.t); renderSyncBox(); toast("Sync code created"); }catch(e){ toast("Couldn't create a code right now"); } });
+  on("syJoin", async()=>{ const c=$("#syIn").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/^(.{4})(.{4})$/,"$1-$2"); if(!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)){ toast("Codes look like ABCD-1234"); return; }
+    try{ const r = await api(`/sync?code=${c}`); applySync(r.data||{}); store.set("syncCode", c); store.set("syncT", r.t); renderSyncBox(); updateTop(); if(S.data) render(); toast("Synced with your other device"); }catch(e){ toast(e.status===404? "That code wasn't found" : "Couldn't sync right now"); } });
+  on("syCopy", async()=>{ try{ await navigator.clipboard.writeText(code); toast("Code copied"); }catch(e){} });
+  on("syNow", async()=>{ const pulled = await syncPull(); if(!pulled) await syncPush(); toast("Synced"); });
+  on("syOff", ()=>{ store.set("syncCode", null); renderSyncBox(); toast("Sync off on this device"); });
+}
+
 /* ---------- Offline ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("/sw.js").catch(()=>{});
 function updateOnline(){ document.body.classList.toggle("offline", !navigator.onLine); const p=$("#offPill"); if(p) p.classList.toggle("on", !navigator.onLine); }
@@ -2338,7 +2495,7 @@ async function openShareSheet(){
 
 
 /* ================= Sheets ================= */
-function openSheet(id){ $("#"+id).classList.add("on"); document.body.style.overflow="hidden"; }
+function openSheet(id){ $("#"+id).classList.add("on"); document.body.style.overflow="hidden"; if(id==="setSheet") renderSyncBox(); }
 function closeSheet(id){ $("#"+id).classList.remove("on"); document.body.style.overflow=""; }
 document.querySelectorAll(".sheet").forEach(sh=>{
   sh.addEventListener("click", e=>{ if(e.target===sh) closeSheet(sh.id); });
@@ -2415,6 +2572,8 @@ if(linked) history.replaceState(null, "", location.pathname + location.hash);
 updateOnline();
 const startLoc = linked || last || PRESETS[0];
 S.loc = startLoc; updateTop(); showView(); load(startLoc); checkAlerts();
+
+setTimeout(()=>{ checkSharedList(); syncPull(); }, 600);
 </script>
 </body>
 </html>
