@@ -27,9 +27,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root{
-  --bg:#0a1020; --card:#111a2e; --card2:#17223b; --line:#223050; --text:#eaf0f9; --mute:#8b9cba; --dim:#5d6e8c;
-  --ice:#7dd3fc; --ice2:#38bdf8; --deep:#a78bfa; --warn:#fbbf24; --bad:#f87171; --good:#86efac;
-  --top:56px; --tab:62px; --r:18px;
+  --bg:#000; --card:#151517; --card2:#212124; --line:#2a2a2e; --text:#f2f2f4; --mute:#8e8e93; --dim:#5a5a60;
+  --ice:#4ea1ff; --ice2:#2f8bff; --deep:#a58bff; --warn:#ffcc4d; --bad:#ff6b6b; --good:#6ee7a0;
+  --top:56px; --tab:74px; --r:16px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -117,7 +117,7 @@ main{max-width:760px;margin:0 auto;padding:10px 12px calc(var(--tab) + var(--sab
 
 /* score chips & badges */
 .sc{display:inline-block;min-width:32px;border-radius:7px;padding:2px 6px;font-weight:700;color:#04121f;font-size:12.5px;text-align:center}
-.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600}
+.badge{display:inline-block;white-space:nowrap;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600}
 .b-hi{background:#14532d;color:#86efac}.b-md{background:#4a3b0b;color:#fde68a}.b-lo{background:#4c1d1d;color:#fca5a5}.b-na{background:#1f2a44;color:var(--mute)}
 .pill{display:inline-flex;align-items:center;gap:6px}
 .sw{width:10px;height:10px;border-radius:3px;display:inline-block}
@@ -224,6 +224,87 @@ tr.cons td{font-weight:700;border-top:2px solid var(--ice2)}
   .chartbox{height:280px}
   .dc{flex-basis:96px}
 }
+/* ---- OpenSnow-style layer ---- */
+.top{background:rgba(0,0,0,.82);border-bottom-color:#1c1c1f}
+.ctrl{background:rgba(0,0,0,.82)}
+.seg{background:#1c1c1f;border-color:#2a2a2e}
+.seg button.on{background:var(--ice2);color:#fff;box-shadow:none}
+.card{border-color:#232326}
+.hero{background:var(--card)}
+.vh{display:flex;align-items:baseline;justify-content:space-between;margin:6px 2px 12px}
+.vh h1{font-size:30px;font-weight:700;letter-spacing:-.6px}
+.tabbar{left:12px;right:12px;bottom:calc(var(--sab) + 8px);padding:6px;border-radius:30px;background:rgba(36,36,40,.82);border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.6)}
+.tabbar a{border-radius:22px;color:#a1a1a8}
+.tabbar a.on{background:rgba(255,255,255,.1);color:var(--ice)}
+main{padding-bottom:calc(var(--tab) + var(--sab) + 30px)}
+/* snow summary */
+.ss{display:flex;gap:0;align-items:stretch;margin:0 -14px;border-top:1px solid #232326}
+.ss-l{flex:0 0 96px;padding:12px 10px 10px 14px;display:flex;flex-direction:column;border-right:1px solid #232326;background:#151517;position:relative;z-index:1}
+.ss-k{font-size:12px;font-weight:600}
+.ss-big{font-size:34px;margin:auto 0;line-height:1;padding:10px 0;text-align:center;background:#0b0b0c;border-radius:6px}
+.ss-t{font-size:10.5px;color:var(--mute);text-align:center;margin-top:6px;line-height:1.35}
+.ss-t .u{text-decoration:underline;text-decoration-color:var(--warn)}
+.ss-r{flex:1;overflow-x:auto;padding:10px 6px 4px;scrollbar-width:none}
+.ss-r::-webkit-scrollbar{display:none}
+svg.bars text{font-family:Inter,system-ui,sans-serif;text-anchor:middle}
+svg.bars .t-l{font-size:10.5px;fill:#a1a1a8}
+svg.bars .t-tot{font-size:11.5px;fill:var(--ice);font-weight:700}
+svg.bars .t-br{stroke:#55555c;stroke-width:1;fill:none}
+svg.bars .t-v{font-size:11px;fill:#d6d6da;font-weight:600}
+svg.bars .t-d{font-size:11.5px;fill:#8e8e93}
+svg.bars .t-d.we{fill:#fff;font-weight:700}
+button.card.fc{display:block;width:100%;text-align:left;padding:14px 14px 0;overflow:hidden}
+.fc-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+.fc-h b{font-size:17px}
+/* right now */
+.rn{display:flex;justify-content:space-between;gap:10px;background:var(--card2);border-radius:14px;padding:12px}
+.rn-a{display:flex;gap:10px;align-items:center;min-width:0}
+.rn-t{font-size:30px;line-height:1}.rn-t small{font-size:14px;color:var(--mute);margin-left:2px}
+.rn-b{text-align:right}
+.rn-w{font-size:26px;line-height:1}.rn-w small{font-size:13px;color:var(--mute)}
+.arr{display:inline-block;font-size:18px;margin-right:4px;color:var(--ice)}
+.surf-row{display:flex;gap:10px;align-items:center;margin:12px 0}
+.surf-row .ic{font-size:30px}
+.surf-row .muted{line-height:1.4;margin-top:2px}
+/* hourly strip */
+.hs{display:flex;overflow-x:auto;margin:0 -14px;padding:0 8px;scrollbar-width:none}
+.hs::-webkit-scrollbar{display:none}
+.hc{flex:0 0 62px;text-align:center;padding:6px 0;border-right:1px solid #232326}
+.hc-t{font-weight:600;font-size:13px}.hc-d{font-size:11px;color:var(--mute)}
+.hc-p{margin:8px 8px 6px;border-bottom:2px solid;font-size:12.5px;padding-bottom:3px;font-weight:600}
+.hc-i{height:28px;display:grid;place-items:center}
+.hc-v{font-size:15px;font-weight:600;margin-top:2px}
+.hc-s{font-size:11.5px;color:#5aa2ff;min-height:15px}
+.hc-w{font-size:11.5px;color:var(--mute);margin-top:2px}
+/* daily list */
+.dl-h,.dl-r{display:grid;grid-template-columns:44px 30px 38px 40px 1fr;align-items:center;gap:6px}
+.dl-h{grid-template-columns:48px 44px 30px 38px 40px 1fr;font-size:11px;color:var(--mute);padding:0 0 6px;border-bottom:1px solid #232326}
+.dl-day{display:flex;border-bottom:1px solid #232326;cursor:pointer}
+.dl-day.sel{background:#1b1b1e;margin:0 -14px;padding:0 14px}
+.dl-l{flex:0 0 48px;display:flex;flex-direction:column;justify-content:center;font-size:13px;line-height:1.25}
+.dl-l span{color:var(--mute);font-size:12px}.dl-l .star{color:var(--deep)}
+.dl-p{flex:1;min-width:0}
+.dl-r{height:38px}
+.dl-r.night{border-top:1px dashed #26262a}
+.dl-tp{font-size:14px}
+.dl-r.night .dl-tp{color:var(--mute)}
+.dl-ic{display:grid;place-items:center}
+.dl-slr{font-size:11.5px;color:var(--ice)}
+.dl-b{position:relative;height:22px;display:flex;align-items:center}
+.dl-b i{position:absolute;left:0;top:3px;bottom:3px;border-radius:3px;opacity:.9}
+.dl-b em{position:relative;font-style:normal;font-size:12.5px;font-weight:600;padding-left:6px;text-shadow:0 1px 2px #000}
+.dl-x .daydetail{border-top:0;padding:10px 0 12px;margin-top:0}
+/* detailed hourly */
+.jump{white-space:nowrap;display:flex;gap:6px;align-items:center;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
+.jump button{background:none;border:0;color:var(--ice);font-weight:600;padding:6px 8px;font-size:14px}
+.dh{overflow-x:auto;margin:0 -14px;border-top:1px solid #232326}
+.dh table{width:auto;font-size:12.5px}
+.dh th{font-size:12px;color:var(--text);font-weight:600;padding:8px 10px;line-height:1.2}
+.dh th span{color:var(--mute);font-weight:500}
+.dh td{padding:7px 10px;min-width:56px}
+.dh td.m,.dh th.m{background:#151517;color:var(--mute);font-size:12px;min-width:118px;max-width:118px;white-space:normal;border-right:1px solid #2a2a2e}
+.sec-b .card{background:none;border:0;padding:0;margin-bottom:16px}
+.wx{display:inline-block;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -243,9 +324,10 @@ tr.cons td{font-weight:700;border-top:2px solid var(--ice2)}
 
 <main>
   <div id="view-forecast"><div id="alertBanner"></div><div id="app"><div class="skel"></div><div class="skel" style="height:120px"></div><div class="skel" style="height:240px"></div></div></div>
+  <div id="view-favs" style="display:none"></div>
   <div id="view-finder" style="display:none"></div>
   <div id="view-maps" style="display:none"><div class="card">
-    <div class="card-h"><h2>Maps & radar</h2><div class="seg sm" id="mapWin"><button data-w="3">3d</button><button data-w="5">5d</button><button data-w="10">10d</button></div></div>
+    <div class="card-h"><h2>Snow forecast map</h2><div class="seg sm" id="mapWin"><button data-w="3">3d</button><button data-w="5">5d</button><button data-w="10">10d</button></div></div>
     <div class="seg sm scroll" id="mapLayers" style="margin-bottom:10px">
       <button data-l="lyGrid" class="on">Snow forecast</button><button data-l="lyRadar">Radar</button><button data-l="lyAvy">Avalanche</button>
     </div>
@@ -259,10 +341,10 @@ tr.cons td{font-weight:700;border-top:2px solid var(--ice2)}
 </main>
 
 <nav class="tabbar" id="tabs">
-  <a href="#forecast" data-v="forecast"><svg viewBox="0 0 24 24"><path d="M12 2v20M3.5 7l17 10M3.5 17l17-10M9 4l3 2 3-2M9 20l3-2 3 2"/></svg>Forecast</a>
-  <a href="#finder" data-v="finder"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6M11 8v6"/></svg>Powder</a>
-  <a href="#maps" data-v="maps"><svg viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>Map</a>
-  <a href="#outlook" data-v="outlook"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M7 14h3M14 14h3M7 17h3"/></svg>Outlook</a>
+  <a href="#forecast" data-v="forecast"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Forecast</a>
+  <a href="#favs" data-v="favs"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>Favorites</a>
+  <a href="#maps" data-v="maps"><svg viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>Maps</a>
+  <a href="#finder" data-v="finder"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Explore</a>
   <a href="#alerts" data-v="alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2zM10 21h4"/></svg>Alerts</a>
 </nav>
 
@@ -344,7 +426,7 @@ const ENS = [
   {id:"gfs_ens",   name:"GFS ENS",   api:["gfs025","gfs_seamless"]},
 ];
 const LAPSE = 0.0065, FT = 3.28084;
-const DET_VARS = "temperature_2m,precipitation,freezing_level_height,wind_speed_10m,wind_gusts_10m,snow_depth,cloud_cover,shortwave_radiation,wind_speed_850hPa,wind_speed_700hPa";
+const DET_VARS = "temperature_2m,precipitation,freezing_level_height,wind_speed_10m,wind_gusts_10m,snow_depth,cloud_cover,shortwave_radiation,wind_speed_850hPa,wind_speed_700hPa,relative_humidity_2m,wind_direction_10m";
 
 /* ================= State ================= */
 const store = {
@@ -405,7 +487,7 @@ async function fetchDet(m, loc, ref){
       const j = await getJSON(url); const h = j.hourly;
       const P = getVar(h,"precipitation");
       if(!P || !P.some(isNum)) continue;
-      return { time:h.time, offset:j.utc_offset_seconds, tz:j.timezone_abbreviation, P, T:getVar(h,"temperature_2m"), FL:getVar(h,"freezing_level_height"), W:getVar(h,"wind_speed_10m"), G:getVar(h,"wind_gusts_10m"), SD:getVar(h,"snow_depth"), CC:getVar(h,"cloud_cover"), SW:getVar(h,"shortwave_radiation"), W8:getVar(h,"wind_speed_850hPa"), W7:getVar(h,"wind_speed_700hPa") };
+      return { time:h.time, offset:j.utc_offset_seconds, tz:j.timezone_abbreviation, P, T:getVar(h,"temperature_2m"), FL:getVar(h,"freezing_level_height"), W:getVar(h,"wind_speed_10m"), G:getVar(h,"wind_gusts_10m"), SD:getVar(h,"snow_depth"), CC:getVar(h,"cloud_cover"), SW:getVar(h,"shortwave_radiation"), W8:getVar(h,"wind_speed_850hPa"), W7:getVar(h,"wind_speed_700hPa"), RH:getVar(h,"relative_humidity_2m"), WD:getVar(h,"wind_direction_10m") };
     }catch(e){}
   }
   return null;
@@ -462,12 +544,12 @@ function computeAt(e){
   // consensus hourly
   const wOf = id => MODELS.find(m=>m.id===id).w;
   const cons = time.map((t,i)=>{
-    let ws=0, s=0, te=0, sl=0, r=0, P=0, W=0, G=0, ww=0, fr=0, cc=0, cw=0, sw=0, swW=0, rw=0, rwW=0;
+    let ws=0, s=0, te=0, sl=0, r=0, P=0, W=0, G=0, ww=0, fr=0, cc=0, cw=0, sw=0, swW=0, rw=0, rwW=0, rh=0, rhW=0, wu=0, wv=0;
     for(const id of ids){ const v = per[id][i]; if(!v) continue; const w=wOf(id); ws+=w; s+=v.snow*w; te+=v.Te*w; sl+=v.sl*w; r+=v.slr*w; fr+=v.frac*w;
-      const raw = rawAt(id, t); if(raw){ P+=raw.P*w; if(isNum(raw.W)){W+=raw.W*w;G+=(isNum(raw.G)?raw.G:raw.W)*w;ww+=w;} if(isNum(raw.CC)){cc+=raw.CC*w;cw+=w;} if(isNum(raw.SW)){sw+=raw.SW*w;swW+=w;} const rr=ridgeWind(raw,e); if(isNum(rr)){rw+=rr*w;rwW+=w;} }
+      const raw = rawAt(id, t); if(raw){ P+=raw.P*w; if(isNum(raw.W)){W+=raw.W*w;G+=(isNum(raw.G)?raw.G:raw.W)*w;ww+=w;} if(isNum(raw.CC)){cc+=raw.CC*w;cw+=w;} if(isNum(raw.SW)){sw+=raw.SW*w;swW+=w;} const rr=ridgeWind(raw,e); if(isNum(rr)){rw+=rr*w;rwW+=w;} if(isNum(raw.RH)){rh+=raw.RH*w;rhW+=w;} if(isNum(raw.WD)){ const mag=isNum(raw.W)?Math.max(raw.W,1):1; wu+=Math.sin(raw.WD*Math.PI/180)*mag*w; wv+=Math.cos(raw.WD*Math.PI/180)*mag*w; } }
     }
     if(!ws) return null;
-    return { snow:s/ws, Te:te/ws, sl:sl/ws, slr:r/ws, P:P/ws, frac:fr/ws, W: ww? W/ww:null, G: ww? G/ww:null, CC: cw? cc/cw:null, SW: swW? sw/swW:null, RW: rwW? rw/rwW:null };
+    return { snow:s/ws, Te:te/ws, sl:sl/ws, slr:r/ws, P:P/ws, frac:fr/ws, W: ww? W/ww:null, G: ww? G/ww:null, CC: cw? cc/cw:null, SW: swW? sw/swW:null, RW: rwW? rw/rwW:null, RH: rhW? rh/rhW:null, WD: (wu||wv)? (Math.atan2(wu,wv)*180/Math.PI+360)%360 : null };
   });
   // days
   const startDate = periodOf(time[nowIdx])[0];
@@ -475,7 +557,7 @@ function computeAt(e){
   const dayIdx = new Map(days.map((d,i)=>[d,i]));
   const blank = () => days.map(()=>({day:0,night:0,n:0,exp:0}));
   const modelDays = {}; for(const id of Object.keys(per)) modelDays[id] = blank();
-  const consDays = days.map(()=>({day:0,night:0,n:0,tmax:-99,tmin:99,slSum:0,slN:0,slrSum:0,slrW:0,gmax:0}));
+  const consDays = days.map(()=>({day:0,night:0,n:0,tmax:-99,tmin:99,tmaxD:null,tminN:null,slSum:0,slN:0,slrSum:0,slrW:0,gmax:0}));
   let past24 = 0, past24n = 0;
   for(let i=0;i<n;i++){
     const t = time[i];
@@ -483,7 +565,7 @@ function computeAt(e){
     const [d,part] = periodOf(t); const k = dayIdx.get(d); if(k==null) continue;
     for(const id of Object.keys(per)){ modelDays[id][k].exp++; const v = per[id][i]; if(v){ modelDays[id][k][part]+=v.snow; modelDays[id][k].n++; } }
     const c = cons[i]; if(!c) continue; const cd = consDays[k];
-    cd[part]+=c.snow; cd.n++; cd.tmax=Math.max(cd.tmax,c.Te); cd.tmin=Math.min(cd.tmin,c.Te); cd.slSum+=c.sl; cd.slN++;
+    cd[part]+=c.snow; cd.n++; if(part==="day") cd.tmaxD = cd.tmaxD==null? c.Te : Math.max(cd.tmaxD,c.Te); else cd.tminN = cd.tminN==null? c.Te : Math.min(cd.tminN,c.Te); cd.tmax=Math.max(cd.tmax,c.Te); cd.tmin=Math.min(cd.tmin,c.Te); cd.slSum+=c.sl; cd.slN++;
     if(c.snow>0.02){ cd.slrSum+=c.slr*c.snow; cd.slrW+=c.snow; }
     if(isNum(c.G)) cd.gmax=Math.max(cd.gmax,c.G);
   }
@@ -491,12 +573,15 @@ function computeAt(e){
   const ensDays = []; // per member: array of daily totals
   for(const E of D.ens){
     for(const mem of E.members){
-      const tot = days.map(()=>0), cnt = days.map(()=>0);
-      E.time.forEach((t,i)=>{ if(t < nk) return; const [d] = periodOf(t); const k = dayIdx.get(d); if(k==null) return; const v = snowAt(mem.P[i], mem.T[i], null, ref, e); if(v){ tot[k]+=v.snow; cnt[k]++; } });
-      ensDays.push({tot, cnt});
+      const tot = days.map(()=>0), cnt = days.map(()=>0), totD = days.map(()=>0), totN = days.map(()=>0);
+      E.time.forEach((t,i)=>{ if(t < nk) return; const [d, part] = periodOf(t); const k = dayIdx.get(d); if(k==null) return; const v = snowAt(mem.P[i], mem.T[i], null, ref, e); if(v){ tot[k]+=v.snow; cnt[k]++; if(part==="day") totD[k]+=v.snow; else totN[k]+=v.snow; } });
+      ensDays.push({tot, cnt, totD, totN});
     }
   }
-  return { time, nowIdx, per, cons, days, modelDays, consDays, ensDays, past24: past24n? past24 : null, ids };
+  // hourly precip chance from ensembles
+  const pop = new Map();
+  for(const E of D.ens){ E.time.forEach((t,i)=>{ if(t < nk) return; let wet=0, n=0; for(const m of E.members){ if(isNum(m.P[i])){ n++; if(m.P[i]>=0.1) wet++; } } const o = pop.get(t) || [0,0]; o[0]+=wet; o[1]+=n; pop.set(t,o); }); }
+  return { time, nowIdx, per, cons, days, modelDays, consDays, ensDays, pop, past24: past24n? past24 : null, ids };
 }
 // raw values lookup cache per model
 const rawCache = new WeakMap();
@@ -504,7 +589,7 @@ function rawAt(id, t){
   const m = S.data.models[id]; let idx = rawCache.get(m);
   if(!idx){ idx = new Map(m.time.map((tt,i)=>[tt,i])); rawCache.set(m, idx); }
   const i = idx.get(t); if(i==null || !isNum(m.P[i])) return null;
-  return { P:m.P[i], W:m.W?.[i], G:m.G?.[i], SD:m.SD?.[i], CC:m.CC?.[i], SW:m.SW?.[i], W8:m.W8?.[i], W7:m.W7?.[i] };
+  return { P:m.P[i], W:m.W?.[i], G:m.G?.[i], SD:m.SD?.[i], CC:m.CC?.[i], SW:m.SW?.[i], W8:m.W8?.[i], W7:m.W7?.[i], RH:m.RH?.[i], WD:m.WD?.[i] };
 }
 function windowTotal(daysArr, N, key){ let s=0; for(let k=0;k<N && k<daysArr.length;k++){ s += key? key(daysArr[k]) : daysArr[k]; } return s; }
 function modelWindow(C, id, N){
@@ -520,185 +605,285 @@ function confidence(vals){
   return cv < 0.35 ? {lvl:"hi",label:"High conf"} : cv < 0.7 ? {lvl:"md",label:"Med conf"} : {lvl:"lo",label:"Low conf"};
 }
 
-/* ================= Render (mobile-first) ================= */
+/* ================= Render (OpenSnow-style) ================= */
 function updateTop(){
   const L = S.loc; if(!L) return;
   $("#locName").textContent = L.name;
   const bandName = {base:"Base", mid:"Mid", summit:"Summit"}[S.band];
-  $("#locSub").textContent = `${bandName} · ${fmtEl(bandElev())}`;
+  $("#locSub").textContent = `Forecast point · ${fmtEl(bandElev())} (${bandName.toLowerCase()})`;
   const fav = S.favs.some(f=>f.name===L.name);
   $("#favBtn").textContent = fav ? "★" : "☆"; $("#favBtn").classList.toggle("on", fav);
 }
 const renderElevInfo = updateTop, updateFavBtn = updateTop, fillSel = updateTop;
 function destroyCharts(){ Object.values(S.charts).forEach(c=>{ try{c.destroy()}catch(e){} }); S.charts = {}; }
 
+/* ---------- small helpers ---------- */
+const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const compass = deg => isNum(deg) ? COMPASS[Math.round(((deg%360)+360)%360/22.5)%16] : "";
+const PT = { snow:"#5aa2ff", mix:"#b48cff", rain:"#4cd38a", none:"#e8e8ea" };
+function ptype(c){ if(!c || !isNum(c.P) || c.P < 0.05) return "none"; const f = isNum(c.frac)? c.frac : 1; return f >= 0.85 ? "snow" : f <= 0.15 ? "rain" : "mix"; }
+function barColor(inch){ return inch >= 12 ? "#f39a44" : inch >= 6 ? "#a58bff" : "#3d8bfd"; }
+function skyKind(c){ const t = ptype(c); if(t!=="none" && c.P >= 0.1) return t; const cc = c?.CC; if(!isNum(cc)) return "clear"; return cc < 25 ? "clear" : cc < 70 ? "partly" : "cloudy"; }
+const SKY_TEXT = { clear:"Clear", partly:"Partly cloudy", cloudy:"Cloudy", snow:"Snow", rain:"Rain", mix:"Rain & snow" };
+function wxIcon(c, hour, size=26){
+  const k = skyKind(c), night = hour < 7 || hour >= 18;
+  const sun = `<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/>`;
+  const moon = `<path d="M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z"/>`;
+  const cloud = (y=0) => `<path transform="translate(0 ${y})" d="M7 18h10.2a3.8 3.8 0 0 0 .4-7.6A5.6 5.6 0 0 0 6.9 11 3.5 3.5 0 0 0 7 18z"/>`;
+  let body;
+  if(k==="clear") body = night? moon : sun;
+  else if(k==="partly") body = (night? `<path transform="translate(4 -3) scale(.62)" d="M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z"/>` : `<g transform="translate(5 -4) scale(.62)">${sun}</g>`) + cloud(2);
+  else if(k==="cloudy") body = cloud(0);
+  else if(k==="snow") body = cloud(-3) + `<path d="M8 19.5h.01M12 21h.01M16 19.5h.01M10 22.5h.01M14 22.5h.01" stroke-width="2.6"/>`;
+  else if(k==="rain") body = cloud(-3) + `<path d="M8.5 18.5l-1 2.6M12.5 18.5l-1 2.6M16.5 18.5l-1 2.6"/>`;
+  else body = cloud(-3) + `<path d="M8.5 18.5l-1 2.6M16.5 18.5l-1 2.6"/><path d="M12.5 20.5h.01" stroke-width="2.6"/>`;
+  return `<svg class="wx" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+}
+const LETTER = ["S","M","T","W","T","F","S"];
+
+/* ---------- Snow summary bars (inline SVG, OpenSnow style) ---------- */
+function snowBarsSVG(vals, dates, o={}){
+  const n = vals.length, cw = o.cw || 26, H = o.h || 70, top = o.labels ? 44 : 30, w = n*cw;
+  const vv = vals.map(v=>isNum(v)? snowNum(v) : null);
+  const mx = Math.max(imp()? 6 : 15, ...vv.map(v=>v||0));
+  let g = "";
+  [[0,5,"Next 1–5 Days"],[5,10,"Next 6–10 Days"],[10,15,"Next 11–15 Days"]].forEach(([a,b,lab])=>{
+    if(a >= n) return; const bb = Math.min(b,n); const tot = vals.slice(a,bb).reduce((x,y)=>x+(y||0),0);
+    const x1 = a*cw+4, x2 = bb*cw-4, xm = (x1+x2)/2, t = fmtSnow(tot,0);
+    g += `<text x="${xm}" y="10" class="t-l">${lab}</text><path d="M${x1} 15v6M${x2} 15v6M${x1} 18H${xm-16}M${xm+16} 18H${x2}" class="t-br"/><text x="${xm}" y="22" class="t-tot">${t}</text>`;
+  });
+  vv.forEach((v,i)=>{
+    const x = i*cw + 5, bw = cw - 10; const val = v||0; const h = Math.max(2, val/mx*H);
+    const inch = vals[i]||0;
+    g += `<rect x="${x}" y="${top+H-h}" width="${bw}" height="${h}" rx="2" fill="${val<0.05 ? "#e8e8ea" : barColor(inch)}" ${val<0.05?'opacity=".8"':''}/>`;
+    if(o.labels && v!=null){ const lab = v<0.5? "0" : String(Math.round(v)); g += `<text x="${x+bw/2}" y="${top+H-h-4}" class="t-v" ${inch>=12?'fill="#f39a44"':''}>${lab}</text>`; }
+    const d = dates[i]; const wd = new Date(d+"T12:00:00Z").getUTCDay(); const we = wd===0||wd===6;
+    g += `<text x="${i*cw+cw/2}" y="${top+H+15}" class="t-d ${we?"we":""}">${LETTER[wd]}</text><text x="${i*cw+cw/2}" y="${top+H+30}" class="t-d ${we?"we":""}">${+d.slice(8,10)}</text>`;
+  });
+  let hh = top + H + 36;
+  if(o.q){ o.q.forEach((sc,i)=>{ if(!isNum(sc)) return; const qh = 6 + sc*2.6; g += `<rect x="${i*cw+7}" y="${hh+34-qh}" width="${cw-14}" height="${qh}" rx="2" fill="${scoreColor(sc)}" opacity=".9"/>`; }); hh += 38; }
+  return `<svg class="bars" width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}">${g}</svg>`;
+}
+function snowSummaryHTML(last24, vals, dates, o={}){
+  const nowLbl = (()=>{ const d = new Date(); return DOW[d.getDay()]+" "+d.getDate()+" "+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}).replace(" ","").toLowerCase(); })();
+  return `<div class="ss"><div class="ss-l"><div class="ss-k">Last 24 Hours</div><div class="ss-big num">${isNum(last24)? fmtSnow(last24,0) : "—"}</div><div class="ss-t">${nowLbl}<br><span class="u">Estimated</span></div></div>
+    <div class="ss-r">${snowBarsSVG(vals, dates, o)}</div></div>`;
+}
+
 const SECTIONS = [
-  {id:"wax",    title:"Wax plan",              nordic:true},
-  {id:"models", title:"Models & odds"},
-  {id:"elev",   title:"Elevation & snow level"},
-  {id:"hourly", title:"Hour by hour"},
-  {id:"season", title:"Season totals"},
-  {id:"avy",    title:"Avalanche danger"},
+  {id:"hourly",  title:"Detailed hourly forecast"},
+  {id:"wax",     title:"Wax plan", nordic:true},
+  {id:"models",  title:"Models & odds"},
+  {id:"elev",    title:"Elevation & snow level"},
+  {id:"outlook", title:"Extended outlook"},
+  {id:"season",  title:"Season totals"},
+  {id:"avy",     title:"Avalanche danger"},
 ];
 S.open = new Set(store.get("open", []));
 
 function render(){
   if(!S.data) return;
   destroyCharts(); updateTop();
-  const e = bandElev(), C = computeAt(e), SIM = simulate(C), N = S.win, D = S.data;
+  const e = bandElev(), C = computeAt(e), SIM = simulate(C), D = S.data;
   S.ctx = {C, SIM, e};
   const consDaily = C.consDays.map(d=>d.day+d.night);
-  const winTot = windowTotal(consDaily, N);
+  const N = 5, winTot = windowTotal(consDaily, N);
   const modelTots = Object.keys(D.models).filter(id=>S.enabled[id]).map(id=>modelWindow(C,id,N)).filter(isNum);
-  const ensTots = ensWindowTotals(C, N);
-  const lo = ensTots.length? pct(ensTots,.1) : Math.min(...modelTots), hi = ensTots.length? pct(ensTots,.9) : Math.max(...modelTots);
-  let next24 = 0; for(let i=C.nowIdx;i<C.nowIdx+24 && i<C.cons.length;i++) if(C.cons[i]) next24 += C.cons[i].snow;
-  const slNow = C.cons[C.nowIdx]?.sl;
   const conf = confidence(modelTots);
 
-  // callouts (max 2, by priority)
+  // callouts (max 2)
   const callouts = [];
-  const bigDay = consDaily.slice(0,N).reduce((b,v,i)=>v>b.v?{v,i}:b,{v:0,i:0});
+  const bigDay = consDaily.slice(0,7).reduce((b,v,i)=>v>b.v?{v,i}:b,{v:0,i:0});
   const rainHrs = C.cons.slice(C.nowIdx, C.nowIdx+24*N).filter(c=>c && c.P>0.3 && c.sl > e).length;
-  if(bigDay.v >= 6) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} on ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}. ${firstPowDay(C)}</div>`);
-  if(rainHrs >= 6) callouts.push(`<div class="callout rain">🌧️ <b>Rain risk:</b> about ${rainHrs} wet hours in the next ${N} days at this elevation. Check the summit band.</div>`);
+  if(bigDay.v >= 6) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}. ${firstPowDay(C)}</div>`);
+  if(rainHrs >= 6) callouts.push(`<div class="callout rain">🌧️ <b>Rain risk:</b> about ${rainHrs} wet hours in the next ${N} days at this elevation.</div>`);
   const days7 = C.days.slice(0,7);
-  if(S.mode!=="alpine"){ const cr = days7.filter(d=>crustCruise(C,SIM,d)); if(cr.length) callouts.push(`<div class="callout crust">✨ <b>Crust cruising ${cr.map(dow).join(", ")}:</b> after a sunny day and a hard overnight freeze, skate off-trail from about 7–10am, before the sun softens it.</div>`); }
-  else { const corn = days7.filter(d=>at(C,SIM,d,12)?.sim?.key==="corn"); if(corn.length) callouts.push(`<div class="callout">🌽 <b>Corn cycle ${corn.map(dow).join(", ")}:</b> firm early. Start on east-facing slopes around 10am and follow the sun to south and west.</div>`); }
+  if(S.mode!=="alpine"){ const cr = days7.filter(d=>crustCruise(C,SIM,d)); if(cr.length) callouts.push(`<div class="callout crust">✨ <b>Crust cruising ${cr.map(dow).join(", ")}:</b> skate off-trail from about 7–10am, before the sun softens the crust.</div>`); }
+  else { const corn = days7.filter(d=>at(C,SIM,d,12)?.sim?.key==="corn"); if(corn.length) callouts.push(`<div class="callout">🌽 <b>Corn cycle ${corn.map(dow).join(", ")}:</b> start on east-facing slopes around 10am and follow the sun.</div>`); }
   const sums = days7.map(d=>daySummary(C,SIM,d));
   let bestK = -1; sums.forEach((x,k)=>{ if(x && (bestK<0 || x.best.avg > sums[bestK].best.avg)) bestK=k; });
   if(bestK>=0 && callouts.length<2){ const b=sums[bestK]; callouts.push(`<div class="callout">🏆 <b>Best ${MODE_NAME[S.mode].toLowerCase()} day: ${dayLabel(days7[bestK])}</b>, ${hl(b.best.from)}–${hl(b.best.to)}, ${b.best.sim.label.toLowerCase()} ${scoreChip(b.best.avg)}</div>`); }
   S.bestDay = bestK>=0 ? days7[bestK] : null;
 
-  const sv = {
-    wax: "", models: `${Object.keys(D.models).length} models · ${conf.label}`,
-    elev: `Snow level ${fmtEl(slNow)}`, hourly: "", season: S.season && S.season.loc===S.loc ? "" : "", avy: S.avyLabel || "",
-  };
-  const now = SIM[C.nowIdx], c0 = C.cons[C.nowIdx];
-  if(now) sv.hourly = `${now.icon} ${fmtT(c0?.Te)} now`;
-  if(S.mode!=="alpine"){ const w = wax(now, c0); if(w) sv.wax = S.mode==="classic"? w.kick.split(" (")[0] : w.glide.split(" (")[0] + " glide"; }
+  const quality = C.days.map(d=>{ const x = daySummary(C,SIM,d); return x? x.best.avg : null; });
+  const slNow = C.cons[C.nowIdx]?.sl;
+  const sv = { models:`${Object.keys(D.models).length} models · ${conf.label}`, elev:`Snow level ${fmtEl(slNow)}`, outlook:"Weeks 1–5 · 6 months", season:"", avy:S.avyLabel||"", hourly:"5 days", wax:"" };
+  if(S.mode!=="alpine"){ const w = wax(SIM[C.nowIdx], C.cons[C.nowIdx]); if(w) sv.wax = S.mode==="classic"? w.kick.split(" (")[0] : w.glide.split(" (")[0] + " glide"; }
 
   $("#app").innerHTML = `
-  <section class="card hero">
-    <div class="hero-top">
-      <div><div class="k">Next ${N} days</div><div class="big num">${fmtSnow(winTot)}</div><div class="muted">likely ${fmtSnow(lo)}–${fmtSnow(hi)} · <span class="badge b-${conf.lvl}">${conf.label}</span></div></div>
-      <div class="seg sm" id="winSeg"><button data-w="3">3d</button><button data-w="5">5d</button><button data-w="10">10d</button></div>
-    </div>
-    <div class="minis">
-      <div class="mini"><div class="l">Next 24h</div><div class="v num">${fmtSnow(next24)}</div></div>
-      <div class="mini"><div class="l">Last 24h</div><div class="v num">${fmtSnow(C.past24)}</div></div>
-      <div class="mini"><div class="l">Snow lvl</div><div class="v num">${isNum(slNow)? (imp()? (Math.max(0,Math.round(slNow*FT/100)/10)).toFixed(1)+"k" : (Math.max(0,slNow)/1000).toFixed(1)+"k") : "—"}</div></div>
-      <div class="mini" id="mAvy"><div class="l">Avy</div><div class="v num">${S.avyMini || "…"}</div></div>
-    </div>
-  </section>
   ${callouts.slice(0,2).join("")}
+  <section class="card">
+    <div class="card-h"><h2>Snow Summary</h2><span class="badge b-${conf.lvl}">${conf.label}</span></div>
+    ${snowSummaryHTML(C.past24, consDaily, C.days, {labels:true, q:quality})}
+    <div class="legend" style="margin-top:6px"><span>Snow per day, 6am–6am · scroll for days 11–15</span><span>Bottom row: ${MODE_NAME[S.mode].toLowerCase()} ski quality</span></div>
+  </section>
   <section class="card" id="nowCard"></section>
-  <section class="card">
-    <div class="card-h"><h2>Daily</h2><span class="muted">6a–6a · tap a day</span></div>
-    <div class="strip" id="strip"></div>
-    <div id="dayDetail"></div>
-  </section>
+  <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
+  <section class="card"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div></section>
   ${S.mode!=="alpine"? `<section class="card" id="birkiePanel"></section>`:""}
-  <section class="card">
-    <div class="card-h"><h2>Snowfall</h2><span class="muted">blend + ensemble range</span></div>
-    <div class="chartbox"><canvas id="cDaily"></canvas></div>
-  </section>
-  <section class="card">
-    <div class="card-h"><h2>Discussion</h2></div>
-    <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read more</button>
-  </section>
+  <section class="card"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted">auto-written from the models</span></div>
+    <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read more</button></section>
   ${SECTIONS.filter(s=>!s.nordic || S.mode!=="alpine").map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
-  <div class="muted" style="text-align:center;margin:16px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${C.ensDays.length} ensemble members · <a href="#" id="aboutLink">How it works</a></div>`;
+  <div class="muted" style="text-align:center;margin:18px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
-  // wire
-  document.querySelectorAll("#winSeg button").forEach(b=>{ b.classList.toggle("on", +b.dataset.w===S.win); b.onclick=()=>{ S.win=+b.dataset.w; store.set("win",S.win); render(); }; });
   $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read more" : "Show less"; };
   $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
+  $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderNow(C, SIM, e); renderStrip(C, SIM);
+  renderRightNow(C, SIM, e); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode!=="alpine") renderBirkie();
-  renderDailyChart(C); renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
+  const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
+  renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
   S.open.forEach(id=>{ if($("#sb-"+id)) renderSection(id); });
   renderAvy(); updateSeasonSummary();
-  const v=(location.hash||'').slice(1); if(v==='maps') initBigMap(); if(v==='outlook') renderOutlook();
+  if((location.hash||'')==='#maps') initBigMap();
 }
 
+function winSegHTML(){ return `<div class="seg sm" data-winseg>${[3,5,10].map(w=>`<button data-w="${w}" class="${S.win===w?"on":""}">${w}d</button>`).join("")}</div>`; }
+function wireWinSeg(el, again){ el.querySelectorAll("[data-winseg] button").forEach(b=>b.onclick=()=>{ S.win=+b.dataset.w; store.set("win",S.win); again(); }); }
+
 function renderSection(id){
-  const {C, SIM} = S.ctx, el = $("#sb-"+id); if(!el) return;
+  const {C, SIM, e} = S.ctx, el = $("#sb-"+id); if(!el) return;
+  if(id==="hourly"){ renderDetailedHourly(C, SIM, el); }
   if(id==="wax"){ el.innerHTML = `<div id="waxList"></div>`; renderWax(C, SIM); }
-  if(id==="models"){ el.innerHTML = `<div class="muted" style="margin-bottom:8px">Each model's daily snow at ${fmtEl(S.ctx.e)}, run through the same snow model. Untick a model to drop it from the blend.</div><div class="tablewrap"><table id="mTable"></table></div><div class="modelstatus" id="mStatus"></div>
-      <h3>Running total by model</h3><div class="chartbox"><canvas id="cAccum"></canvas></div>
-      <h3>Chance of snow</h3><div class="muted" style="margin-bottom:8px">From ${C.ensDays.length} ensemble members</div><div class="probgrid" id="probs"></div><div class="chartbox" style="height:180px;margin-top:10px"><canvas id="cProb"></canvas></div>`;
-    renderModelTable(C); renderAccum(C); renderProbs(C); }
-  if(id==="elev"){ el.innerHTML = `<div class="muted">${S.win}-day snow from valley to summit. The shaded band is the model min–max.</div><div class="chartbox tall"><canvas id="cElev"></canvas></div>
+  if(id==="models"){
+    ["daily","accum","prob"].forEach(k=>{ if(S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
+    el.innerHTML = `<div class="muted" style="margin-bottom:8px">Bars show the Snowline blend; whiskers show the ensemble 10–90% range.</div><div class="chartbox"><canvas id="cDaily"></canvas></div>
+      <h3>Model by model</h3><div class="muted" style="margin-bottom:8px">Daily snow at ${fmtEl(e)}. Untick a model to drop it from the blend.</div><div class="tablewrap"><table id="mTable"></table></div><div class="modelstatus" id="mStatus"></div>
+      <h3>Running total</h3><div class="chartbox"><canvas id="cAccum"></canvas></div>
+      <div class="card-h" style="margin-top:14px"><h3 style="margin:0">Chance of snow</h3>${winSegHTML()}</div><div class="probgrid" id="probs"></div><div class="chartbox" style="height:170px;margin-top:10px"><canvas id="cProb"></canvas></div>`;
+    renderDailyChart(C); renderModelTable(C); renderAccum(C); renderProbs(C); wireWinSeg(el, ()=>renderSection("models")); }
+  if(id==="elev"){
+    ["elev","sl"].forEach(k=>{ if(S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
+    el.innerHTML = `<div class="card-h"><span class="muted">Snow from valley to summit (band = model range)</span>${winSegHTML()}</div><div class="chartbox tall"><canvas id="cElev"></canvas></div>
       <h3>Snow level, next 7 days</h3><div class="chartbox"><canvas id="cSL"></canvas></div><div class="legend"><span><i class="dot" style="background:#38bdf8"></i> snow at your elevation</span><span><i class="dot" style="background:#34d399"></i> rain</span></div>`;
-    renderElevChart(C); renderSL(C); }
-  if(id==="hourly"){ el.innerHTML = `<div class="seg sm" id="hrSeg"><button data-h="5">5 days</button><button data-h="10">10 days</button></div><div class="tablewrap" style="margin-top:10px;max-height:520px;overflow-y:auto"><table id="hTable"></table></div>`;
-    document.querySelectorAll("#hrSeg button").forEach(b=>{ b.classList.toggle("on", +b.dataset.h===(S.hrDays||5)); b.onclick=()=>{ S.hrDays=+b.dataset.h; renderSection("hourly"); }; });
-    renderHourly(C, SIM); }
+    renderElevChart(C); renderSL(C); wireWinSeg(el, ()=>renderSection("elev")); }
+  if(id==="outlook"){ renderOutlook(); }
   if(id==="season"){ el.innerHTML = `<div id="seasonPanel"></div>`; renderSeason(C); }
   if(id==="avy"){ renderAvy(); }
 }
 
-function renderNow(C, SIM, e){
+/* ---------- Right Now ---------- */
+function renderRightNow(C, SIM, e){
   const now = SIM[C.nowIdx], c = C.cons[C.nowIdx]; const el = $("#nowCard"); if(!now || !c){ el.remove(); return; }
-  const sc = scoreOf(now);
-  const t = todayStr(); const ts = daySummary(C,SIM,t) || daySummary(C,SIM,dateAdd(t,1)); const tsDay = daySummary(C,SIM,t)? "Today" : "Tomorrow";
+  const hr = +C.time[C.nowIdx].slice(11,13), sc = scoreOf(now);
+  const t = todayStr(); const ts = daySummary(C,SIM,t) || daySummary(C,SIM,dateAdd(t,1)); const tsDay = daySummary(C,SIM,t)? "today" : "tomorrow";
   const lh = liftHold(c.RW, c.G); const W = S.mode!=="alpine" ? wax(now, c) : null;
-  el.innerHTML = `<div class="card-h" style="margin-bottom:6px"><h2>Now</h2><span class="muted">${MODE_NAME[S.mode]} · ${fmtEl(e)}</span></div>
-    <div class="now"><div class="ic">${now.icon}</div><div><div class="lab">${now.label}</div><div class="muted">${now.light.icon} ${now.light.label} · ${fmtT(c.Te)}, feels ${fmtT(now.feels)}</div></div>
-      <div class="sc-big"><b class="num" style="color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</b><div class="muted">/10</div></div></div>
-    <div class="desc">${now.d}</div>
+  el.innerHTML = `<div class="card-h" style="margin-bottom:8px"><h2>Right Now</h2><span class="muted">${fmtEl(e)}</span></div>
+    <div class="rn">
+      <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like ${fmtT(now.feels)}</div></div></div>
+      <div class="rn-b"><div class="rn-w num"><span class="arr" style="transform:rotate(${(c.WD||0)+180}deg)">↑</span>${fmtWind(c.W)} <small>${windU()}</small></div><div class="muted">${compass(c.WD)} gusts to ${fmtWind(c.G)}</div></div>
+    </div>
+    <div class="surf-row"><span class="ic">${now.icon}</span><div style="flex:1;min-width:0"><b>${now.label}</b><div class="muted">${now.d}</div></div><div style="text-align:right"><div class="num" style="font-size:26px;color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</div><div class="muted">${MODE_NAME[S.mode]}</div></div></div>
     <div class="kv">
-      ${ts? `<div class="full"><div class="l">Best window ${tsDay.toLowerCase()}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
-      ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>
-            ${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
+      ${ts? `<div class="full"><div class="l">Best window ${tsDay}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
+      ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
       <div><div class="l">New snow</div><div class="v">${fmtSnow(now.newSnow)}${now.newSnow>0.5? ` · ${now.age<24?"last 24h":Math.round(now.age/24)+"d ago"}`:""}</div></div>
-      <div><div class="l">Wind / gust</div><div class="v">${fmtWind(c.W)} / ${fmtWind(c.G)} ${windU()}</div></div>
-      ${S.mode==="alpine"? `<div><div class="l">Ridgetop</div><div class="v">${fmtWind(c.RW)} ${windU()}</div></div><div><div class="l">Lifts</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : ""}
+      ${S.mode==="alpine"? `<div><div class="l">Lifts · ridgetop ${fmtWind(c.RW)}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>`}
     </div>`;
 }
 
-function renderStrip(C, SIM){
-  const html = C.days.map((d,k)=>{
-    const cd = C.consDays[k]; if(!cd.n) return "";
-    const tot = cd.day+cd.night, x = k<10 ? daySummary(C,SIM,d) : null;
-    const memb = C.ensDays.filter(m=>m.cnt[k]>0).map(m=>m.tot[k]);
-    const p6 = memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length) : null;
-    return `<button class="dc ${S.selDay===d?"sel":""} ${S.bestDay===d?"best":""}" data-d="${d}" data-k="${k}">
-      <div class="d">${d===todayStr()?"Today":dow(d)}</div><div class="dt">${md(d)}</div>
-      <div class="sn num" style="color:${tot>=6?'var(--deep)':tot>=1?'var(--ice)':'var(--text)'}">${tot<0.1?"0":fmtSnow(tot)}</div>
-      <div class="ics">${x? (x.am?x.am.icon:x.pm?.icon||"") + (x.pm && x.am && x.pm.key!==x.am.key? x.pm.icon:"") : "&nbsp;"}</div>
-      <div style="margin-top:4px">${x? scoreChip(x.best.avg) : `<span class="muted">—</span>`}</div>
-      ${p6!=null && p6>=10? `<div class="p">${p6}% ≥6"</div>`:`<div class="p">&nbsp;</div>`}
-    </button>`;
-  }).join("");
-  $("#strip").innerHTML = html;
-  document.querySelectorAll("#strip .dc").forEach(b=>b.onclick=()=>{ S.selDay = S.selDay===b.dataset.d ? null : b.dataset.d; document.querySelectorAll("#strip .dc").forEach(x=>x.classList.toggle("sel", x.dataset.d===S.selDay)); renderDayDetail(C, SIM); });
-  renderDayDetail(C, SIM);
+/* ---------- Hourly strip ---------- */
+function renderHourStrip(C, SIM){
+  let h = "";
+  for(let i=C.nowIdx; i<Math.min(C.time.length, C.nowIdx+48); i++){
+    const c = C.cons[i]; if(!c) continue; const t = C.time[i], hr = +t.slice(11,13);
+    const pp = C.pop.get(t); const pc = pp && pp[1] ? Math.round(100*pp[0]/pp[1]) : null; const ty = ptype(c);
+    h += `<div class="hc"><div class="hc-t">${i===C.nowIdx?"Now":hl(hr).replace("a","am").replace("p","pm")}</div><div class="hc-d">${dow(t.slice(0,10))}</div>
+      <div class="hc-p" style="border-color:${pc>=20?PT[ty==="none"?"snow":ty]:"#3a3a3e"};color:${pc>=20?PT[ty==="none"?"snow":ty]:"var(--mute)"}">${pc==null?"—":pc+"%"}</div>
+      <div class="hc-i" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${wxIcon(c, hr, 24)}</div><div class="hc-v">${fmtT(c.Te)}</div>
+      ${c.snow>=0.05? `<div class="hc-s">${fmtSnow(c.snow,1)}</div>`:`<div class="hc-s muted">&nbsp;</div>`}
+      <div class="hc-w">${compass(c.WD)}${fmtWind(c.W)}</div></div>`;
+  }
+  $("#hourStrip").innerHTML = h;
 }
 
-function renderDayDetail(C, SIM){
-  const el = $("#dayDetail"); const d = S.selDay; const k = C.days.indexOf(d);
-  if(!d || k<0){ el.innerHTML = ""; return; }
+/* ---------- Daily list (day / night) ---------- */
+function periodRange(C, k, part){
+  const arr = C.ensDays.filter(m=>m.cnt[k]>0).map(m=> part==="day"? m.totD[k] : m.totN[k]);
+  return arr.length>=5 ? [pct(arr,.25), pct(arr,.75)] : null;
+}
+function rangeText(cons, r){
+  let lo = r? r[0] : cons*0.7, hi = r? r[1] : cons*1.3; lo = Math.min(lo, cons); hi = Math.max(hi, cons);
+  const L = Math.floor(snowNum(lo)), Hh = Math.max(L+1, Math.ceil(snowNum(hi)));
+  if(snowNum(hi) < 0.5) return `0${imp()?'"':' cm'}`;
+  return `${L}–${Hh}${imp()?'"':' cm'}`;
+}
+function renderDailyList(C, SIM){
+  const rows = C.days.map((d,k)=>{
+    const cd = C.consDays[k]; if(!cd.n) return "";
+    const noon = at(C,SIM,d,13), mid = at(C,SIM,dateAdd(d,1),1);
+    const x = k<15 ? daySummary(C,SIM,d) : null;
+    const per = (part) => {
+      const c = part==="day" ? noon?.c : mid?.c; const v = cd[part]; const hrs = [];
+      // temp: high for day, low for night
+      const T = part==="day" ? cd.tmaxD : cd.tminN;
+      const ty = (()=>{ let s=0,r=0; const H = part==="day"? [6,18] : [18,30]; for(let h=H[0]; h<H[1]; h++){ const q = at(C,SIM, h<24? d : dateAdd(d,1), h%24); if(q?.c && q.c.P>0.05){ s+=q.c.P*(q.c.frac??1); r+=q.c.P*(1-(q.c.frac??1)); } } return s+r<0.3? "none" : r>s*1.5? "rain" : s>r*3? "snow" : "mix"; })();
+      const rr = periodRange(C,k,part); const txt = rangeText(v, rr);
+      const pctW = Math.min(100, Math.max(v>=0.05?6:0, snowNum(rr? Math.max(rr[1],v) : v)/(imp()?12:30)*100));
+      const slrP = (()=>{ let a=0,w=0; const H = part==="day"? [6,18] : [18,30]; for(let h=H[0]; h<H[1]; h++){ const q = at(C,SIM, h<24? d : dateAdd(d,1), h%24); if(q?.c && q.c.snow>0.02){ a+=q.c.slr*q.c.snow; w+=q.c.snow; } } return w>0.1? Math.round(a/w)+":1" : "--"; })();
+      return `<div class="dl-r ${part}"><span class="dl-tp num">${fmtT(T)}</span><span class="dl-ic" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${c? wxIcon(c, part==="day"?13:1, 24) : ""}</span>
+        <span class="dl-sc">${part==="day" && x? scoreChip(x.best.avg) : ""}</span><span class="dl-slr">${slrP}</span>
+        <span class="dl-b"><i style="width:${pctW}%;background:${ty==="none"?"#3d8bfd":PT[ty]}"></i><em>${txt}</em></span></div>`;
+    };
+    return `<div class="dl-day ${S.selDay===d?"sel":""}" data-d="${d}"><div class="dl-l"><b>${d===todayStr()?"Today":dow(d)}</b><span>${+d.slice(8,10)}</span>${S.bestDay===d?'<span class="star">★</span>':""}</div><div class="dl-p">${per("day")}${per("night")}</div></div>
+      <div class="dl-x" id="dx-${d}">${S.selDay===d? "" : ""}</div>`;
+  }).join("");
+  $("#dailyList").innerHTML = `<div class="dl-h"><span></span><span>Temp</span><span></span><span>Ski</span><span>SLR</span><span>12-hr snowfall</span></div>` + rows;
+  document.querySelectorAll("#dailyList .dl-day").forEach(r=>r.onclick=()=>{ const d=r.dataset.d; const was = S.selDay===d; S.selDay = was? null : d;
+    document.querySelectorAll("#dailyList .dl-x").forEach(x=>x.innerHTML=""); document.querySelectorAll("#dailyList .dl-day").forEach(x=>x.classList.toggle("sel", x.dataset.d===S.selDay));
+    if(!was) renderDayDetail(C, SIM, $("#dx-"+d)); });
+  if(S.selDay && $("#dx-"+S.selDay)) renderDayDetail(C, SIM, $("#dx-"+S.selDay));
+}
+
+function renderDayDetail(C, SIM, el){
+  const d = S.selDay; const k = C.days.indexOf(d); if(!el || !d || k<0) return;
   const cd = C.consDays[k], x = daySummary(C,SIM,d);
   const ratio = cd.slrW? cd.slrSum/cd.slrW : null, sl = cd.slN? cd.slSum/cd.slN : null;
   const conf = confidence(Object.keys(C.modelDays).filter(id=>S.enabled[id]).map(id=>{ const m=C.modelDays[id][k]; return m.n>=m.exp*0.75? m.day+m.night : null; }));
   const memb = C.ensDays.filter(m=>m.cnt[k]>0).map(m=>m.tot[k]);
   let mx=0,g=0; for(let h=9;h<=15;h++){ const q=at(C,SIM,d,h); if(q?.c){ mx=Math.max(mx,q.c.RW||0); g=Math.max(g,q.c.G||0);} } const lh = liftHold(mx,g);
   const w = S.mode!=="alpine" ? (()=>{ const q=at(C,SIM,d,9); return q?.sim? wax(q.sim,q.c):null; })() : null;
-  el.innerHTML = `<div class="daydetail"><div class="card-h" style="margin-bottom:8px"><h3>${dayLabel(d)}</h3><span class="badge b-${conf.lvl}">${conf.label}</span></div>
-   <div class="kv">
-    <div><div class="l">Snow · day / night</div><div class="v">${fmtSnow(cd.day)} / ${fmtSnow(cd.night)}</div></div>
-    <div><div class="l">Odds of 6"+</div><div class="v">${memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length)+"%" : "—"}${memb.length? ` · range ${fmtSnow(pct(memb,.1))}–${fmtSnow(pct(memb,.9))}`:""}</div></div>
-    <div><div class="l">High / low</div><div class="v">${fmtT(cd.tmax)} / ${fmtT(cd.tmin)}</div></div>
+  el.innerHTML = `<div class="daydetail"><div class="kv">
+    <div><div class="l">Total · confidence</div><div class="v">${fmtSnow(cd.day+cd.night)} <span class="badge b-${conf.lvl}">${conf.label}</span></div></div>
+    <div><div class="l">Odds of 6"+</div><div class="v">${memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length)+"%" : "—"}</div></div>
     <div><div class="l">Snow level</div><div class="v">${fmtEl(sl)}</div></div>
-    ${ratio? `<div><div class="l">Snow quality</div><div class="v">${Math.round(ratio)}:1 · ${ratio>=15?"blower":ratio>=11?"average":"dense"}</div></div>`:""}
-    <div><div class="l">Max gust</div><div class="v">${fmtWind(cd.gmax)} ${windU()}${S.mode==="alpine" && lh.k!=="hi"? ` <span class="badge b-${lh.k}">${lh.label}</span>`:""}</div></div>
+    <div><div class="l">Quality</div><div class="v">${ratio? `${Math.round(ratio)}:1 · ${ratio>=15?"blower":ratio>=11?"average":"dense"}` : "—"}</div></div>
+    <div><div class="l">Max gust</div><div class="v">${fmtWind(cd.gmax)} ${windU()}</div></div>
+    ${S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
     ${x? `<div class="full"><div class="l">Surface · best window</div><div class="v">${x.am?`AM ${x.am.icon} ${x.am.label}`:""}${x.am&&x.pm?" → ":""}${x.pm?`PM ${x.pm.icon} ${x.pm.label}`:""}<br><b>${hl(x.best.from)}–${hl(x.best.to)}</b> ${scoreChip(x.best.avg)} · ${x.best.sim.light.icon} ${x.best.sim.light.label}</div></div>`:""}
-    ${w? `<div class="full"><div class="l">Wax at 9am</div><div class="v">Glide: ${w.glide}${S.mode==="classic"?`<br>Kick: ${w.kick}`:""}<br>Tracks: <b style="color:${speedColor(w.speed)}">${w.speed}</b> (${w.why})</div></div>`:""}
-   </div></div>`;
+    ${w? `<div class="full"><div class="l">Wax at 9am</div><div class="v">Glide: ${w.glide}${S.mode==="classic"?`<br>Kick: ${w.kick}`:""}</div></div>`:""}
+  </div></div>`;
+}
+
+/* ---------- Detailed hourly table ---------- */
+function renderDetailedHourly(C, SIM, el){
+  const end = Math.min(C.time.length, C.nowIdx + 24*5); const cols = [];
+  for(let i=C.nowIdx;i<end;i++){ if(C.cons[i] && SIM[i]) cols.push(i); }
+  const days = [...new Set(cols.map(i=>C.time[i].slice(0,10)))];
+  const cell = (i, txt) => { const ty = ptype(C.cons[i]); return `<td style="color:${ty==="none"?"var(--text)":PT[ty]}">${txt}</td>`; };
+  const ROWS = [
+    ["Precip chance", i=>{ const pp=C.pop.get(C.time[i]); return pp&&pp[1]? Math.round(100*pp[0]/pp[1])+"%" : "—"; }],
+    [`Precipitation ${imp()?"in":"mm"}`, i=>{ const p=C.cons[i].P; return imp()? (p/25.4).toFixed(2) : p.toFixed(1); }],
+    [`Snowfall ${imp()?"in":"cm"}`, i=>{ const v=C.cons[i].snow; return imp()? v.toFixed(2) : (v*2.54).toFixed(1); }],
+    ["Snow ratio", i=> C.cons[i].snow>0.01 ? Math.round(C.cons[i].slr)+":1" : "--"],
+    [`Snow level ${imp()?"ft":"m"}`, i=>{ const sl=Math.max(0,C.cons[i].sl); return imp()? (Math.round(sl*FT/100)*100).toLocaleString() : Math.round(sl/10)*10; }],
+    ["Weather", i=> wxIcon(C.cons[i], +C.time[i].slice(11,13), 20)],
+    [`Temperature °${imp()?"F":"C"}`, i=> fmtT(C.cons[i].Te).replace("°","")],
+    [`Feels like °${imp()?"F":"C"}`, i=> fmtT(SIM[i].feels).replace("°","")],
+    ["Humidity %", i=> isNum(C.cons[i].RH)? Math.round(C.cons[i].RH) : "—"],
+    [`Wind ${windU()}`, i=> compass(C.cons[i].WD)+fmtWind(C.cons[i].W)],
+    [`Gust ${windU()}`, i=> fmtWind(C.cons[i].G)],
+    ["Cloud cover %", i=> isNum(C.cons[i].CC)? Math.round(C.cons[i].CC) : "—"],
+    [`${MODE_NAME[S.mode]} score`, i=> scoreChip(scoreOf(SIM[i]))],
+    ["Surface", i=> `<span title="${SIM[i].label}">${SIM[i].icon}</span>`],
+  ];
+  el.innerHTML = `<div class="jump"><span class="muted">Jump to:</span>${days.map((d,j)=>`<button data-j="${d}">${j===0?"Now":dow(d)}</button>`).join("")}</div>
+    <div class="dh" id="dhWrap"><table><thead><tr><th class="m"></th>${cols.map(i=>{ const t=C.time[i], hr=+t.slice(11,13); return `<th data-day="${t.slice(0,10)}" data-hr="${hr}">${hl(hr).replace("a","am").replace("p","pm")}<br><span>${dow(t.slice(0,10))}</span></th>`; }).join("")}</tr></thead>
+    <tbody>${ROWS.map(([lab,f])=>`<tr><td class="m">${lab}</td>${cols.map(i=>lab==="Weather"||lab.endsWith("score")||lab==="Surface"? `<td>${f(i)}</td>` : cell(i, f(i))).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="legend"><span class="muted">Precip type:</span><span><i class="dot" style="background:${PT.snow}"></i> Snow</span><span><i class="dot" style="background:${PT.mix}"></i> Snow/rain</span><span><i class="dot" style="background:${PT.rain}"></i> Rain</span><span><i class="dot" style="background:${PT.none}"></i> None</span></div>`;
+  el.querySelectorAll(".jump button").forEach(b=>b.onclick=()=>{ const wrap=$("#dhWrap"); const th = b.dataset.j===days[0] ? wrap.querySelector("th[data-day]") : (wrap.querySelector(`th[data-day="${b.dataset.j}"][data-hr="6"]`) || wrap.querySelector(`th[data-day="${b.dataset.j}"]`)); if(th) wrap.scrollTo({left: th.offsetLeft - wrap.querySelector("th.m").offsetWidth, behavior:"smooth"}); });
 }
 
 function renderWax(C, SIM){
@@ -715,6 +900,24 @@ function updateSeasonSummary(){
   if(!S.season || S.season.loc!==S.loc){ el.textContent = "Loading…"; return; }
   const Z = seasonCalc(bandElev()); if(!Z){ el.textContent=""; return; }
   el.textContent = `${fmtSnow(Z.toDate,0)} so far${isNum(Z.pctNormal)? " · "+Z.pctNormal+"% of normal":""}`;
+}
+
+/* ---------- Favorites ---------- */
+const DEFAULT_FAVS = ["Mt. Bachelor, OR","Mt. Bachelor Nordic Center, OR","Meissner Nordic (Bend), OR","Hoodoo, OR"];
+async function renderFavs(force){
+  const el = $("#view-favs");
+  const list = S.favs.length ? S.favs : DEFAULT_FAVS.map(n=>PRESETS.find(p=>p.name===n)).filter(Boolean);
+  if(!S.finder || force) el.innerHTML = `<div class="vh"><h1>Favorites</h1></div>${list.map(()=>`<div class="skel" style="height:170px"></div>`).join("")}`;
+  let F; try{ F = await loadFinder(force); }catch(e){ el.innerHTML = `<div class="vh"><h1>Favorites</h1></div><div class="card err">Couldn't load forecasts. Try again in a minute.</div>`; return; }
+  const byName = new Map(F.rows.map(r=>[r.spot.name, r]));
+  el.innerHTML = `<div class="vh"><h1>Favorites</h1><button class="link" id="favRefresh">Refresh</button></div>
+    ${S.favs.length? "" : `<div class="callout">Tap ☆ on any forecast to add it here. These are suggestions for Bend.</div>`}
+    ${list.map(sp=>{ const r = byName.get(sp.name); if(!r) return "";
+      return `<button class="card fc" data-n="${encodeURIComponent(sp.name)}"><div class="fc-h"><div><b>${sp.name}</b><div class="muted">${Math.round(sp.top).toLocaleString()} ft summit · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
+        ${snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</button>`; }).join("")}
+    <div class="muted" style="text-align:center;margin:10px 0">Summit forecasts · Open-Meteo best-match blend through Snowline's snow model</div>`;
+  el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
+  $("#favRefresh").onclick = () => renderFavs(true);
 }
 
 function firstPowDay(C){
@@ -1119,7 +1322,7 @@ function renderSeason(C){
 }
 
 /* ================= Views / tabs ================= */
-const VIEWS = ["forecast","finder","maps","outlook","alerts"];
+const VIEWS = ["forecast","favs","finder","maps","alerts"];
 function showView(){
   let v = (location.hash||"").slice(1); if(!VIEWS.includes(v)) v = "forecast";
   VIEWS.forEach(x=>{ const el=$("#view-"+x); if(el) el.style.display = x===v? "" : "none"; });
@@ -1128,7 +1331,7 @@ function showView(){
   window.scrollTo(0,0);
   if(v==="finder") renderFinder();
   if(v==="maps") initBigMap();
-  if(v==="outlook") renderOutlook();
+  if(v==="favs") renderFavs();
   if(v==="alerts") renderAlerts();
 }
 window.addEventListener("hashchange", showView);
@@ -1152,7 +1355,7 @@ function finderSpots(){ const seen = new Set(); return [...S.favs, ...PRESETS].f
 async function loadFinder(force){
   if(S.finder && !force && Date.now()-S.finder.at < 30*60e3) return S.finder;
   const spots = finderSpots();
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${spots.map(s=>s.lat).join(",")}&longitude=${spots.map(s=>s.lon).join(",")}&elevation=${spots.map(s=>(s.top/FT).toFixed(0)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&forecast_days=11`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${spots.map(s=>s.lat).join(",")}&longitude=${spots.map(s=>s.lon).join(",")}&elevation=${spots.map(s=>(s.top/FT).toFixed(0)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&past_days=1&forecast_days=16`;
   let j = await getJSON(url); if(!Array.isArray(j)) j = [j];
   const rows = spots.map((sp,i)=>{
     const r = j[i]; if(!r) return null; const H = r.hourly, ref = sp.top/FT;
@@ -1161,21 +1364,23 @@ async function loadFinder(force){
     const sum = (hrs, e) => { let s=0; for(let k=i0;k<i0+hrs && k<H.time.length;k++){ const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, e); if(v) s+=v.snow; } return s; };
     const daily = {}; for(let k=i0;k<H.time.length;k++){ const [d]=periodOf(H.time[k]); const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, ref); if(v) daily[d]=(daily[d]||0)+v.snow; }
     const peak = Object.entries(daily).reduce((b,[d,v])=>v>b.v?{d,v}:b,{d:null,v:0});
-    return { spot:sp, h24:sum(24,ref), d3:sum(72,ref), d5:sum(120,ref), d10:sum(240,ref), b5:sum(120, sp.base/FT), peak, regions:regionOf(sp.name) };
+    const d0 = periodOf(H.time[i0])[0]; const dates15 = Array.from({length:15},(_,k)=>dateAdd(d0,k)); const days15 = dates15.map(d=>daily[d]||0);
+    let last24 = 0; for(let k=Math.max(0,i0-24); k<i0; k++){ const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, ref); if(v) last24+=v.snow; }
+    return { spot:sp, days15, dates15, last24, h24:sum(24,ref), d3:sum(72,ref), d5:sum(120,ref), d10:sum(240,ref), b5:sum(120, sp.base/FT), peak, regions:regionOf(sp.name) };
   }).filter(Boolean);
   S.finder = { at:Date.now(), rows };
   return S.finder;
 }
 async function renderFinder(force){
   const el = $("#view-finder");
-  if(!S.finder || force) el.innerHTML = `<div class="card"><h2>Powder Finder</h2><div class="loading"><div class="spin"></div>Checking ${finderSpots().length} spots…</div></div>`;
+  if(!S.finder || force) el.innerHTML = `<div class="vh"><h1>Explore</h1></div><div class="card"><h2>Powder Finder</h2><div class="loading"><div class="spin"></div>Checking ${finderSpots().length} spots…</div></div>`;
   let F; try{ F = await loadFinder(force); }catch(e){ el.innerHTML = `<div class="card"><h2>Powder Finder</h2><div class="err" style="margin-top:8px">Couldn't load the Powder Finder. Pull to refresh in a minute.</div></div>`; return; }
   const reg = S.finderRegion || "All", sortK = S.finderSort || "d5";
   const regions = ["All","Pacific NW","Rockies","California","Midwest","Nordic"];
   const W = {h24:"24h", d3:"3d", d5:"5d", d10:"10d"};
   const rows = F.rows.filter(r=>reg==="All"||r.regions.includes(reg)).sort((a,b)=>b[sortK]-a[sortK]);
-  el.innerHTML = `<div class="card">
-    <div class="card-h"><h2>Powder Finder</h2><button class="link" id="fRefresh" style="padding:0">Refresh</button></div>
+  el.innerHTML = `<div class="vh"><h1>Explore</h1></div><div class="card">
+    <div class="card-h"><h2>Powder Finder</h2><button class="link" id="fRefresh" style="padding:0">Refresh</button></div><div class="muted" style="margin:-4px 0 10px">Every resort and Nordic area, ranked by forecast snow</div>
     <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg sm" id="sortSeg">${Object.entries(W).map(([k,l])=>`<button data-s="${k}" class="${k===sortK?'on':''}">${l}</button>`).join("")}</div><span class="muted">summit snow</span></div>
     <div class="seg sm scroll" id="regSeg">${regions.map(r=>`<button data-r="${r}" class="${r===reg?'on':''}">${r}</button>`).join("")}</div>
     <div class="list" style="margin-top:6px">${rows.map((r,i)=>`<button class="li" data-n="${encodeURIComponent(r.spot.name)}"><span class="rk">${i+1}</span><span class="nm"><b>${S.favs.some(f=>f.name===r.spot.name)?"★ ":""}${r.spot.name}</b><small>${r.peak.d&&r.peak.v>=0.5? `Peak ${dow(r.peak.d)} ${fmtSnow(r.peak.v)} · `:""}24h ${fmtSnow(r.h24)} · 10d ${fmtSnow(r.d10)} · base ${fmtSnow(r.b5)}</small></span><span class="num" style="font-size:20px;min-width:52px;text-align:right;color:${r[sortK]>=6?'var(--deep)':r[sortK]>=1?'var(--ice)':'var(--mute)'}">${fmtSnow(r[sortK])}</span></button>`).join("")}</div>
@@ -1206,7 +1411,7 @@ async function checkAlerts(){
 function renderAlerts(){
   const el = $("#view-alerts"); const spots = finderSpots();
   const W = {h24:"24 hr", d3:"3 days", d5:"5 days", d10:"10 days"};
-  el.innerHTML = `<div class="card"><h2>Powder alerts</h2><div class="muted" style="margin:4px 0 12px">Snowline checks your alerts every time you open it and shows any matches at the top of the Forecast tab.</div>
+  el.innerHTML = `<div class="vh"><h1>Alerts</h1></div><div class="card"><h2>Powder alerts</h2><div class="muted" style="margin:4px 0 12px">Snowline checks your alerts every time you open it and shows any matches at the top of the Forecast tab.</div>
     <div class="field">Spot<select id="aSpot"><option value="*favs">Any favorite</option><option value="*all">Any spot</option>${spots.map(s=>`<option>${s.name}</option>`).join("")}</select></div>
     <div class="form2"><div class="field">At least (${imp()?"in":"cm"})<input id="aIn" type="number" inputmode="numeric" value="${imp()?6:15}"></div>
     <div class="field">Within<select id="aWin">${Object.entries(W).map(([k,l])=>`<option value="${k}" ${k==="d3"?"selected":""}>${l}</option>`).join("")}</select></div></div>
@@ -1317,7 +1522,7 @@ async function loadOutlook(loc){
 }
 function membersOf(H, name){ return Object.keys(H).filter(k=>k===name || k.startsWith(name+"_")).map(k=>H[k]).filter(a=>Array.isArray(a) && a.some(isNum)); }
 async function renderOutlook(){
-  const el = $("#view-outlook"); if(!S.loc) return;
+  const el = $("#sb-outlook") || $("#view-outlook"); if(!S.loc) return;
   if(!S.data){ el.innerHTML = `<div class="card"><h2>Extended outlook</h2><div class="loading"><div class="spin"></div>Loading…</div></div>`; return; }
   if(!S.outlook || S.outlook.loc !== S.loc){
     el.innerHTML = `<div class="panel"><h2>Extended outlook</h2><div class="loading"><div class="spin"></div>Loading the 35-day ensemble and seasonal models…</div></div>`;
@@ -1399,7 +1604,7 @@ function renderLocList(){
 }
 $("#locBtn").onclick = () => { renderLocList(); $("#q").value=""; $("#res").innerHTML=""; openSheet("locSheet"); };
 $("#setBtn").onclick = () => openSheet("setSheet");
-$("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.unshift({...S.loc}); store.set("favs",S.favs); S.finder=null; updateTop(); };
+$("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.unshift({...S.loc}); store.set("favs",S.favs); updateTop(); };
 
 let qT;
 $("#q").oninput = e => { clearTimeout(qT); const q=e.target.value.trim(); if(q.length<2){ $("#res").innerHTML=""; return; }
