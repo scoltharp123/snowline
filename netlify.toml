@@ -10,3 +10,23 @@
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"
+
+# Official trail maps, loaded through Snowline's own address so the app can draw
+# them (the resorts' servers don't allow cross-site reads) and save them offline.
+# Each rule only reaches one resort's file folder.
+[[redirects]]
+  from = "/tm/mtb/*"
+  to = "https://cms.mtbachelor.com/sites/default/files/:splat"
+  status = 200
+[[redirects]]
+  from = "/tm/methow/*"
+  to = "https://methowtrails.org/assets/:splat"
+  status = 200
+[[redirects]]
+  from = "/tm/birkie/*"
+  to = "https://www.birkie.com/wp-content/uploads/:splat"
+  status = 200
+[[redirects]]
+  from = "/tm/usfs/*"
+  to = "https://www.fs.usda.gov/media/:splat"
+  status = 200
