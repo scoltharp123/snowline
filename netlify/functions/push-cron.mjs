@@ -1,12 +1,12 @@
-// Scheduled: every morning ~5:45am Pacific (13:45 UTC) send powder alerts
-import { subs, send, buildAlert } from "../lib/push.mjs";
+// Scheduled: every morning ~5:45am Pacific (13:45 UTC) send powder alerts and the morning brief
+import { subs, send, buildAlert, buildBrief, combine } from "../lib/push.mjs";
 
 export default async () => {
   const s = subs(); const { blobs } = await s.list();
   let sent = 0, gone = 0;
   for (const b of blobs) {
     const rec = await s.get(b.key, { type: "json" }); if (!rec) continue;
-    const alert = await buildAlert(rec).catch(() => null); if (!alert) continue;
+    const alert = combine(await buildAlert(rec).catch(() => null), await buildBrief(rec).catch(() => null)); if (!alert) continue;
     const r = await send(rec.sub, alert);
     if (r === "ok") sent++; else if (r === "gone") { await s.delete(b.key); gone++; }
   }

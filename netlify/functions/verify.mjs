@@ -34,7 +34,7 @@ export default async (req) => {
     const [st] = await nearestStations(lat, lon, 1, 40);
     if (!st) return json({ status: "no-station" }, { cache: 86400 });
     const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `verify-v5-${st.id}-${today}`;
+    const cacheKey = `verify-v6-${st.id}-${today}`;
     const s = store("snowline-cache");
     try { const c = await s.get(cacheKey, { type: "json" }); if (c) return json(c, { cache: 21600 }); } catch (e) {}
 
@@ -77,7 +77,7 @@ export default async (req) => {
     const depthGain = {}; const sd = o.SNWD || [];
     for (let i = 1; i < sd.length; i++) { const dv = sd[i].value - sd[i - 1].value; depthGain[String(sd[i].date).slice(0, 10)] = Math.max(0, dv); }
     const uniq = []; const sigs = new Set();
-    for (const [id, f] of results) { if (!f || !f._snow) continue; const sig = JSON.stringify(Object.values(f).slice(-10).map(v => Math.round(v * 10))); if (sigs.has(sig)) continue; sigs.add(sig); uniq.push(f); }
+    for (const [id, f] of results) { if (!f || !f._snow) continue; const sig = JSON.stringify(Object.values(f).slice(-10).map(v => Math.round(v * 10))); if (sigs.has(sig)) continue; sigs.add(sig); f._id = id; uniq.push(f); }
     const wetDay = (d) => (daily[d] ?? 0) >= 2.5 || (depthGain[d] ?? 0) >= 1;
     const storms = []; let cur = null;
     for (const d of days) {
@@ -87,12 +87,15 @@ export default async (req) => {
     if (cur) { cur.ongoing = true; storms.push(cur); }
     const stormOut = storms.map(x => {
       const obsSnow = x.days.reduce((a, d) => a + (depthGain[d] || 0), 0), obsWater = x.days.reduce((a, d) => a + (daily[d] || 0), 0) / 25.4;
-      const per = uniq.map(f => ({ s: x.days.reduce((a, d) => a + (f._snow[d] || 0), 0), w: x.days.reduce((a, d) => a + (f[d] || 0), 0) / 25.4 })).filter(v => isFinite(v.s));
+      const per = uniq.map(f => ({ id: f._id, s: x.days.reduce((a, d) => a + (f._snow[d] || 0), 0), w: x.days.reduce((a, d) => a + (f[d] || 0), 0) / 25.4 })).filter(v => isFinite(v.s));
       if (per.length < 2) return null;
       const ss = per.map(v => v.s).sort((a, b) => a - b), mean = ss.reduce((a, b) => a + b, 0) / ss.length;
       return { start: x.days[0], end: x.days[x.days.length - 1], ongoing: !!x.ongoing, obsSnow: Math.round(obsSnow * 10) / 10, obsWater: Math.round(obsWater * 100) / 100,
         fcstSnow: Math.round(mean * 10) / 10, fcstLo: Math.round(ss[0] * 10) / 10, fcstHi: Math.round(ss[ss.length - 1] * 10) / 10,
-        fcstWater: Math.round(per.reduce((a, v) => a + v.w, 0) / per.length * 100) / 100, models: per.length };
+        fcstWater: Math.round(per.reduce((a, v) => a + v.w, 0) / per.length * 100) / 100, models: per.length,
+        // the model whose day-before forecasts came closest to what the station measured (water is the fairer test; snow depth settles)
+        closest: per.reduce((b, v) => { const e = Math.abs(v.w - obsWater) + Math.abs(v.s - obsSnow) / 12; return !b || e < b.e ? { id: v.id, s: Math.round(v.s * 10) / 10, e } : b; }, null),
+        perModel: Object.fromEntries(per.map(v => [v.id, Math.round(v.s * 10) / 10])) };
     }).filter(x => x && (x.obsSnow >= 2 || x.fcstSnow >= 2) && (x.obsWater >= 0.1 || x.fcstWater >= 0.1)).reverse().slice(0, 4);
     const out = { storms: stormOut, status, station: { id: st.id, name: st.name, km: Math.round(st.km), elevFt: st.elevFt }, days: days.length, wetDays: wetTotal, scores, weights, best, updated: new Date().toISOString() };
     try { await s.setJSON(cacheKey, out); } catch (e) {}

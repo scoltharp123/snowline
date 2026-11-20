@@ -440,6 +440,13 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .afd p{font-size:14px;line-height:1.55;margin:0 0 8px}.clamp4{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
 .et-wrap{overflow-x:auto;margin:0 -4px}.et{border-collapse:collapse;width:100%;min-width:420px;font-size:13px;text-align:center}.et th{font-weight:600;font-size:12px;color:var(--mute);padding:4px 2px}.et th small,.et td small{color:var(--mute);font-size:11px}
 .et td{padding:5px 2px;border-top:1px solid var(--line)}.et .et-l{text-align:left;color:var(--mute);font-size:12px;white-space:nowrap;padding-right:6px}.et .et-h td{text-align:left;font-weight:700;padding-top:12px;border-top:0;color:var(--text)}
+
+.gr-big{display:flex;align-items:center;gap:12px;margin:4px 0}.gr-big b{font-size:36px;color:var(--good)}.gr-big span{font-size:14px;line-height:1.35}.gr-big small{color:var(--mute)}
+.chip-s{font-size:12px;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+.ob{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line);color:inherit;text-decoration:none}.ob:first-of-type{border-top:0}.ob img{width:64px;height:64px;object-fit:cover;border-radius:10px;flex:0 0 auto}
+.ob-h b{display:block;font-size:14px}.ob-h small{color:var(--mute);font-size:12px}.ob p{margin:4px 0 0;font-size:13px;line-height:1.45;color:#d6d6da}
+.ob-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.ob-chip{font-size:11px;font-weight:700;color:#ffd9d9;background:#3a1518;border:1px solid #6b2a2e;border-radius:6px;padding:2px 6px}
+.stake-img{position:relative;border-radius:12px;overflow:hidden;background:#000}.stake-img img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}.stake-img span{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:3px 8px;border-radius:6px}
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -966,9 +973,11 @@ function render(){
     <div class="qleg"><span>Ski quality</span><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
   </section>
   <section class="card" id="nowCard"></section>
+  <section class="card" id="groomCard" hidden></section>
   <section class="card" id="workCard"></section>
   <section class="card" id="reportCard"></section>
   <section class="card" id="camCard"></section>
+  ${S.loc && RESORT_CAMS[S.loc.name]?.some(c=>c.id==="mtb-14")? `<section class="card" id="stakeCard"></section>`:""}
   <section class="card" id="tmCard"></section>
   ${!isAlp()? `<section class="card" id="openCard"></section>`:""}
   <section class="card" id="repCard"></section>
@@ -992,7 +1001,7 @@ function render(){
   $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -2050,6 +2059,8 @@ function loadExtras(loc){
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
   api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
   api(`/nws?${q}`).then(r=>{ X.nws=r; if(S.loc===loc){ renderNwsAlerts(); renderAFD(); } }).catch(()=>{});
+  if(GROOM_SPOTS.includes(loc.name)) api(`/groom?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.groom=r; if(S.loc===loc) renderGroom(); }).catch(()=>{});
+  if(loc.bc || PRESETS.find(p=>p.name===loc.name)?.bc || S.mode==="bc") loadAvyObs(loc);
 }
 function nearObs(){ const X = S.loc && S.extras[S.loc.name]; const st = X?.obs?.stations?.[0]; return st && st.km <= SNOTEL_MAX_KM ? st : null; }
 function learned(){ const X = S.loc && S.extras[S.loc.name]; const v = X?.verify; return v && v.status==="ok" ? v : null; }
@@ -2123,6 +2134,62 @@ function buildFacts(C, SIM, e){
     avalancheDanger: X.avy?.zone?.danger || null, mode: S.mode, modeDescription: S.mode==="bc"? "backcountry ski touring: climbing on skins with no lifts, in or near avalanche terrain" : byMode("alpine (downhill) skiing at a resort", "skate (nordic cross-country) skiing on groomed trails", "classic (nordic cross-country) skiing in set tracks") };
 }
 
+
+
+/* ================= Grooming, avalanche observations, snow stake time-lapse ================= */
+const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Methow Valley Trails, WA", "Birkie Trail (Cable, WI)", "Mt. Spokane, WA"];
+function renderGroom(){
+  const card = $("#groomCard"); if(!card || !S.loc) return; const G = extrasFor(S.loc).groom;
+  if(!G || S.mode==="bc"){ card.hidden = true; return; }
+  if(G.links){ if(!G.links.length){ card.hidden = true; return; }
+    card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><div class="row" style="gap:8px;flex-wrap:wrap">${G.links.map(([t,u])=>`<a class="btn" style="text-decoration:none" href="${u}" target="_blank" rel="noopener">${t} ↗</a>`).join("")}</div>
+      <div class="muted" style="font-size:11px;margin-top:6px">Live grooming for this area is published on its own report; Snowline links to it rather than copying it.</div>`; return; }
+  if(G.error){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><a href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor's grooming report ↗</a>`; return; }
+  const nordic = !isAlp(), D = nordic ? G.nordic : G.alpine, R = G.report; card.hidden = false;
+  const kinds = Object.entries(D.kinds||{}).map(([k,n])=>`<span class="chip-s">${esc(k)} · ${n}</span>`).join("");
+  const head = D.groomed ? `<div class="gr-big"><b class="num">${D.groomed}</b><span>of ${D.total} ${nordic? "trails" : "runs"} groomed${D.latest? `<br><small>last update ${ago(D.latest)}</small>` : ""}</span></div>`
+    : `<p class="muted" style="margin:4px 0">No ${nordic? "trails" : "runs"} marked groomed right now${D.open? ` · ${D.open} open` : ""}.</p>`;
+  card.innerHTML = `<div class="card-h"><h2>${nordic? "Grooming · Nordic" : "Grooming & resort report"}</h2><a class="muted" href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor ↗</a></div>
+    ${head}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
+    ${D.trails?.length? `<details class="nb" style="margin-top:8px"><summary>See groomed ${nordic? "trails" : "runs"}</summary><div class="list">${D.trails.map(x=>`<div class="li" style="min-height:38px"><span class="nm"><b>${esc(x.name)}</b><small>${esc(x.groom)}${x.updated? " · "+ago(x.updated) : ""}</small></span></div>`).join("")}</div></details>` : ""}
+    ${R? `<div class="grp">Resort snow report</div><div class="fr"><div><b class="num">${R.overnight ?? "—"}″</b><small>Overnight</small></div><div><b class="num">${R.h24 ?? "—"}″</b><small>24 hours</small></div><div><b class="num">${R.base ?? "—"}″</b><small>Base</small></div></div>
+      ${R.text? `<p class="muted clamp3" style="margin:8px 0 0;font-size:13px">${esc(R.text)}</p>` : ""}` : ""}
+    <div class="muted" style="font-size:11px;margin-top:6px">From Mt. Bachelor's own mountain report.</div>`;
+}
+async function loadAvyObs(loc){
+  const X = extrasFor(loc); if(X.avyobs && Date.now()-X.avyobsAt < 15*60e3) return;
+  try{ X.avyobs = await api(`/avyobs?lat=${loc.lat.toFixed(3)}&lon=${loc.lon.toFixed(3)}`); X.avyobsAt = Date.now(); if(S.loc===loc) renderBC(); }catch(e){}
+}
+function avyObsHTML(){
+  const O = extrasFor(S.loc).avyobs; if(!O) return `<div class="loading"><div class="spin"></div>Loading field observations…</div>`;
+  const list = (O.obs||[]).slice(0, 6);
+  const chip = (on, t) => on? `<span class="ob-chip">${t}</span>` : "";
+  const items = list.map(o=>{ const f=o.flags||{}, txt = o.avalanches || o.instability || o.summary;
+    return `<a class="ob" href="${o.link}" target="_blank" rel="noopener">${o.photo? `<img src="${o.photo}" alt="" loading="lazy">` : ""}<div>
+      <div class="ob-h"><b>${esc(o.where||"Field observation")}</b><small>${new Date(o.date+"T12:00:00").toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"})} · ${o.pro? "Professional" : "Public"}${o.org? " · "+esc(o.org) : ""}</small></div>
+      <div class="ob-chips">${chip(f.caught, "Someone caught")}${chip(f.triggered, "Avalanche triggered")}${chip(f.avalanchesSeen, "Avalanches seen")}${chip(f.cracking, "Cracking")}${chip(f.collapsing, "Collapsing")}</div>
+      ${txt? `<p class="clamp3">${esc(txt)}</p>` : ""}</div></a>`; }).join("");
+  return (items || `<p class="muted">No field observations posted near here in the last 14 days. That does not mean the snowpack is stable.</p>`)
+    + `<p class="muted" style="font-size:11px;margin:6px 0 0">As reported to the avalanche center by observers${O.total>list.length? ` · <a href="https://coavalanche.org/pages/observations" target="_blank" rel="noopener">see all ${O.total}</a>` : ""}. Snowline doesn't check or rate them.</p>`;
+}
+async function renderStakeCard(){
+  const card = $("#stakeCard"); if(!card) return;
+  if(!card.innerHTML) card.innerHTML = `<div class="card-h"><h2>Snow stake · last 24 h</h2><span class="muted">Mt. Bachelor</span></div><div id="stakeBox"><div class="loading"><div class="spin"></div>Loading pictures…</div></div>`;
+  let j; try{ j = await api("/stake"); }catch(e){ card.remove(); return; }
+  const F = j.frames || []; if(F.length < 3){ $("#stakeBox").innerHTML = `<p class="muted">Snowline saves the snow stake picture every 30 minutes. The time-lapse fills in over the first few hours.</p>`; return; }
+  let i = F.length-1, timer = null;
+  const box = $("#stakeBox");
+  box.innerHTML = `<div class="stake-img"><img id="stakeImg" src="${F[i].src}" alt="Snow stake"><span id="stakeT"></span></div>
+    <div class="tl-row"><button id="stakePlay" aria-label="Play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button><input type="range" id="stakeSl" min="0" max="${F.length-1}" value="${i}" aria-label="Time"></div>
+    <div class="muted" style="font-size:11px;margin-top:4px">Pictures from <a href="${j.page}" target="_blank" rel="noopener">Mt. Bachelor's snow stake camera</a>, saved every 30 minutes.</div>`;
+  const img = $("#stakeImg"), lab = $("#stakeT"), sl = $("#stakeSl"), pl = $("#stakePlay");
+  const show = k => { i = k; img.src = F[k].src; sl.value = k; lab.textContent = new Date(F[k].t).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}); };
+  show(i);
+  F.forEach(f=>{ const im = new Image(); im.src = f.src; });   // warm the cache so playback is smooth
+  sl.oninput = () => { clearInterval(timer); timer=null; pl.innerHTML = PLAY_SVG; show(+sl.value); };
+  pl.onclick = () => { if(timer){ clearInterval(timer); timer=null; pl.innerHTML = PLAY_SVG; return; } if(i >= F.length-1) show(0); pl.innerHTML = PAUSE_SVG;
+    timer = setInterval(()=>{ if(i >= F.length-1){ clearInterval(timer); timer=null; pl.innerHTML = PLAY_SVG; return; } show(i+1); }, 350); };
+}
 
 /* ================= Free "pro" extras: NWS meteorologists, warnings, top/mid/bottom table, cloud base ================= */
 const NWS_OFFICE = { PDT:"Pendleton", PQR:"Portland", MFR:"Medford", BOI:"Boise", SEW:"Seattle", OTX:"Spokane", MSO:"Missoula", DLH:"Duluth", MPX:"Twin Cities", EKA:"Eureka", STO:"Sacramento", REV:"Reno" };
@@ -2361,6 +2428,7 @@ function renderBC(){
   card.innerHTML = `<div class="card-h"><h2>Backcountry</h2><button class="link" id="bcWhy" style="padding:0">Read first</button></div>
     <p class="bc-alert"><b>⚠️ Avalanche danger is serious.</b> Snowline makes no recommendations and cannot tell you whether a slope is safe. Read the avalanche center's forecast and make your own decisions. You are responsible for them.</p>
     <div class="grp" style="margin-top:12px">Avalanche forecast (from the avalanche center)</div>${avy}
+    <div class="grp">Recent field observations · last 14 days</div>${avyObsHTML()}
     <div class="grp">Weather that affects the snowpack</div>
     ${facts.length? `<ul class="bc-list">${facts.map(f=>`<li>${f}</li>`).join("")}</ul>` : `<p class="muted">Waiting for the forecast…</p>`}
     <p class="muted" style="font-size:11.5px;margin:6px 0 0">Model estimates for the summit (${fmtEl(L0.top/FT)}), not observations. Wind-loading notes describe where wind moves snow, not where avalanches will or won't happen.</p>
@@ -2601,14 +2669,16 @@ function evalAlerts(F){
 }
 function pushSpots(){ const L = S.favs.length? S.favs : (S.loc? [S.loc] : []); return L.slice(0,6).map(x=>({name:x.name, lat:x.lat, lon:x.lon, base:x.base, top:x.top})); }
 function pushRules(){ const all=[...S.favs, ...PRESETS]; return alertRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
-async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules()})}); }catch(e){} }
+async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units}})}); }catch(e){} }
 function renderAlerts(){
   const el = $("#view-alerts"); const spots = finderSpots(); const on = store.get("pushOn", false);
   if(!alertRules().length && !store.get("alertsSeeded")){ store.set("alerts", [{spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); store.set("alertsSeeded", 1); }
   const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   const pushRow = isIOS && !standalone ? `<div class="muted">To get these on your lock screen, add Snowline to your home screen (Share → <b>Add to Home Screen</b>), open it from there, and come back here.</div>`
     : !supported ? `<div class="muted">This browser can't show lock-screen notifications; alerts still show at the top of the Forecast tab.</div>`
-    : `<div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:10px"><div><b>Lock-screen notifications</b><div class="muted">Checked around 6am each morning</div></div><button class="btn ${on?"":"primary"}" id="pToggle" style="flex:0 0 auto">${on? "Turn off" : "Turn on"}</button></div>${on? `<button class="link" id="pTest">Send a test notification</button>`:""}`;
+    : `<div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:10px"><div><b>Lock-screen notifications</b><div class="muted">Checked around 6am each morning</div></div><button class="btn ${on?"":"primary"}" id="pToggle" style="flex:0 0 auto">${on? "Turn off" : "Turn on"}</button></div>${on? `<div style="margin-top:14px"><b>Morning brief</b><div class="muted">Around 6am, one line per favorite: overnight snow, more today, Bachelor grooming, the temperature up top</div>
+      <div class="seg sm" id="briefSeg" style="margin-top:8px">${[["off","Off"],["snow","Snow days"],["daily","Every day"]].map(([k,l])=>`<button data-b="${k}" class="${store.get("brief","snow")===k?"on":""}">${l}</button>`).join("")}</div></div>
+      <button class="link" id="pTest">Send a test notification</button>`:""}`;
   el.innerHTML = `<div class="vh"><h1>Alerts</h1></div>
     <div class="card"><h2>Your alerts</h2><div class="muted" style="margin:4px 0 8px">Matches show at the top of the Forecast tab${on? " and on your lock screen" : ""}.</div>
       <div class="list" id="aList"></div><div id="aHits"></div></div>
@@ -2631,8 +2701,9 @@ function renderAlerts(){
     if(on){ try{ const sub = await pushSub(); if(sub){ await post({action:"unsubscribe", endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); } }catch(e){} store.set("pushOn", false); toast("Lock-screen alerts off"); renderAlerts(); return; }
     try{ const perm = await Notification.requestPermission(); if(perm!=="granted"){ toast("Notifications are blocked in Settings"); return; }
       const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
-      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules()}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
+      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
     }catch(e){ toast("Couldn't turn on notifications"); } };
+  document.querySelectorAll("#briefSeg button").forEach(b=>b.onclick=()=>{ store.set("brief", b.dataset.b); document.querySelectorAll("#briefSeg button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(b.dataset.b==="off"? "Morning brief off" : b.dataset.b==="daily"? "Morning brief every day" : "Morning brief on snow days"); });
   const tb = $("#pTest"); if(tb) tb.onclick = async () => { try{ const sub = await pushSub(); const r = await post({action:"test", endpoint:sub?.endpoint}); toast(r.ok? "Test sent" : "Test failed"); }catch(e){ toast("Test failed"); } };
 }
 
@@ -2650,8 +2721,8 @@ function renderTrack(){
   el.innerHTML = `<div class="card-h"><h2>Forecast vs. actual</h2><span class="muted">${v.station.name} SNOTEL</span></div>
     <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px;margin-bottom:6px"><b>Last storm · ${range(L0.start,L0.end)}</b><span style="color:${vd.c};font-weight:700">${vd.t}</span></div>
     ${bar(L0.fcstSnow, "#5aa2ff", "Forecast")}${bar(L0.obsSnow, "#e6edf7", "Measured")}
-    <div class="muted" style="margin:2px 0 10px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)} · water ${L0.fcstWater.toFixed(2)}" forecast vs ${L0.obsWater.toFixed(2)}" measured</div>
-    ${st.length>1? `<div class="list">${st.slice(1).map(x=>{ const w=verdict(x.fcstSnow,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(x.fcstSnow,0)} fcst · ${fmtSnow(x.obsSnow,0)} got · <b style="color:${w.c}">${w.t==="Close"? "✓" : w.t.includes("high")? "↑" : "↓"}</b></span></div>`; }).join("")}</div>`:""}
+    <div class="muted" style="margin:2px 0 10px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)} · water ${L0.fcstWater.toFixed(2)}" forecast vs ${L0.obsWater.toFixed(2)}" measured${L0.closest? `<br>Closest model: <b style="color:var(--text)">${MODELS.find(m=>m.id===L0.closest.id)?.name || L0.closest.id}</b> (${fmtSnow(L0.closest.s,0)})` : ""}</div>
+    ${st.length>1? `<div class="list">${st.slice(1).map(x=>{ const w=verdict(x.fcstSnow,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(x.fcstSnow,0)} fcst · ${fmtSnow(x.obsSnow,0)} got${x.closest? ` · best ${MODELS.find(m=>m.id===x.closest.id)?.name || ""}` : ""} · <b style="color:${w.c}">${w.t==="Close"? "✓" : w.t.includes("high")? "↑" : "↓"}</b></span></div>`; }).join("")}</div>`:""}
     ${avg!=null? `<div class="muted" style="margin-top:8px">Over the last ${ratios.length} storms, forecasts averaged <b>${avg}%</b> of what fell.</div>`:""}
     <div class="muted" style="margin-top:6px;font-size:12px">Average of the models' forecasts made the day before each snow day, at the station's elevation. Measured snow is the depth gain at the station, which runs a little low as new snow settles.</div>`;
 }
