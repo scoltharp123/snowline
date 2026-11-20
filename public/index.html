@@ -429,6 +429,12 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .map-base button{border:0;background:none;color:#cbd5e1;font:600 12px Inter,system-ui;padding:6px 9px;border-radius:8px;min-height:30px}.map-base button.on{background:#334155;color:#fff}
 .map-fsb{width:40px;height:40px;border-radius:50%;border:0;background:rgba(15,23,42,.85);color:#fff;font-size:18px;backdrop-filter:blur(6px)}
 
+
+.bc-card{border-color:#5a2a2a}
+@media (max-width:560px){ .ctrl .seg button{padding:6px 4px;font-size:12.5px;min-width:0} .ctrl #modeSeg{flex:4} .ctrl #bandSeg{flex:3} }
+.bc-alert{background:#2a1416;border:1px solid #6b2a2e;border-radius:12px;padding:10px 12px;margin:8px 0 0;font-size:13.5px;line-height:1.5;color:#ffd9d9}
+.bc-alert a{color:#ffb4b4}
+.bc-list{margin:6px 0 0;padding-left:18px;line-height:1.5;font-size:14px}.bc-list li{margin:0 0 6px}
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -477,7 +483,7 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
   <div id="ptr"><div class="spin"></div></div>
   <div id="view-forecast"><div class="lt"><button id="ltBtn" aria-label="Change location"><span id="ltName">Snowline</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="lt-sub" id="ltSub"></div><div id="ltStatus"></div></div>
 <div class="ctrl" id="ctrl">
-  <div class="seg" id="modeSeg"><button data-m="alpine">Alpine</button><button data-m="skate">Skate</button><button data-m="classic">Classic</button></div>
+  <div class="seg" id="modeSeg"><button data-m="alpine">Alpine</button><button data-m="skate">Skate</button><button data-m="classic">Classic</button><button data-m="bc">Tour</button></div>
   <div class="seg" id="bandSeg" style="flex:.8"><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
 </div>
   <div id="alertBanner"></div><div id="app"><div class="skel"></div><div class="skel" style="height:120px"></div><div class="skel" style="height:240px"></div></div></div>
@@ -530,6 +536,7 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
   <div class="about">
     <p>Snowline blends up to nine weather models (ECMWF IFS and AIFS, GFS, HRRR, NBM, GEM, ICON, UKMO, JMA) with the ECMWF and GFS ensembles. It doesn't use each model's built-in snowfall. It re-models snow at your elevation instead: it adjusts temperature for altitude, finds the rain/snow line from the freezing level, and applies a temperature-based snow-to-liquid ratio. ECMWF, HRRR and NBM get extra weight in the blend.</p>
     <p>Days run 6am–6am (Day 6a–6p, Night 6p–6a). Ski surfaces are modeled hour by hour from new snow, density, wind, sun, melt-freeze and rain, and each hour gets its own score for alpine, skate and classic. The wax calls are a starting point, so test on the snow.</p>
+    <p><b>Backcountry and avalanches:</b> Snowline is a weather tool. It does not assess avalanche danger, does not make recommendations, and never says a slope, route or day is safe. Forecasts and map layers (slope angle, aspect, wind loading) are estimates and can be wrong. Avalanche forecasts shown are the avalanche center's own, unchanged. Anyone entering avalanche terrain is solely responsible for their decisions and should read the avalanche center's forecast, carry rescue gear and have avalanche training. Snowline and its maker accept no responsibility for how this information is used.</p>
     <p>Data: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0), ERA5/Copernicus, NOAA, <a href="https://avalanche.org" target="_blank" rel="noopener">avalanche.org</a>, <a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a>, OpenStreetMap/OpenTopoMap. These are model estimates, not avalanche or safety guidance.</p>
   </div>
 </div></div>
@@ -566,7 +573,13 @@ const PRESETS = [
   {name:"Mission Ridge, WA", lat:47.292, lon:-120.400, base:4570, top:6820},
   {name:"Teacup Lake Nordic (Mt. Hood), OR", lat:45.307, lon:-121.640, base:4250, top:4600},
   {name:"Anthony Lakes, OR", lat:44.961, lon:-118.229, base:7100, top:8000},
-  {name:"Mt. Washington Alpine, BC", lat:49.742, lon:-125.288, base:3500, top:5215}
+  {name:"Mt. Washington Alpine, BC", lat:49.742, lon:-125.288, base:3500, top:5215},
+  {name:"Tumalo Mountain, OR", lat:44.0054, lon:-121.6427, base:6350, top:7779, bc:{from:"Dutchman Flat Sno-Park", th:[44.0018,-121.6656]}},
+  {name:"Ball Butte, OR", lat:44.0659, lon:-121.6765, base:6350, top:8091, bc:{from:"Dutchman Flat Sno-Park", th:[44.0018,-121.6656]}},
+  {name:"Broken Top, OR", lat:44.0831, lon:-121.6989, base:6350, top:9177, bc:{from:"Dutchman Flat Sno-Park", th:[44.0018,-121.6656]}},
+  {name:"Tam McArthur Rim, OR", lat:44.0934, lon:-121.6495, base:6550, top:7732, bc:{from:"Three Creek Lake (snowmobile or ski in from Upper Three Creek Sno-Park)"}},
+  {name:"South Sister, OR", lat:44.1035, lon:-121.7693, base:5450, top:10358, bc:{from:"Devils Lake trailhead (road closed in winter)"}},
+  {name:"Paulina Peak, OR", lat:43.6892, lon:-121.2548, base:6330, top:7984, bc:{from:"Paulina Lake (road closed in winter)"}}
 ];
 const MODELS = [
   {id:"ecmwf", name:"ECMWF IFS",   api:["ecmwf_ifs025"], w:1.4, c:"#60a5fa"},
@@ -674,7 +687,14 @@ async function fetchEns(m, loc, ref){
 const MEM = new Map(); const MEM_TTL = 20*60e3;
 let renderTimer;
 function scheduleRender(loc){ clearTimeout(renderTimer); renderTimer = setTimeout(()=>{ if(S.loc===loc && S.data){ const y=scrollY; render(); scrollTo(0,y); saveSnap(loc); } }, 350); }
+function syncModeFor(loc){
+  const isTour = !!loc.bc;
+  if(isTour && S.mode!=="bc"){ S.prevMode = S.mode; S.autoBC = true; setMode("bc"); }
+  else if(!isTour && S.mode==="bc" && S.autoBC){ S.autoBC = false; setMode(S.prevMode || "alpine"); }
+}
+function setMode(m){ S.mode = m; store.set("mode", m); document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===m)); if(m==="bc") bcAcknowledge(); }
 async function load(loc){
+  syncModeFor(PRESETS.find(p=>p.name===loc.name) || loc);
   S.loc = loc; store.set("last", loc); S.selDay = null; S.avyMini = null; S.avyLabel = ""; S.season = null; S.outlook = null;
   const ref = ((loc.base+loc.top)/2)/FT; // reference elevation (m) = mid-mountain
   const mem = MEM.get(loc.name);
@@ -899,27 +919,28 @@ function render(){
   const callouts = [];
   const bigDay = consDaily.slice(0,7).reduce((b,v,i)=>v>b.v?{v,i}:b,{v:0,i:0});
   const rainHrs = C.cons.slice(C.nowIdx, C.nowIdx+24*N).filter(c=>c && c.P>0.3 && c.sl > e).length;
-  if(bigDay.v >= 6) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}. ${firstPowDay(C)}</div>`);
+  if(bigDay.v >= 6) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}.${S.mode==="bc"? "" : " "+firstPowDay(C)}</div>`);
   if(rainHrs >= 6) callouts.push(`<div class="callout rain">🌧️ <b>Rain risk:</b> about ${rainHrs} wet hours in the next ${N} days at this elevation.</div>`);
   const days7 = C.days.slice(0,7);
-  if(S.mode!=="alpine"){ const cr = days7.filter(d=>crustCruise(C,SIM,d)); if(cr.length) callouts.push(byMode("", `<div class="callout crust">✨ <b>Crust cruising ${cr.map(dow).join(", ")}:</b> skate off-trail from about 7–10am, before the sun softens the crust.</div>`, `<div class="callout crust">🧊 <b>Firm, icy tracks early ${cr.map(dow).join(", ")}:</b> klister for kick before about 10am, or wait for the tracks to soften. Tracks soften by late morning.</div>`)); }
+  if(!isAlp()){ const cr = days7.filter(d=>crustCruise(C,SIM,d)); if(cr.length) callouts.push(byMode("", `<div class="callout crust">✨ <b>Crust cruising ${cr.map(dow).join(", ")}:</b> skate off-trail from about 7–10am, before the sun softens the crust.</div>`, `<div class="callout crust">🧊 <b>Firm, icy tracks early ${cr.map(dow).join(", ")}:</b> klister for kick before about 10am, or wait for the tracks to soften. Tracks soften by late morning.</div>`)); }
   else { const corn = days7.filter(d=>at(C,SIM,d,12)?.sim?.key==="corn"); if(corn.length) callouts.push(`<div class="callout">🌽 <b>Corn cycle ${corn.map(dow).join(", ")}:</b> start on east-facing slopes around 10am and follow the sun.</div>`); }
   const sums = days7.map(d=>daySummary(C,SIM,d));
   let bestK = -1; sums.forEach((x,k)=>{ if(x && (bestK<0 || x.best.avg > sums[bestK].best.avg)) bestK=k; });
-  if(bestK>=0 && callouts.length<2){ const b=sums[bestK]; callouts.push(`<div class="callout">🏆 <b>Best ${MODE_NAME[S.mode].toLowerCase()} day: ${dayLabel(days7[bestK])}</b>, ${hl(b.best.from)}–${hl(b.best.to)}, ${b.best.sim.label.toLowerCase()} ${scoreChip(b.best.avg)}</div>`); }
+  if(bestK>=0 && callouts.length<2 && S.mode!=="bc"){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout">🏆 <b>Best ${MODE_NAME[S.mode].toLowerCase()} day: ${dayLabel(days7[bestK])}</b>, ${hl(b.best.from)}–${hl(b.best.to)}, ${b.best.sim.label.toLowerCase()} ${scoreChip(b.best.avg)}</div>`); }
   S.bestDay = bestK>=0 ? days7[bestK] : null;
 
   const quality = C.days.map(d=>{ const x = daySummary(C,SIM,d); return x? x.best.avg : null; });
   const slNow = C.cons[C.nowIdx]?.sl;
   const LV = learned();
   const sv = { models: LV? `Tuned to ${LV.station.name} · ${MODELS.find(m=>m.id===LV.best)?.name||""} leads` : `${Object.keys(D.models).length} models · ${conf.label}`, elev:`Snow level ${fmtEl(slNow)}`, outlook:"Weeks 1–5 · season · 6 months", avy:S.avyLabel||"", hourly:"5 days", wax:"" };
-  if(S.mode!=="alpine"){ const w = wax(SIM[C.nowIdx], C.cons[C.nowIdx]); if(w) sv.wax = S.mode==="classic"? w.kick.split(" (")[0] : w.glide.split(" (")[0] + " glide"; }
+  if(!isAlp()){ const w = wax(SIM[C.nowIdx], C.cons[C.nowIdx]); if(w) sv.wax = S.mode==="classic"? w.kick.split(" (")[0] : w.glide.split(" (")[0] + " glide"; }
 
   const nIn = Object.keys(D.models).length, longIn = Object.keys(D.models).filter(id=>id!=="hrrr").length;
   const modelNote = nIn < MODELS.length-2 ? `<div class="callout rain">⏳ <b>${nIn} of ${MODELS.length} models loaded.</b> ${longIn<3? "The forecast past 2 days is incomplete until more arrive." : "The rest are still coming in."}${S.omLimited && Date.now()-S.omLimited<15*60e3? " Open-Meteo, the free weather service, has hit its hourly limit for this network; it resets within the hour." : ""} ${D.retrying? "Retrying now…" : `<a href="#" id="modelRetry">Try again</a>`}</div>` : "";
   $("#app").innerHTML = `
   ${a2hsHTML()}${modelNote}
   ${callouts.slice(0,2).join("")}
+  ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend"><span class="spin"></span>ensembles</span>` : `<span class="badge b-${conf.lvl}">${conf.label}</span>`}</div>
     ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
@@ -930,7 +951,7 @@ function render(){
   <section class="card" id="reportCard"></section>
   <section class="card" id="camCard"></section>
   <section class="card" id="tmCard"></section>
-  ${S.mode!=="alpine"? `<section class="card" id="openCard"></section>`:""}
+  ${!isAlp()? `<section class="card" id="openCard"></section>`:""}
   <section class="card" id="repCard"></section>
   <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card" id="stormCard"></section>
@@ -941,7 +962,7 @@ function render(){
   ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}
   <section class="card"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read more</button></section>
-  ${SECTIONS.filter(s=>!s.nordic || S.mode!=="alpine").map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
+  ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
   <div class="muted" style="text-align:center;margin:18px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
@@ -950,7 +971,7 @@ function render(){
   $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -995,7 +1016,7 @@ function renderRightNow(C, SIM, e){
   const now = SIM[C.nowIdx], c = C.cons[C.nowIdx]; const el = $("#nowCard"); if(!now || !c){ el.remove(); return; }
   const hr = +C.time[C.nowIdx].slice(11,13), sc = scoreOf(now);
   const t = todayStr(); const ts = daySummary(C,SIM,t) || daySummary(C,SIM,dateAdd(t,1)); const tsDay = daySummary(C,SIM,t)? "today" : "tomorrow";
-  const lh = liftHold(c.RW, c.G); const W = S.mode!=="alpine" ? wax(now, c) : null;
+  const lh = liftHold(c.RW, c.G); const W = !isAlp() ? wax(now, c) : null;
   el.innerHTML = `<div class="card-h" style="margin-bottom:8px"><h2>Right Now</h2><span class="muted">${fmtEl(e)}</span></div>
     <div class="rn">
       <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like ${fmtT(now.feels)}</div></div></div>
@@ -1005,12 +1026,12 @@ function renderRightNow(C, SIM, e){
     <div class="kv">
       ${(()=>{ const an = aspectNote(C, todayStr()) || aspectNote(C, dateAdd(todayStr(),1)); return an? `<div class="full"><div class="l">${byMode("Slopes","Sun vs. shade")} ${aspectNote(C, todayStr())? "today":"tomorrow"}</div><div class="v">☀️ ${an.line}</div></div>` : ""; })()}
       ${(()=>{ const cn = coldNote(c, now); return cn? `<div class="full"><div class="l">Dress for it</div><div class="v">🧤 ${cn}</div></div>` : ""; })()}
-      ${S.mode!=="alpine"? (()=>{ const k = fromKit(c, now); return k && (k.glide||k.kick)? `<div class="full"><div class="l">From your wax box</div><div class="v">🧰 ${[k.glide?.name, k.kick?.name].filter(Boolean).join(" + ")}</div></div>` : ""; })() : ""}
-      ${S.mode!=="alpine"? (()=>{ const sg = waxSuggest(c, now); return sg?.text? `<div class="full"><div class="l">Your wax log</div><div class="v">🧠 ${sg.text}</div></div>` : ""; })() : ""}
+      ${!isAlp()? (()=>{ const k = fromKit(c, now); return k && (k.glide||k.kick)? `<div class="full"><div class="l">From your wax box</div><div class="v">🧰 ${[k.glide?.name, k.kick?.name].filter(Boolean).join(" + ")}</div></div>` : ""; })() : ""}
+      ${!isAlp()? (()=>{ const sg = waxSuggest(c, now); return sg?.text? `<div class="full"><div class="l">Your wax log</div><div class="v">🧠 ${sg.text}</div></div>` : ""; })() : ""}
       ${ts? `<div class="full"><div class="l">Best window ${tsDay}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
       ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
       <div><div class="l">New snow</div><div class="v">${fmtSnow(now.newSnow)}${now.newSnow>0.5? ` · ${now.age<24?"last 24h":Math.round(now.age/24)+"d ago"}`:""}</div></div>
-      ${S.mode==="alpine"? `<div><div class="l">Lifts · ridgetop ${fmtWind(c.RW)}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>`}
+      ${S.mode==="alpine"? `<div><div class="l">Lifts · ridgetop ${fmtWind(c.RW)}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>`}
     </div>`;
 }
 
@@ -1074,14 +1095,14 @@ function renderDayDetail(C, SIM, el){
   const conf = confidence(Object.keys(C.modelDays).filter(id=>S.enabled[id]).map(id=>{ const m=C.modelDays[id][k]; return m.n>=m.exp*0.75? m.day+m.night : null; }));
   const memb = C.ensDays.filter(m=>m.cnt[k]>0).map(m=>m.tot[k]);
   let mx=0,g=0; for(let h=9;h<=15;h++){ const q=at(C,SIM,d,h); if(q?.c){ mx=Math.max(mx,q.c.RW||0); g=Math.max(g,q.c.G||0);} } const lh = liftHold(mx,g);
-  const w = S.mode!=="alpine" ? (()=>{ const q=at(C,SIM,d,9); return q?.sim? wax(q.sim,q.c):null; })() : null;
+  const w = !isAlp() ? (()=>{ const q=at(C,SIM,d,9); return q?.sim? wax(q.sim,q.c):null; })() : null;
   el.innerHTML = `<div class="daydetail"><div class="kv">
     <div><div class="l">Total · confidence</div><div class="v">${fmtSnow(cd.day+cd.night)} <span class="badge b-${conf.lvl}">${conf.label}</span></div></div>
     <div><div class="l">Odds of 6"+</div><div class="v">${memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length)+"%" : "—"}</div></div>
     <div><div class="l">Snow level</div><div class="v">${fmtEl(sl)}</div></div>
     <div><div class="l">Quality</div><div class="v">${ratio? `${Math.round(ratio)}:1 · ${ratio>=15?"blower":ratio>=11?"average":"dense"}` : "—"}</div></div>
     <div><div class="l">Max gust</div><div class="v">${fmtWind(cd.gmax)} ${windU()}</div></div>
-    ${S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
+    ${S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
     ${x? `<div class="full"><div class="l">Surface · best window</div><div class="v">${x.am?`AM ${x.am.icon} ${x.am.label}`:""}${x.am&&x.pm?" → ":""}${x.pm?`PM ${x.pm.icon} ${x.pm.label}`:""}<br><b>${hl(x.best.from)}–${hl(x.best.to)}</b> ${scoreChip(x.best.avg)} · ${x.best.sim.light.icon} ${x.best.sim.light.label}</div></div>`:""}
     ${(()=>{ const an=aspectNote(C,d); return an? `<div class="full"><div class="l">${byMode("Slope aspects","Sun vs. shade")}</div><div class="v">${an.line}</div></div>` : ""; })()}
     ${w? `<div class="full"><div class="l">Wax at 9am</div><div class="v">Glide: ${w.glide}${S.mode==="classic"?`<br>Kick: ${w.kick}`:""}</div></div>`:""}
@@ -1321,7 +1342,7 @@ function renderSL(C){
 }
 
 function renderHourly(C, SIM){
-  const alp = S.mode==="alpine";
+  const alp = isAlp();
   let h = `<tr><th class="m">Time</th><th>Ski</th><th>Temp</th><th>Snow</th><th>Sky</th><th>Wind</th>${alp?"<th>Ridge</th>":""}</tr>`;
   const end = Math.min(C.time.length, C.nowIdx + 24*(S.hrDays||5)); let lastDay = "";
   for(let i=C.nowIdx;i<end;i+=3){
@@ -1353,8 +1374,9 @@ const SURF = {
   softpack:{label:"Soft packed",            icon:"🎿", a:6.2,   s:6.5, c:7.5, d:"A few inches of settled new snow over a firm base. Forgiving and fun.", sk:"A few inches of settled snow over a firm base: forgiving, a little slower than packed.", cl:"A few inches of settled snow over a firm base: good kick, slightly slower glide."},
 };
 const MODE_KEY = {alpine:"a", skate:"s", classic:"c"};
-const byMode = (a, sk, cl) => S.mode==="alpine" ? a : S.mode==="skate" ? sk : (cl ?? sk);
-const MODE_NAME = {alpine:"Alpine", skate:"Skate", classic:"Classic"};
+const byMode = (a, sk, cl) => isAlp() ? a : S.mode==="skate" ? sk : (cl ?? sk);
+const MODE_NAME = {alpine:"Alpine", skate:"Skate", classic:"Classic", bc:"Backcountry"};
+const isAlp = () => S.mode==="alpine" || S.mode==="bc";   // backcountry skis like alpine (no grooming, no wax), without lifts
 function windChill(T, V){ if(!isNum(T)) return null; if(!isNum(V) || T>10 || V<4.8) return T; const v=Math.pow(V,0.16); return 13.12+0.6215*T-11.37*v+0.3965*T*v; }
 function lightOf(c){ const cc = c.CC; if(!isNum(cc)) return {k:"?",icon:"",label:"—"}; if(c.snow>0.08) return {k:"storm",icon:"🌨",label:"Storm"}; if(cc<25) return {k:"blue",icon:"☀️",label:"Bluebird"}; if(cc<65) return {k:"part",icon:"⛅",label:"Partly sunny"}; return {k:"flat",icon:"☁️",label:"Flat light"}; }
 
@@ -1571,6 +1593,7 @@ function liftHold(rw, g){ const v = Math.max(isNum(rw)?rw:0, isNum(g)?g*0.9:0); 
 
 /* ================= Powder Finder ================= */
 function regionOf(name){
+  if(PRESETS.find(p=>p.name===name)?.bc) return ["Backcountry", regionOf2(name)];
   if(/Nordic|Trails|Lodge|XC|Birkie/i.test(name)) return ["Nordic", regionOf2(name)];
   return [regionOf2(name)];
 }
@@ -1605,7 +1628,7 @@ async function renderFinder(force){
   if(!S.finder || force) el.innerHTML = `<div class="vh"><h1>Explore</h1></div><div class="card"><h2>Powder Finder</h2><div class="loading"><div class="spin"></div>Checking ${finderSpots().length} spots…</div></div>`;
   let F; try{ F = await loadFinder(force); }catch(e){ el.innerHTML = `<div class="card"><h2>Powder Finder</h2><div class="err" style="margin-top:8px">Couldn't load the Powder Finder. Pull to refresh in a minute.</div></div>`; return; }
   const reg = S.finderRegion || "All", sortK = S.finderSort || "d5";
-  const regions = ["All","Oregon","Washington & BC","Nordic"];
+  const regions = ["All","Oregon","Washington & BC","Nordic","Backcountry"];
   const W = {h24:"24h", d3:"3d", d5:"5d", d10:"10d"};
   const rows = F.rows.filter(r=>reg==="All"||r.regions.includes(reg)).sort((a,b)=>b[sortK]-a[sortK]);
   el.innerHTML = `<div class="vh"><h1>Explore</h1></div><div class="card">
@@ -1902,7 +1925,7 @@ function aspectNote(C, d){
     if(h===8){ sAM=q.sim; nAM=r.sim; }
     if(sWet==null && WETK.has(q.sim.key)) sWet={h, sim:q.sim}; if(nWet==null && WETK.has(r.sim.key)) nWet={h, sim:r.sim}; }
   if(!sAM) return null;
-  const nordic = S.mode!=="alpine";
+  const nordic = !isAlp();
   const sTxt = sWet ? (nordic? `Sunny stretches soften by ${hl(sWet.h)}` : `South faces ${sWet.sim.key==="corn"?"turn to corn":"soften"} by ${hl(sWet.h)}`) : (nordic? `Sunny stretches stay ${sAM.key==="firm"?"firm":"dry"}` : `South faces stay ${sAM.key==="firm"?"firm":"dry"}`);
   const dryN = ["powder","fresh","softpack","packed","cold","heavy","wind"].includes(nAM.key);
   const nTxt = nWet ? (nordic? `shaded trail softens by ${hl(nWet.h)}` : `north softens by ${hl(nWet.h)}`) : (dryN? (nordic? "shaded trail stays dry and fast" : "north stays dry and cold") : `${nordic? "shaded trail" : "north"} stays ${nAM.label.toLowerCase()}`);
@@ -1933,7 +1956,9 @@ function renderStorm(C, SIM, e){
   const endD = C.time[st.b].slice(0,10), endH = +C.time[st.b].slice(11,13);
   const after = endH < 7 ? endD : dateAdd(endD,1);
   const ratio = slrW? slrA/slrW : 10;
-  const verdict = S.mode==="alpine"
+  const verdict = S.mode==="bc"
+    ? `<b>Snow ends around ${tLabel(C,st.b)}.</b> New snow${maxG>=50? " and strong wind" : ""} add weight to the snowpack, and avalanche danger often rises during and after storms. Check the avalanche center's forecast for each day you plan to go.`
+    : isAlp()
     ? (dayHrs>=3 && maxG<70
       ? `<b>Ski the storm:</b> about ${fmtSnow(dayTot)} falls during lift hours, ${ratio>=13?"light and deep":"heavier and supportive"}. Then hit the <b>morning after</b> on ${dow(after)}.`
       : `<b>Wait for the morning after:</b> most of it falls ${dayHrs? "outside lift hours" : "overnight"}${maxG>=70? " with strong winds" : ""}. First chair ${dow(after)} is the call.`)
@@ -2031,11 +2056,11 @@ function renderReport(){
         ${R.base!=null? `<div><div class="l">Base</div><div class="v num">${fmtSnow(R.base,0)}</div></div>`:""}
         ${R.summit!=null? `<div><div class="l">Summit</div><div class="v num">${fmtSnow(R.summit,0)}</div></div>`:""}
         ${R.lifts && S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v">${R.liftsOpen}/${R.lifts}</div></div>`:""}
-        ${R.runs && S.mode==="alpine"? `<div><div class="l">Runs</div><div class="v">${R.runsOpen}/${R.runs}</div></div>`:""}
+        ${R.runs && isAlp()? `<div><div class="l">Runs</div><div class="v">${R.runsOpen}/${R.runs}</div></div>`:""}
       </div>${R.comment? `<p class="clamp3 muted" style="margin:8px 0 0">${R.comment}</p>`:""}
       <a class="muted" href="${R.url}" target="_blank" rel="noopener">${R.source} ↗</a></div>`);
   } else if(R && R.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b></div><a href="${R.url}" target="_blank" rel="noopener">Open the latest resort report ↗</a></div>`);
-  const G = S.mode!=="alpine" ? rep.grooming : null;
+  const G = !isAlp() ? rep.grooming : null;
   if(G) blocks.push(`<a class="li" href="${G.url}" target="_blank" rel="noopener"><span class="nm"><b>Nordic grooming report</b><small>Today's grooming on ${G.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
   const cl = "";
   if(!blocks.length && !cl){ el.remove(); return; }
@@ -2158,7 +2183,7 @@ async function renderAvy(){
     mini = `<span class="pill"><i class="sw" style="background:${col}"></i>${lvl>0?lvl:"–"}</span>`;
     sv = `<span class="pill"><i class="sw" style="background:${col}"></i>${lvl>0? lvl+" · ":""}${z.off_season? "Off season" : nm}</span>`;
     const band = (lab, v) => { const [n,c]=AVY_LVL[v]||["—","#333"]; return `<div class="avb"><span>${lab}</span><i style="background:${c}"></i><b>${v>0? v+" · "+n : "—"}</b></div>`; };
-    body = `<div class="muted" style="margin-bottom:8px">${z.center||""} · ${z.name||""}${d?.published? " · issued "+new Date(d.published).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"}):""}</div>
+    body = `<p class="bc-alert" style="margin:0 0 10px"><b>⚠️ Avalanches are deadly.</b> This is the avalanche center's forecast, shown as published. Snowline adds no rating or recommendation of its own; read the full forecast and make your own decisions.</p><div class="muted" style="margin-bottom:8px">${z.center||""} · ${z.name||""}${d?.published? " · issued "+new Date(d.published).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"}):""}</div>
       ${d?.danger? `<div class="avbands">${band("Above treeline",d.danger.upper)}${band("Near treeline",d.danger.middle)}${band("Below treeline",d.danger.lower)}</div>` : `<div class="now"><span style="width:44px;height:44px;border-radius:12px;background:${col};display:grid;place-items:center;color:#000;font-weight:800;font-size:20px">${lvl>0?lvl:"–"}</span><div class="lab">${nm}</div></div>`}
       ${d?.tomorrow? `<div class="muted" style="margin-top:6px">Tomorrow: ${["upper","middle","lower"].map(k=>(AVY_LVL[d.tomorrow[k]]||["—"])[0]).join(" / ")}</div>`:""}
       ${d?.bottomLine? `<p class="desc">${d.bottomLine}</p>` : z.travel_advice? `<p class="desc">${z.travel_advice}</p>` : ""}
@@ -2169,7 +2194,104 @@ async function renderAvy(){
   else body = `<div class="loading"><div class="spin"></div>Loading avalanche forecast…</div>`;
   if(S.loc !== L0) return;
   S.avyMini = mini; S.avyLabel = sv;
+  try{ renderBC(); }catch(e){}
   const m=$("#mAvy .v"); if(m) m.innerHTML=mini; const s2=$("#sv-avy"); if(s2) s2.innerHTML=sv; const b=$("#sb-avy"); if(b) b.innerHTML=body;
+}
+
+
+/* ================= Backcountry (Tour mode) =================
+   Snowline only shows weather facts and the avalanche center's own forecast. It never rates avalanche danger,
+   never calls a slope or a day safe, and never recommends where or whether to go. */
+const BC_WARN = `Avalanches kill people in Central Oregon. Snowline shows weather data and links the avalanche center's forecast. It does not assess avalanche danger, does not make recommendations, and cannot tell you whether any slope, route or day is safe. Weather models are often wrong in the mountains. You alone are responsible for your decisions in avalanche terrain.`;
+function bcAcknowledge(force){
+  if(!force && store.get("bcAck", 0) > Date.now() - 180*864e5) return;   // asked again every 6 months
+  let sh = $("#bcAck"); if(!sh){ sh = document.createElement("div"); sh.id = "bcAck"; sh.className = "sheet"; document.body.appendChild(sh); }
+  sh.innerHTML = `<div class="sheet-b"><div class="grab"></div>
+    <h2 style="margin:4px 0 10px">⚠️ Before you use Tour mode</h2>
+    <p style="line-height:1.5;margin:0 0 10px"><b>${BC_WARN}</b></p>
+    <ul class="bc-list">
+      <li>Read the <a href="https://www.coavalanche.org/" target="_blank" rel="noopener">Central Oregon Avalanche Center</a> forecast every day you go, and follow it.</li>
+      <li>Every person carries a beacon, shovel and probe, and knows how to use them.</li>
+      <li>Take an avalanche course (AIARE or similar) before going into avalanche terrain, and never travel alone.</li>
+      <li>Tell someone your plan and when you'll be back. Cell service is poor or absent on most tours.</li>
+    </ul>
+    <p class="muted" style="margin:10px 0 12px">By continuing you accept that Snowline and its maker take no responsibility for how you use this information.</p>
+    <button class="btn primary wide" id="bcAckOk">I understand</button>
+    <button class="btn wide" id="bcAckNo" style="margin-top:8px">Go back to Alpine mode</button></div>`;
+  sh.classList.add("on"); document.body.style.overflow = "hidden";
+  const close = () => { sh.classList.remove("on"); document.body.style.overflow = ""; };
+  $("#bcAckOk").onclick = () => { store.set("bcAck", Date.now()); close(); };
+  $("#bcAckNo").onclick = () => { close(); S.autoBC = false; setMode("alpine"); render(); };
+}
+const lee = from => (from + 180) % 360;
+const aspectsAround = (deg, spread) => { const out = []; for(let d=-spread; d<=spread; d+=45){ const c = compass((deg+d+360)%360); if(!out.includes(c)) out.push(c); } return out; };
+function bcFacts(){
+  const L0 = S.loc, ctx = S.ctx; if(!ctx || !S.data) return null;
+  const Ct = ctx.Ctop || (ctx.Ctop = computeAt(L0.top/FT)); const n = Ct.nowIdx, cons = Ct.cons;
+  const sumSnow = (a, b) => { let s=0, k=0; for(let i=Math.max(0,a); i<Math.min(cons.length,b); i++){ if(cons[i]){ s += cons[i].snow; k++; } } return k? s : null; };
+  const windOver = (a, b) => { let u=0, v=0, sp=0, mx=0, k=0; for(let i=Math.max(0,a); i<Math.min(cons.length,b); i++){ const c=cons[i]; if(!c || !isNum(c.WD)) continue; const w = Math.max(c.RW||0, c.W||0); u+=Math.sin(c.WD*Math.PI/180)*w; v+=Math.cos(c.WD*Math.PI/180)*w; sp+=w; mx=Math.max(mx, c.G||w); k++; } return k? {from:(Math.atan2(u,v)*180/Math.PI+360)%360, avg:sp/k, max:mx} : null; };
+  const past72 = sumSnow(n-72, n), next24 = sumSnow(n, n+24), next48 = sumSnow(n, n+48);
+  const wPast = windOver(n-72, n), wNext = windOver(n, n+24);
+  // warming and rain on snow at the summit and trailhead over the next 48 hours
+  const Cb = ctx.Cbase || (ctx.Cbase = computeAt(L0.base/FT));
+  let maxT = -99, maxTt = null, rainH = 0, rainBaseH = 0, minSL = 99999, maxSL = 0;
+  for(let i=n; i<Math.min(cons.length, n+48); i++){ const c = cons[i]; if(!c) continue; if(c.Te > maxT){ maxT = c.Te; maxTt = Ct.time[i]; } if(c.P > 0.2 && c.frac < 0.5) rainH++; if(isNum(c.sl)){ minSL = Math.min(minSL, c.sl); maxSL = Math.max(maxSL, c.sl); }
+    const cb = Cb.cons[i]; if(cb && cb.P > 0.2 && cb.frac < 0.5) rainBaseH++; }
+  // the day you'd tour: today until 1pm, after that tomorrow
+  const nowH = +String(Ct.time[n]||"").slice(11,13), day = nowH >= 13 ? dateAdd(Ct.time[n].slice(0,10), 1) : Ct.time[n].slice(0,10);
+  const hrs = []; Ct.time.forEach((tm, i)=>{ if(tm.slice(0,10)===day){ const h=+tm.slice(11,13); if(h>=7 && h<=16 && cons[i]) hrs.push({h, c:cons[i]}); } });
+  const chill = (T, kmh) => kmh < 5 ? T : 13.12 + 0.6215*T - 11.37*Math.pow(kmh,0.16) + 0.3965*T*Math.pow(kmh,0.16);
+  const noon = hrs.find(x=>x.h===12) || hrs[Math.floor(hrs.length/2)];
+  const flat = hrs.filter(x=>(x.c.CC||0) >= 90 && x.c.P > 0.1);
+  const sunny = hrs.filter(x=>(x.c.CC??100) < 35);
+  const st = sunTimes(day);
+  return { day, past72, next24, next48, wPast, wNext, maxT, maxTt, rainH, rainBaseH, minSL, maxSL, noon, chillNoon: noon? chill(noon.c.Te, Math.max(noon.c.RW||0, noon.c.W||0)) : null, flat, sunny, st,
+    gain: L0.top - L0.base };
+}
+function renderBC(){
+  const card = $("#bcCard"); if(!card) return; const L0 = S.loc; const F = bcFacts(); if(!F){ card.innerHTML = ""; return; }
+  const P = PRESETS.find(p=>p.name===L0.name), info = P?.bc;
+  const A = extrasFor(L0).avy, z = A?.zone, d = A?.detail;
+  const band = (lab, v) => { const [nm, col] = AVY_LVL[v] || ["Not rated", "#3a4a6b"]; return `<div class="avb"><span>${lab}</span><i style="background:${col}"></i><b>${v>0? v+" · "+nm : nm}</b></div>`; };
+  let avy;
+  if(z && !z.off_season && d?.danger) avy = `<div class="muted" style="margin:0 0 6px">${esc(z.center||"Avalanche center")} · ${esc(z.name||"")}${d.published? " · issued "+new Date(d.published).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}) : ""}</div>
+      <div class="avbands">${band("Above treeline", d.danger.upper)}${band("Near treeline", d.danger.middle)}${band("Below treeline", d.danger.lower)}</div>
+      ${(d.problems||[]).length? `<div class="muted" style="margin-top:8px"><b style="color:var(--text)">Avalanche problems:</b> ${d.problems.map(p=>esc(p.name)).join(" · ")}</div>`:""}
+      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">${z.link? `<a class="btn primary" style="text-decoration:none" href="${z.link}" target="_blank" rel="noopener">Read the full avalanche forecast ↗</a>`:""}<button class="btn" id="bcAvyMore">Problems and bottom line</button></div>`;
+  else if(z && z.off_season) avy = `<p class="bc-alert">The avalanche center is <b>not issuing forecasts right now</b>. No forecast does not mean no danger. Assess the snowpack yourself and check <a href="${z.link||"https://www.coavalanche.org/"}" target="_blank" rel="noopener">${esc(z.center||"the avalanche center")}</a> for observations.</p>`;
+  else if(A && z===null) avy = `<p class="bc-alert">No avalanche center covers this spot. No forecast does not mean no danger. See <a href="https://avalanche.org" target="_blank" rel="noopener">avalanche.org</a>.</p>`;
+  else if(extrasFor(L0).avyFailed) avy = `<p class="bc-alert">Couldn't load the avalanche forecast. <b>Read it before you go:</b> <a href="https://www.coavalanche.org/" target="_blank" rel="noopener">Central Oregon Avalanche Center ↗</a></p>`;
+  else avy = `<div class="loading"><div class="spin"></div>Loading the avalanche forecast…</div>`;
+  const facts = [];
+  if(isNum(F.past72) && F.wPast){
+    const windy = F.wPast.avg >= 25;   // km/h, about 15 mph and up moves snow
+    facts.push(`<b>Last 3 days:</b> about ${fmtSnow(F.past72)} of new snow at the summit${windy? `, with ridgetop wind from the ${compass(F.wPast.from)} averaging ${fmtWind(F.wPast.avg)} ${windU()} (gusts near ${fmtWind(F.wPast.max)}). Wind like that moves snow onto <b>${aspectsAround(lee(F.wPast.from),45).join(", ")}</b>-facing slopes, mostly near ridgelines` : `, with lighter ridgetop wind`}.`);
+  }
+  if(isNum(F.next24) && F.wNext) facts.push(`<b>Next 24 hours:</b> ${F.next24>=0.5? `about ${fmtSnow(F.next24)} more snow` : "little or no new snow"}, ridgetop wind from the ${compass(F.wNext.from)} around ${fmtWind(F.wNext.avg)} ${windU()}${F.wNext.avg>=25 && F.next24>=1? ` (loading ${aspectsAround(lee(F.wNext.from),45).join(", ")}-facing slopes)` : ""}.`);
+  const warm = [];
+  if(F.maxT > 0.5) warm.push(`the summit goes above freezing (about ${fmtT(F.maxT)} around ${dow(F.maxTt.slice(0,10))} ${hl(+F.maxTt.slice(11,13))})`);
+  if(F.rainH) warm.push(`about ${F.rainH} hours of rain at the summit`);
+  else if(F.rainBaseH) warm.push(`about ${F.rainBaseH} hours of rain at the trailhead`);
+  if(F.maxSL > 0) warm.push(Math.abs(F.maxSL-F.minSL) < 60 ? `snow level near ${fmtEl(F.maxSL)}` : `snow level between ${fmtEl(F.minSL)} and ${fmtEl(F.maxSL)}`);
+  if(warm.length) facts.push(`<b>Next 48 hours:</b> ${warm.join("; ")}.`);
+  if(F.sunny.length >= 3 && F.maxT > -3) facts.push(`<b>Sun:</b> mostly clear ${hl(F.sunny[0].h)}–${hl(F.sunny[F.sunny.length-1].h+1)} on ${dow(F.day)}; sun warms east, south and west-facing snow through the day.`);
+  const tour = [];
+  if(F.st?.rise && F.st?.set) tour.push(`Daylight ${clock(F.st.rise)}–${clock(F.st.set)}`);
+  if(F.noon) tour.push(`summit at noon ${fmtT(F.noon.c.Te)}${isNum(F.chillNoon) && F.chillNoon < F.noon.c.Te-2? `, feels like ${fmtT(F.chillNoon)} in the wind` : ""}`);
+  if(F.flat.length) tour.push(`snow and thick cloud ${hl(F.flat[0].h)}–${hl(F.flat[F.flat.length-1].h+1)} (poor visibility)`);
+  if(F.gain > 300) tour.push(`${Math.round(F.gain).toLocaleString()} ft from ${info?.from ? esc(info.from) : "the base"} to the summit, often about ${Math.max(1, Math.round(F.gain/1000*2)/2)} h at a steady 1,000 ft an hour`);
+  card.innerHTML = `<div class="card-h"><h2>Backcountry</h2><button class="link" id="bcWhy" style="padding:0">Read first</button></div>
+    <p class="bc-alert"><b>⚠️ Avalanche danger is serious.</b> Snowline makes no recommendations and cannot tell you whether a slope is safe. Read the avalanche center's forecast and make your own decisions. You are responsible for them.</p>
+    <div class="grp" style="margin-top:12px">Avalanche forecast (from the avalanche center)</div>${avy}
+    <div class="grp">Weather that affects the snowpack</div>
+    ${facts.length? `<ul class="bc-list">${facts.map(f=>`<li>${f}</li>`).join("")}</ul>` : `<p class="muted">Waiting for the forecast…</p>`}
+    <p class="muted" style="font-size:11.5px;margin:6px 0 0">Model estimates for the summit (${fmtEl(L0.top/FT)}), not observations. Wind-loading notes describe where wind moves snow, not where avalanches will or won't happen.</p>
+    <div class="grp">Your day · ${dayLabel(F.day)}</div>
+    <p style="margin:4px 0 10px;line-height:1.5">${tour.join(" · ")}.</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="bcMap">🗺️ Slope angle & wind-loading map</button></div>`;
+  $("#bcWhy").onclick = () => bcAcknowledge(true);
+  $("#bcMap").onclick = () => { ["lySlope","lyWind","lyAvy"].forEach(id=>document.querySelector(`#mapLayers [data-l="${id}"]`)?.classList.add("on")); location.hash = "maps"; setTimeout(()=>{ if(bigMap){ bigMap.setView([L0.lat, L0.lon], 13); applyLayers(); } }, 400); };
+  const more = $("#bcAvyMore"); if(more) more.onclick = () => { const dd = document.querySelector('details[data-sec="avy"]'); if(dd){ dd.open = true; dd.scrollIntoView({behavior:"smooth", block:"start"}); } };
 }
 
 /* ---------- Backcountry map layers (computed from open terrain tiles) ---------- */
@@ -2234,7 +2356,7 @@ const OREGON = n => /,\s*OR\)?$/.test(n) || /\(.*,\s*OR\)/.test(n);
 
 /* ---------- Trail-opening predictor ---------- */
 function openingOutlook(){
-  if(S.mode==="alpine" || !S.ctx) return null;
+  if(isAlp() || !S.ctx) return null;
   const L0 = S.loc, cfg = NORDIC_SPOTS[L0.name] || (/Nordic|Trails|XC|Sno-?Park/i.test(L0.name)? {thr:12, label:"Trail grooming"} : null);
   const ob = nearObs(); if(!cfg || !ob || !isNum(ob.depth)) return null;
   const C2 = S.ctx.Cbase || (S.ctx.Cbase = computeAt(L0.base/FT));
@@ -2287,7 +2409,7 @@ function renderAfterWork(C, SIM){
 function coldNote(c, sim){
   if(!c || !sim || !isNum(sim.feels)) return null; const fF = sim.feels*9/5+32;
   const frost = fF<=-48? "5 min" : fF<=-35? "10 min" : fF<=-18? "30 min" : null;
-  const nordic = S.mode!=="alpine";
+  const nordic = !isAlp();
   const layer = fF>=35? "Light layers." : fF>=20? (nordic? "Light base layer and a wind shirt." : "Base layer plus a shell.") : fF>=5? (nordic? "Warm base, wind-blocking top and front, hat and gloves." : "Insulated mid layer, shell, warm gloves.") : fF>=-10? (nordic? "Insulated layers, buff, lobster mitts; cover exposed skin." : "Full winter kit, face covering, mittens.") : "Full winter kit and limit exposed skin.";
   if(fF>25 && !frost) return null;
   return `${frost? `<b style="color:#ffb35c">Frostbite in ~${frost}</b> on exposed skin. ` : ""}${layer}${nordic && fF<20? " You'll run hot skiing hard, so start a little cold." : ""}`;
@@ -3120,14 +3242,14 @@ $("#pGo").onclick = () => { const [lat,lon] = $("#pLL").value.split(",").map(Num
 
 /* ================= Controls ================= */
 function seg(id, attr, key, cb){ const el=$(id); el.querySelectorAll("button").forEach(b=>{ b.classList.toggle("on", String(S[key])===b.dataset[attr]); b.onclick=()=>{ S[key] = key==="win"? +b.dataset[attr] : b.dataset[attr]; store.set(key,S[key]); el.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); cb(); }; }); }
-seg("#modeSeg","m","mode",render); seg("#bandSeg","b","band",render); seg("#unitSeg","u","units",()=>{ render(); if(location.hash==="#finder") renderFinder(); });
+seg("#modeSeg","m","mode",()=>{ S.autoBC = false; if(S.mode==="bc") bcAcknowledge(); render(); }); seg("#bandSeg","b","band",render); seg("#unitSeg","u","units",()=>{ render(); if(location.hash==="#finder") renderFinder(); });
 seg("#mapWin","w","win",()=>{ render(); tlStop(); S.tl.h = Math.min(S.grid?.maxH||240, S.win*24); if(S.tl.mode!=="fc") setTlMode("fc"); else paintField(); });
 document.querySelectorAll("#mapLayers button").forEach(b=>b.onclick=()=>{ b.classList.toggle("on"); applyLayers(); });
 
 // boot
 const last = store.get("last", null);
 const qp = new URLSearchParams(location.search);
-const nearPreset = (la, lo) => PRESETS.map(p=>({p, d:km(la,lo,p.lat,p.lon)})).sort((a,b)=>a.d-b.d).find(x=>x.d<=4)?.p;   // a link from Route Forecast lands on the named Nordic area when it's close
+const nearPreset = (la, lo) => PRESETS.filter(p=>!p.bc).map(p=>({p, d:km(la,lo,p.lat,p.lon)})).sort((a,b)=>a.d-b.d).find(x=>x.d<=4)?.p;   // a link from Route Forecast lands on the named Nordic area when it's close
 const linked = qp.get("s") ? PRESETS.find(p=>p.name===qp.get("s")) : (qp.get("lat") ? (nearPreset(+qp.get("lat"), +qp.get("lon")) || {name:qp.get("n")||"Shared spot", lat:+qp.get("lat"), lon:+qp.get("lon"), base:+qp.get("b")||5000, top:+qp.get("t")||6500}) : null);
 const linkMode = qp.get("m"); if(["alpine","skate","classic"].includes(linkMode)){ S.mode = linkMode; store.set("mode", linkMode); document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===linkMode)); }
 if(linked) history.replaceState(null, "", location.pathname + location.hash);
