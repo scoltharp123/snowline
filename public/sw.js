@@ -1,5 +1,5 @@
 // Snowline service worker: offline app + saved forecasts, and push notifications
-const V = "snowline-v3";
+const V = "snowline-v4";
 const SHELL = ["/", "/index.html", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
 const WEATHER = /(^|\.)open-meteo\.com$/;
 const STATIC_CDN = /(cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)$/;
@@ -30,7 +30,6 @@ self.addEventListener("fetch", (e) => {
   const u = new URL(req.url);
   if (u.origin === location.origin) {
     if (req.mode === "navigate") { e.respondWith(networkFirst(req, 6000).catch(() => caches.match("/"))); return; }
-    if (u.pathname.startsWith("/api/strava")) return;
     e.respondWith(networkFirst(req, u.pathname.startsWith("/api/") ? 12000 : 6000)); return;
   }
   if (WEATHER.test(u.hostname)) { e.respondWith(networkFirst(req, 15000)); return; }

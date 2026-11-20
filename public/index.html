@@ -1945,7 +1945,7 @@ function renderWaxLog(el){
     const all = waxLog(); all.push({t:Date.now(), spot:S.loc.name, mode:S.mode, wax:w, rating, note:$("#wxNote").value.trim(), tempC: +(c?.Te||0).toFixed(1), surface: sim?.key, age: sim?.age}); store.set("waxlog", all.slice(-300)); toast("Saved to wax log"); renderWaxLog(el); };
 }
 
-/* ---------- Birkie race mode + Strava ---------- */
+/* ---------- Birkie race mode ---------- */
 const BIRKIE_PTS = [ {k:"Start", name:"Cable start", lat:46.207, lon:-91.290, km:0}, {k:"Midway", name:"OO trailhead (approx.)", lat:46.105, lon:-91.327, km:23}, {k:"Finish", name:"Hayward Main St", lat:46.013, lon:-91.485, km:50} ];
 const parseHM = s => { const m = String(s||"").match(/^(\d{1,2}):(\d{2})$/); return m? +m[1]*60 + +m[2] : null; };
 async function birkieForecast(){
@@ -1960,7 +1960,7 @@ async function renderBirkie(){
   const goal = store.get("birkieGoal","3:00"), wave = store.get("birkieWave","8:30");
   el.innerHTML = `<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><div><h2>Birkie race mode</h2><div class="muted">50k skate · Cable → Hayward · Sat Feb 27, 2027</div></div><div style="text-align:right"><div class="num" style="font-size:32px;color:var(--ice)">${days}</div><div class="muted">days</div></div></div>
     <div class="form2" style="margin-top:10px"><div class="field">Goal finish (h:mm)<input id="bkGoal" value="${goal}" inputmode="numeric"></div><div class="field">Wave start<input id="bkWave" value="${wave}" inputmode="numeric"></div></div>
-    <div id="bkPlan"></div><div id="bkStrava" style="margin-top:12px"></div>`;
+    <div id="bkPlan"></div>`;
   const savePlan = () => { store.set("birkieGoal",$("#bkGoal").value); store.set("birkieWave",$("#bkWave").value); drawPlan(); };
   $("#bkGoal").onchange = savePlan; $("#bkWave").onchange = savePlan;
   const drawPlan = async () => {
@@ -1973,26 +1973,8 @@ async function renderBirkie(){
       return `<tr><td class="m"><b>${r.k}</b><div class="muted" style="font-size:11px">km ${r.km}</div></td><td>${hl(r.hh).replace(/([ap])$/,"")}:${String(r.mm).padStart(2,"0")}${r.hh<12?"a":"p"}</td><td>${T}</td><td>${Wd}</td><td>${Sn}</td></tr>`; }).join("")}</table></div>
       <div class="muted" style="margin-top:6px">Goal pace ${paceTxt}. ${fc? `Glide for the start: <b>${glideByTemp(rows[0].T ?? -6)}</b>${isNum(rows[2].T) && Math.abs((rows[2].T)-(rows[0].T??rows[2].T))>=3? `; it warms to ${fmtT(rows[2].T)} by the finish, so pick a wax that covers both or go one step warmer.`:"."}` : `The race-day forecast for the course appears around Feb 12. Midway point is approximate.`}</div>`;
   };
-  drawPlan(); renderStrava($("#bkStrava"), days);
+  drawPlan();
 }
-async function renderStrava(el, daysToRace){
-  if(!el) return; el.innerHTML = `<div class="grp" style="margin-top:4px">Training · Strava</div><div class="muted">Loading…</div>`;
-  let d; try{ d = await api("/strava/data", {credentials:"same-origin"}); }catch(e){ d = e.status===503? {notConfigured:true} : {error:true}; }
-  if(d.notConfigured){ el.innerHTML = `<div class="grp" style="margin-top:4px">Training · Strava</div><div class="muted">Strava sync needs a one-time setup on the Snowline server (a Strava API app). Then you can connect here.</div>`; return; }
-  if(d.error){ el.innerHTML = `<div class="grp" style="margin-top:4px">Training · Strava</div><div class="muted">Strava sync isn't reachable right now.</div>`; return; }
-  if(!d.connected){ el.innerHTML = `<div class="grp" style="margin-top:4px">Training · Strava</div><div class="muted" style="margin-bottom:8px">Connect Strava to tag every ski with that day's snow conditions and track your fitness for race day.</div><a class="btn wide" href="/api/strava/login" style="display:block;text-align:center;background:#fc4c02;border-color:#fc4c02;color:#fff;text-decoration:none">Connect with Strava</a>`; return; }
-  const f = d.fitness.at(-1) || {ctl:0, atl:0}; const form = Math.round((f.ctl - f.atl)*10)/10;
-  const W = d.weeks, mx = Math.max(1, ...W.map(w=>w.hours));
-  const bars = `<svg width="100%" height="56" viewBox="0 0 ${W.length*22} 56" preserveAspectRatio="none">${W.map((w,i)=>{ const h=w.hours/mx*44, hs=w.skiHours/mx*44; return `<rect x="${i*22+3}" y="${48-h}" width="16" height="${h}" rx="2" fill="#2f3a52"/><rect x="${i*22+3}" y="${48-hs}" width="16" height="${hs}" rx="2" fill="#5aa2ff"/>`; }).join("")}</svg>`;
-  const taper = daysToRace<=14 && daysToRace>=0 ? `<div class="callout" style="margin:10px 0 0">Race week${daysToRace>7?"s":""}: cut volume and keep some intensity. Aim to arrive with form positive (about +5 to +20).</div>` : "";
-  el.innerHTML = `<div class="grp" style="margin-top:4px">Training · Strava${d.athlete?.name? " · "+d.athlete.name : ""}</div>
-    <div class="kv k3"><div><div class="l">Fitness</div><div class="v num">${Math.round(f.ctl)}</div></div><div><div class="l">Fatigue</div><div class="v num">${Math.round(f.atl)}</div></div><div><div class="l">Form</div><div class="v num" style="color:${form>=0?"#6ee7a0":"#ffb35c"}">${form>0?"+":""}${form}</div></div></div>
-    <div class="muted" style="margin:10px 0 2px">Hours per week, last 12 weeks <span style="color:#5aa2ff">■ ski</span></div>${bars}${taper}
-    ${d.ski.length? `<div class="grp">Ski workouts + conditions</div><div class="list">${d.ski.slice(0,8).map(a=>`<div class="li" style="min-height:52px"><span class="nm"><b>${a.name}</b><small>${new Date(a.date).toLocaleDateString([], {month:"short",day:"numeric"})} · ${imp()? (a.km*0.621).toFixed(1)+" mi" : a.km+" km"} · ${Math.floor(a.min/60)}h${String(a.min%60).padStart(2,"0")}${a.conditions? ` · ${fmtT(a.conditions.tempC)}, ${a.conditions.surface}${a.conditions.snow24>=1? `, ${fmtSnow(a.conditions.snow24)} new`:""}` : ""}</small></span></div>`).join("")}</div>` : `<div class="muted" style="margin-top:8px">No ski workouts in the last 120 days yet.</div>`}
-    <button class="link" id="stravaOut">Disconnect Strava</button>`;
-  $("#stravaOut").onclick = async () => { await api("/strava/logout", {method:"POST", credentials:"same-origin"}).catch(()=>{}); renderStrava(el, daysToRace); };
-}
-
 /* ---------- Avalanche (detail by elevation + problems) ---------- */
 const AVY_LVL = {1:["Low","#50b848"],2:["Moderate","#fff200"],3:["Considerable","#f7941e"],4:["High","#ed1c24"],5:["Extreme","#231f20"]};
 const DIRS = ["north","northeast","east","southeast","south","southwest","west","northwest"];
@@ -2222,8 +2204,7 @@ document.querySelectorAll("#mapLayers button").forEach(b=>b.onclick=()=>{ b.clas
 const last = store.get("last", null);
 const qp = new URLSearchParams(location.search);
 const linked = qp.get("s") ? PRESETS.find(p=>p.name===qp.get("s")) : (qp.get("lat") ? {name:qp.get("n")||"Shared spot", lat:+qp.get("lat"), lon:+qp.get("lon"), base:+qp.get("b")||5000, top:+qp.get("t")||6500} : null);
-if(qp.get("strava")){ setTimeout(()=>toast(qp.get("strava")==="connected"? "Strava connected" : "Strava connection failed"),800); if(qp.get("strava")==="connected" && store.get("mode","alpine")==="alpine"){ S.mode="skate"; store.set("mode","skate"); } }
-if(linked || qp.get("strava")) history.replaceState(null, "", location.pathname + location.hash);
+if(linked) history.replaceState(null, "", location.pathname + location.hash);
 updateOnline();
 const startLoc = linked || last || PRESETS[0];
 S.loc = startLoc; updateTop(); showView(); load(startLoc); checkAlerts();
