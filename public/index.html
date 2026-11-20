@@ -389,6 +389,8 @@ input[type=range]{accent-color:var(--ice2)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid var(--line);background:transparent;color:inherit;border-radius:99px;padding:8px 12px;font:inherit;font-size:14px;min-height:38px}.chips button.on{background:var(--ice);color:#04121f;border-color:var(--ice)}
 .cams{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}.cams figure{margin:0}.cams img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;background:#111}.cams figcaption{font-size:11px;color:var(--mute);margin-top:3px}
 .kv.k3{grid-template-columns:repeat(3,1fr)}
+.tk-row{display:flex;align-items:center;gap:10px;margin:6px 0}.tk-l{width:72px;font-size:13px;color:var(--mute)}.tk-bar{flex:1;height:12px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}.tk-bar i{display:block;height:100%;border-radius:99px}.tk-row b{width:44px;text-align:right}
+.sn-pin{transform:translate(-50%,-50%);padding:2px 6px;border-radius:99px;font:700 11px/1.3 system-ui;color:#04121f;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.5);border:1px solid rgba(0,0,0,.25)}
 </style>
 </head>
 <body>
@@ -416,7 +418,7 @@ input[type=range]{accent-color:var(--ice2)}
   <div id="view-maps" style="display:none"><div class="card">
     <div class="card-h"><h2>Snow forecast map</h2><div class="seg sm" id="mapWin"><button data-w="3">3d</button><button data-w="5">5d</button><button data-w="10">10d</button></div></div>
     <div class="seg sm scroll" id="mapLayers" style="margin-bottom:10px">
-      <button data-l="lyGrid" class="on">Snow forecast</button><button data-l="lyRadar">Radar</button><button data-l="lyAvy">Avalanche</button><button data-l="lySlope">Slope angle</button><button data-l="lyWind">Wind loading</button>
+      <button data-l="lyGrid" class="on">Snow forecast</button><button data-l="lySnotel">Measured snow</button><button data-l="lyRadar">Radar</button><button data-l="lyAvy">Avalanche</button><button data-l="lySlope">Slope angle</button><button data-l="lyWind">Wind loading</button>
     </div>
     <div id="bigmap"></div>
     <div class="row" style="justify-content:space-between;margin-top:10px"><span class="muted" id="mapStatus"></span><button class="btn" id="gridGo">Model this view</button></div>
@@ -844,6 +846,7 @@ function render(){
   <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card" id="stormCard"></section>
   <section class="card"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div></section>
+  <section class="card" id="trackCard"></section>
   <section class="card" id="roadCard"></section>
   ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}
   <section class="card"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
@@ -856,7 +859,7 @@ function render(){
   $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -1542,7 +1545,7 @@ function initBigMap(){
     L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15, attribution:"© OpenStreetMap, SRTM | © OpenTopoMap"}).addTo(bigMap);
     $("#gridGo").onclick = () => drawGrid(true);
     bigMap.on("click", e=>{ openPicker(e.latlng.lat, e.latlng.lng, "Custom spot", null); });
-    bigMap.on("zoomend", ()=>applyBackcountry());
+    bigMap.on("zoomend", ()=>applyBackcountry()); bigMap.on("moveend", ()=>{ if(document.querySelector('#mapLayers [data-l="lySnotel"]')?.classList.contains("on")) showSnotel(); });
   }
   setTimeout(()=>bigMap.invalidateSize(), 60);
   document.querySelectorAll("#mapWin button").forEach(b=>b.classList.toggle("on", +b.dataset.w===S.win));
@@ -1554,6 +1557,7 @@ function applyLayers(){
   if(gridLayer){ on("lyGrid") ? gridLayer.addTo(bigMap) : gridLayer.remove(); }
   on("lyRadar") ? startRadar() : stopRadar();
   on("lyAvy") ? showAvy() : (avyLayer && avyLayer.remove());
+  on("lySnotel") ? showSnotel() : (snotelLayer && snotelLayer.remove());
   applyBackcountry();
 }
 async function drawGrid(){
@@ -2252,6 +2256,45 @@ function renderAlerts(){
     }catch(e){ toast("Couldn't turn on notifications"); } };
   const tb = $("#pTest"); if(tb) tb.onclick = async () => { try{ const sub = await pushSub(); const r = await post({action:"test", endpoint:sub?.endpoint}); toast(r.ok? "Test sent" : "Test failed"); }catch(e){ toast("Test failed"); } };
 }
+
+/* ---------- Forecast vs. actual ---------- */
+function renderTrack(){
+  const el = $("#trackCard"); if(!el) return; const v = S.extras[S.loc?.name]?.verify;
+  const st = (v?.storms||[]).filter(x=>!x.ongoing); if(!st.length){ el.remove(); return; }
+  const range = (a,b) => a===b? md(a) : `${md(a)}–${md(b)}`;
+  const verdict = (f,o) => { if(o < 1) return {t:"—", c:"var(--mute)"}; const r=f/o; return r>1.35? {t:"Forecast too high", c:"#ffb35c"} : r<0.7? {t:"Forecast too low", c:"#ffb35c"} : {t:"Close", c:"#6ee7a0"}; };
+  const L0 = st[0], vd = verdict(L0.fcstSnow, L0.obsSnow);
+  const maxV = Math.max(L0.fcstHi, L0.obsSnow, 1);
+  const bar = (val, col, lab) => `<div class="tk-row"><span class="tk-l">${lab}</span><div class="tk-bar"><i style="width:${Math.max(3,val/maxV*100)}%;background:${col}"></i></div><b class="num">${fmtSnow(val,0)}</b></div>`;
+  const ratios = st.filter(x=>x.obsSnow>=1).map(x=>x.fcstSnow/x.obsSnow);
+  const avg = ratios.length>=2 ? Math.round(ratios.reduce((a,b)=>a+b,0)/ratios.length*100) : null;
+  el.innerHTML = `<div class="card-h"><h2>Forecast vs. actual</h2><span class="muted">${v.station.name} SNOTEL</span></div>
+    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px;margin-bottom:6px"><b>Last storm · ${range(L0.start,L0.end)}</b><span style="color:${vd.c};font-weight:700">${vd.t}</span></div>
+    ${bar(L0.fcstSnow, "#5aa2ff", "Forecast")}${bar(L0.obsSnow, "#e6edf7", "Measured")}
+    <div class="muted" style="margin:2px 0 10px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)} · water ${L0.fcstWater.toFixed(2)}" forecast vs ${L0.obsWater.toFixed(2)}" measured</div>
+    ${st.length>1? `<div class="list">${st.slice(1).map(x=>{ const w=verdict(x.fcstSnow,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(x.fcstSnow,0)} fcst · ${fmtSnow(x.obsSnow,0)} got · <b style="color:${w.c}">${w.t==="Close"? "✓" : w.t.includes("high")? "↑" : "↓"}</b></span></div>`; }).join("")}</div>`:""}
+    ${avg!=null? `<div class="muted" style="margin-top:8px">Over the last ${ratios.length} storms, forecasts averaged <b>${avg}%</b> of what fell.</div>`:""}
+    <div class="muted" style="margin-top:6px;font-size:12px">Average of the models' forecasts made the day before each snow day, at the station's elevation. Measured snow is the depth gain at the station, which runs a little low as new snow settles.</div>`;
+}
+
+/* ---------- Measured snow map layer ---------- */
+let snotelLayer = null, snotelFor = null;
+async function showSnotel(){
+  if(!bigMap) return; const c = bigMap.getCenter(); const k = `${Math.round(c.lat*2)/2},${Math.round(c.lng*2)/2}`;
+  if(snotelLayer && snotelFor===k){ snotelLayer.addTo(bigMap); return; }
+  let j; try{ j = await api(`/snowmap?lat=${c.lat.toFixed(2)}&lon=${c.lng.toFixed(2)}`); }catch(e){ toast("Couldn't load SNOTEL stations"); return; }
+  if(!document.querySelector('#mapLayers [data-l="lySnotel"]')?.classList.contains("on")) return;
+  if(snotelLayer) snotelLayer.remove(); snotelLayer = L.layerGroup(); snotelFor = k;
+  const col = d => d>=60? "#a78bfa" : d>=36? "#5aa2ff" : d>=18? "#38bdf8" : d>=6? "#86efac" : d>0? "#fde68a" : "#6b7280";
+  (j.stations||[]).forEach(x=>{
+    const lab = x.new24>=1? `+${fmtSnow(x.new24,0)}` : fmtSnow(x.depth,0);
+    const icon = L.divIcon({className:"", html:`<div class="sn-pin" style="background:${col(x.depth)}">${lab}</div>`, iconSize:null});
+    L.marker([x.lat,x.lon],{icon}).bindPopup(`<b>${x.name}</b> · ${fmtEl(x.elevFt/FT)}<br>Depth <b>${fmtSnow(x.depth,0)}</b><br>New snow: ${x.new24==null?"—":fmtSnow(x.new24,0)} (24h) · ${x.new72==null?"—":fmtSnow(x.new72,0)} (72h)<br><span style="color:#888">SNOTEL · ${x.updated? String(x.updated).slice(5,16).replace("-","/") : ""}</span><br><a href="#" class="sn-go" data-lat="${x.lat}" data-lon="${x.lon}" data-n="${encodeURIComponent(x.name+" SNOTEL")}" data-e="${x.elevFt}">Forecast here →</a>`).addTo(snotelLayer);
+  });
+  snotelLayer.addTo(bigMap);
+  $("#mapStatus").innerHTML = `Measured snow at ${j.stations?.length||0} SNOTEL stations · pins show new snow in the last 24h, or depth`;
+}
+document.addEventListener("click", e=>{ const a=e.target.closest?.(".sn-go"); if(!a) return; e.preventDefault(); const el=+a.dataset.e; location.hash="forecast"; load({name:decodeURIComponent(a.dataset.n), lat:+a.dataset.lat, lon:+a.dataset.lon, base:el, top:el+300}); });
 
 /* ---------- Offline ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("/sw.js").catch(()=>{});

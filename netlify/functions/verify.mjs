@@ -13,12 +13,14 @@ const DAYS = 30;
 async function modelDaily(st, apis, start, end) {
   for (const api of apis) {
     try {
-      const url = `https://previous-runs-api.open-meteo.com/v1/forecast?latitude=${st.lat}&longitude=${st.lon}&elevation=${Math.round(st.elevFt / FT)}&hourly=precipitation_previous_day1&models=${api}&start_date=${start}&end_date=${end}&timezone=America%2FLos_Angeles`;
+      const url = `https://previous-runs-api.open-meteo.com/v1/forecast?latitude=${st.lat}&longitude=${st.lon}&elevation=${Math.round(st.elevFt / FT)}&hourly=precipitation_previous_day1,snowfall_previous_day1&models=${api}&start_date=${start}&end_date=${end}&timezone=America%2FLos_Angeles`;
       const j = await getJSON(url, { timeout: 15000 });
       const h = j.hourly || {}; const key = Object.keys(h).find(k => k.startsWith("precipitation_previous_day1")); if (!key) continue;
-      const out = {}; let any = false;
-      h.time.forEach((t, i) => { const v = h[key][i]; if (v == null) return; any = true; const d = t.slice(0, 10); out[d] = (out[d] || 0) + v; });
-      if (any) return out;
+      const skey = Object.keys(h).find(k => k.startsWith("snowfall_previous_day1"));
+      const out = {}, snow = {}; let any = false;
+      h.time.forEach((t, i) => { const v = h[key][i]; if (v == null) return; any = true; const d = t.slice(0, 10); out[d] = (out[d] || 0) + v;
+        const sv = skey ? h[skey][i] : null; if (sv != null) snow[d] = (snow[d] || 0) + sv / 2.54; });
+      if (any) { Object.defineProperty(out, "_snow", { value: Object.keys(snow).length ? snow : null, enumerable: false }); return out; }
     } catch (e) {}
   }
   return null;
@@ -32,12 +34,12 @@ export default async (req) => {
     const [st] = await nearestStations(lat, lon, 1, 40);
     if (!st) return json({ status: "no-station" }, { cache: 86400 });
     const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `verify-v2-${st.id}-${today}`;
+    const cacheKey = `verify-v3-${st.id}-${today}`;
     const s = store("snowline-cache");
     try { const c = await s.get(cacheKey, { type: "json" }); if (c) return json(c, { cache: 21600 }); } catch (e) {}
 
     const start = daysAgo(DAYS + 1), end = daysAgo(1);
-    const obs = await awdbData([st.id], ["PREC", "WTEQ"], "DAILY", daysAgo(DAYS + 2), end);
+    const obs = await awdbData([st.id], ["PREC", "WTEQ", "SNWD"], "DAILY", daysAgo(DAYS + 2), end);
     const o = obs[st.id] || {};
     // observed daily precip (mm): PREC increments, fall back to SWE gains
     const daily = {};
@@ -71,7 +73,28 @@ export default async (req) => {
       weights = Object.fromEntries(ids.map(id => [id, Math.max(0.4, Math.min(2.2, raw[id] / mean))]));
     }
     const best = ids.length ? ids.reduce((a, b) => scores[a].mae <= scores[b].mae ? a : b) : null;
-    const out = { status, station: { id: st.id, name: st.name, km: Math.round(st.km), elevFt: st.elevFt }, days: days.length, wetDays: wetTotal, scores, weights, best, updated: new Date().toISOString() };
+    // ---- Forecast vs. actual, storm by storm ----
+    const depthGain = {}; const sd = o.SNWD || [];
+    for (let i = 1; i < sd.length; i++) { const dv = sd[i].value - sd[i - 1].value; depthGain[String(sd[i].date).slice(0, 10)] = Math.max(0, dv); }
+    const uniq = []; const sigs = new Set();
+    for (const [id, f] of results) { if (!f || !f._snow) continue; const sig = JSON.stringify(Object.values(f).slice(-10).map(v => Math.round(v * 10))); if (sigs.has(sig)) continue; sigs.add(sig); uniq.push(f); }
+    const wetDay = (d) => (daily[d] ?? 0) >= 2.5 || (depthGain[d] ?? 0) >= 1;
+    const storms = []; let cur = null;
+    for (const d of days) {
+      if (wetDay(d)) { if (!cur) cur = { days: [] }; cur.days.push(d); }
+      else if (cur) { storms.push(cur); cur = null; }
+    }
+    if (cur) { cur.ongoing = true; storms.push(cur); }
+    const stormOut = storms.map(x => {
+      const obsSnow = x.days.reduce((a, d) => a + (depthGain[d] || 0), 0), obsWater = x.days.reduce((a, d) => a + (daily[d] || 0), 0) / 25.4;
+      const per = uniq.map(f => ({ s: x.days.reduce((a, d) => a + (f._snow[d] || 0), 0), w: x.days.reduce((a, d) => a + (f[d] || 0), 0) / 25.4 })).filter(v => isFinite(v.s));
+      if (per.length < 3) return null;
+      const ss = per.map(v => v.s).sort((a, b) => a - b), mean = ss.reduce((a, b) => a + b, 0) / ss.length;
+      return { start: x.days[0], end: x.days[x.days.length - 1], ongoing: !!x.ongoing, obsSnow: Math.round(obsSnow * 10) / 10, obsWater: Math.round(obsWater * 100) / 100,
+        fcstSnow: Math.round(mean * 10) / 10, fcstLo: Math.round(ss[0] * 10) / 10, fcstHi: Math.round(ss[ss.length - 1] * 10) / 10,
+        fcstWater: Math.round(per.reduce((a, v) => a + v.w, 0) / per.length * 100) / 100, models: per.length };
+    }).filter(x => x && (x.obsSnow >= 2 || x.obsWater >= 0.25)).reverse().slice(0, 4);
+    const out = { storms: stormOut, status, station: { id: st.id, name: st.name, km: Math.round(st.km), elevFt: st.elevFt }, days: days.length, wetDays: wetTotal, scores, weights, best, updated: new Date().toISOString() };
     try { await s.setJSON(cacheKey, out); } catch (e) {}
     return json(out, { cache: 21600 });
   } catch (e) {
