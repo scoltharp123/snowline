@@ -10,10 +10,12 @@ const SERVERS = [
 ];
 const UA = "Snowline/1.0 (snowline-forecast.netlify.app; ski run overlay)";
 
+// Netlify ends a function at 10 s, so all servers share one ~9 s budget.
 async function overpass(q) {
-  let last;
+  let last; const end = Date.now() + 9000;
   for (const url of SERVERS) {
-    const c = new AbortController(), t = setTimeout(() => c.abort(), 25000);
+    const left = end - Date.now(); if (left < 1500) break;
+    const c = new AbortController(), t = setTimeout(() => c.abort(), Math.min(6500, left));
     try {
       const r = await fetch(url, { method: "POST", body: "data=" + encodeURIComponent(q), signal: c.signal,
         headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA, Accept: "application/json" } });
@@ -33,7 +35,7 @@ export default async (req) => {
   const key = `pistes-v1-${kLat}-${kLon}`, s = store("snowline-cache");
   try { const c = await s.get(key, { type: "json" }); if (c && Date.now() - c.at < 7 * 864e5) return json(c, { cache: 86400 }); } catch (e) {}
   const d = 0.06, bb = [lat - d, lon - d * 1.4, lat + d, lon + d * 1.4].map(v => v.toFixed(4)).join(",");
-  const query = `[out:json][timeout:25];(way["piste:type"](${bb});way["aerialway"]["aerialway"!~"station|pylon|goods"](${bb});node["aerialway"="station"](${bb}););out tags geom;`;
+  const query = `[out:json][timeout:8];(way["piste:type"](${bb});way["aerialway"]["aerialway"!~"station|pylon|goods"](${bb});node["aerialway"="station"](${bb}););out tags geom;`;
   try {
     const j = await overpass(query);
     const runs = [], lifts = [], stations = [];

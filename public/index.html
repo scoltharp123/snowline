@@ -406,6 +406,36 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .fw-now{display:flex;align-items:center;gap:12px;margin-top:8px}.fw-now b{font-size:26px;display:block}.fw-now small{color:var(--mute);font-size:12.5px}.fw-w{margin-left:auto;text-align:right}.fw-w b{font-size:17px}.fw-days{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px;text-align:center}.fw-days b{font-size:12.5px;display:block}.fw-days small{font-size:12px;color:var(--mute)}
 .fr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;text-align:center}.fr b{font-size:24px;display:block}.fr small{font-size:12px;color:var(--mute)}.fr-src{margin-top:8px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .cam-a{position:relative;display:block}.cam-live{position:absolute;left:8px;top:8px;background:#e5484d;color:#fff;font:700 11px/1 system-ui;padding:4px 7px;border-radius:6px;z-index:1}
+
+/* cam map callouts, lightbox, trail maps */
+.cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
+.cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
+.cmap-fs{position:absolute;top:10px;right:10px;z-index:500;width:40px;height:40px;border-radius:50%;border:0;background:rgba(15,23,42,.8);color:#fff;font-size:18px;backdrop-filter:blur(6px)}
+.cmap-wrap.full .cmap-fs{top:calc(env(safe-area-inset-top) + 12px)}
+.cco-ic{background:none;border:0}
+.cco{position:relative;transform:translate(-50%,calc(-100% - 8px));background:#0f172a;border-radius:10px;padding:3px;width:118px;box-shadow:0 4px 14px rgba(0,0,0,.55);cursor:pointer}
+.cco:after{content:"";position:absolute;left:50%;bottom:-7px;margin-left:-7px;border:7px solid transparent;border-bottom:0;border-top-color:#0f172a}
+.cco-img{position:relative}.cco img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:7px;background:#1e293b}
+.cco>span{display:block;color:#fff;font:600 11px/1.25 system-ui;padding:4px 3px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cco-live{position:absolute;left:4px;bottom:4px;background:#e11d48;color:#fff;font:700 9.5px/1 system-ui;padding:3px 5px;border-radius:4px}
+.cco.multi{width:132px}.cco-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px}.cco-grid img{border-radius:4px;aspect-ratio:4/3}
+.lift-lab{transform:translate(-50%,-140%);color:#fff;font:700 10px/1 system-ui;text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap;pointer-events:none}
+#camBox{position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:16px}#camBox.on{display:flex}
+.cb-in{width:100%;max-width:720px;background:var(--card);border-radius:16px;overflow:hidden}.cb-in img{display:block;width:100%;background:#111}
+.cb-h,.cb-f{display:flex;align-items:center;gap:10px;padding:10px 12px}.cb-h>span{flex:1;min-width:0}.cb-h b{display:block}.cb-h small{color:var(--mute);font-size:12px}
+.cb-x{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.1);color:var(--text);font-size:16px;flex:none}
+.rs-link{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--ice);text-decoration:none;margin-left:10px;vertical-align:middle;min-height:28px}
+#ltStatus .rs-link:first-child{margin-left:0}
+.tm-row{display:flex;gap:10px;overflow-x:auto;margin:8px -4px 0;padding:0 4px 4px;scroll-snap-type:x mandatory}
+.tm-tile{flex:0 0 74%;max-width:300px;scroll-snap-align:start;background:rgba(255,255,255,.03);border-radius:12px;overflow:hidden}
+.tm-open{display:block;width:100%;padding:0;border:0;background:#e9eef5;aspect-ratio:4/3;overflow:hidden}.tm-open img{width:100%;height:100%;object-fit:cover;display:block}
+.tm-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:34px;background:linear-gradient(135deg,#1b2a4a,#0f172a);color:#fff}.tm-ph small{font-size:12px;color:var(--mute);margin-top:4px}
+.tm-cap{display:flex;align-items:center;gap:8px;padding:9px 10px}.tm-cap b{flex:1;font-size:14px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-dl{border:0;background:none;color:var(--ice);font-size:12px;font-weight:600;min-height:36px;padding:0 2px;white-space:nowrap}.tm-dl.on{color:#6ee7a0}
+#tmView{position:fixed;inset:0;z-index:1300;background:#0a0f1d;display:none;flex-direction:column}#tmView.on{display:flex}
+.tv-h,.tv-f{display:flex;align-items:center;gap:10px;padding:10px 14px}.tv-h{padding-top:calc(env(safe-area-inset-top) + 10px)}.tv-h>span{flex:1;min-width:0}.tv-h b{display:block;font-size:17px}.tv-h small{color:var(--mute);font-size:12px}
+.tv-f{padding-bottom:calc(env(safe-area-inset-bottom) + 10px);flex-wrap:wrap}#tvPg{flex:1;display:flex;align-items:center;gap:8px;font-size:13px}
+#tvMap{flex:1;position:relative;background:#dfe5ec}.tv-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:#334155;font-weight:600}
 </style>
 </head>
 <body>
@@ -860,6 +890,7 @@ function render(){
   <section class="card" id="workCard"></section>
   <section class="card" id="reportCard"></section>
   <section class="card" id="camCard"></section>
+  <section class="card" id="tmCard"></section>
   ${S.mode!=="alpine"? `<section class="card" id="openCard"></section>`:""}
   <section class="card" id="repCard"></section>
   <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
@@ -879,7 +910,7 @@ function render(){
   $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -2491,7 +2522,7 @@ function statusPill(rep){
   if(R.status==="Closed") return `<span class="st-pill st-closed"><i></i>Closed</span>`;
   return "";
 }
-function renderStatus(){ const el = $("#ltStatus"); if(!el || !S.loc) return; el.innerHTML = statusPill(S.extras[S.loc.name]?.report); }
+function renderStatus(){ const el = $("#ltStatus"); if(!el || !S.loc) return; el.innerHTML = statusPill(S.extras[S.loc.name]?.report) + resortSiteHTML(S.loc.name); }
 
 /* ---------- alert bell on each spot ---------- */
 function spotRules(name){ return alertRules().filter(r=>r.spot===name); }
@@ -2586,14 +2617,15 @@ function nearbyStationsHTML(st){
 /* ---------- cams card (spot page) + favorite cams ---------- */
 const favCams = () => store.get("favCams", []);
 // Resort cameras: live still images published on each resort's own webcam page, credited and linked back.
-const BACH = (n, name) => ({ id:"mtb-"+n, name, img:`https://api.mtbachelor.com/api/v1/cams/mtn/${n}`, src:"Mt. Bachelor", live:true, page:`https://www.mtbachelor.com/the-mountain/webcams/webcam-modal/#${n===14? "snow-stake" : "live-cam-"+n}`, lat:43.979, lon:-121.688 });
-const TIMB = (f, name) => ({ id:"tl-"+f, name, img:`https://timberlinelodge.com/snowcameras/${f}.jpg`, src:"Timberline", page:"https://www.timberlinelodge.com/conditions", lat:45.331, lon:-121.711 });
-const BACH_CAMS = [BACH(14,"West Village snow stake"), BACH(1,"Base of Pine Marten Lift"), BACH(12,"Tumalo Mtn & top of Pine Marten"), BACH(9,"Pine Marten Lodge"), BACH(11,"Outback lift line"), BACH(3,"The Cone"), BACH(5,"Sunrise Base"), BACH(13,"West Village base & parking"), BACH(2,"Rock Bar patio"), BACH(16,"Nordic Center")];
+// Each cam sits where it is on the mountain (placed from OpenStreetMap lift and lodge positions), so the cam map shows them in place.
+const BACH = (n, name, lat, lon) => ({ id:"mtb-"+n, name, img:`https://api.mtbachelor.com/api/v1/cams/mtn/${n}`, src:"Mt. Bachelor", live:true, page:`https://www.mtbachelor.com/the-mountain/webcams/webcam-modal/#${n===14? "snow-stake" : "live-cam-"+n}`, lat, lon });
+const TIMB = (f, name, lat, lon) => ({ id:"tl-"+f, name, img:`https://timberlinelodge.com/snowcameras/${f}.jpg`, src:"Timberline", page:"https://www.timberlinelodge.com/conditions", lat, lon });
+const BACH_CAMS = [BACH(14,"West Village snow stake",44.0011,-121.6807), BACH(1,"Base of Pine Marten Lift",44.0021,-121.6786), BACH(12,"Tumalo Mtn & top of Pine Marten",43.9905,-121.6862), BACH(9,"Pine Marten Lodge",43.9896,-121.6846), BACH(11,"Outback lift line",43.9951,-121.6972), BACH(3,"The Cone",43.9985,-121.6738), BACH(5,"Sunrise Base",43.9924,-121.6617), BACH(13,"West Village base & parking",44.0037,-121.6792), BACH(2,"Rock Bar patio",44.0026,-121.6801), BACH(16,"Nordic Center",44.0063,-121.6747)];
 const ROAD_CAM_FILTER = { "Mt. Bachelor, OR": /^Century Dr/i, "Mt. Bachelor Nordic Center, OR": /^Century Dr/i, "Meissner Nordic (Bend), OR": /^Century Dr/i };
 const RESORT_CAMS = {
   "Mt. Bachelor, OR": BACH_CAMS,
   "Mt. Bachelor Nordic Center, OR": [BACH_CAMS.find(c=>c.id==="mtb-16")],
-  "Timberline, OR": [TIMB("snowstake","Snow stake"), TIMB("lodge","Timberline Lodge"), TIMB("FloodEast","Magic Mile"), TIMB("FloodSouth","Jeff Flood"), TIMB("palmerbottom","Palmer / Silcox"), TIMB("pucci","Pucci"), TIMB("brunotop","Bruno's"), TIMB("summit","Summit Pass"), TIMB("SummitBus","Summit Pass shuttle")],
+  "Timberline, OR": [TIMB("snowstake","Snow stake",45.3318,-121.7102), TIMB("lodge","Timberline Lodge",45.3311,-121.7112), TIMB("FloodEast","Magic Mile",45.3400,-121.7101), TIMB("FloodSouth","Jeff Flood",45.3205,-121.7082), TIMB("palmerbottom","Palmer / Silcox",45.3436,-121.7091), TIMB("pucci","Pucci",45.3331,-121.7176), TIMB("brunotop","Bruno's",45.3006,-121.7468), TIMB("summit","Summit Pass",45.3020,-121.7431), TIMB("SummitBus","Summit Pass shuttle",45.3025,-121.7441)],
 };
 function camKey(c){ return c.id!=null? (String(c.id).includes("-")? c.id : "odot-"+c.id) : c.img; }
 async function loadSpotCams(L0){
@@ -2613,16 +2645,215 @@ async function renderCamCard(){
   const view = store.get("camView","list");
   const resort = rc.length? "" : links.map(([t,u])=>`<a class="cam-resort" href="${u}" target="_blank" rel="noopener"><span class="cam-ic">📷</span><span><b>${t}</b><small>Snow stake, summit and lift cams on the resort's site</small></span><span style="color:var(--ice)">↗</span></a>`).join("");
   const draw = () => { const v = store.get("camView","list");
-    card.innerHTML = `<div class="card-h"><h2>Cams</h2>${cams.length? `<div class="seg sm" id="camSeg">${[["list","List"],["grid","Grid"]].concat(road.length? [["map","Map"]] : []).map(([k,l])=>`<button data-cv="${k}" class="${v===k?"on":""}">${l}</button>`).join("")}</div>`:""}</div>
+    card.innerHTML = `<div class="card-h"><h2>Cams</h2>${cams.length? `<div class="seg sm" id="camSeg">${[["list","List"],["grid","Grid"]].concat(cams.some(c=>isNum(c.lat))? [["map","Map"]] : []).map(([k,l])=>`<button data-cv="${k}" class="${v===k?"on":""}">${l}</button>`).join("")}</div>`:""}</div>
       ${resort}
-      ${cams.length? (v==="map"? `<div id="camMini" style="height:240px;border-radius:12px;overflow:hidden;margin-top:8px"></div>` : `<div class="cams-${v}">${cams.map(c=>camTile(c, v==="list")).join("")}</div>`) : ""}
+      ${cams.length? (v==="map"? `<div class="cmap-wrap" id="camWrap"><div id="camMini"></div><button class="cmap-fs" id="camFs" aria-label="Full screen map">⤢</button></div>` : `<div class="cams-${v}">${cams.map(c=>camTile(c, v==="list")).join("")}</div>`) : ""}
       ${cams.length? `<div class="muted" style="font-size:11px;margin-top:6px">${rc.length? `Resort cams: <a href="${rc[0].page.split("webcam-modal")[0]}" target="_blank" rel="noopener">${rc[0].src} ↗</a>${rc[0].live? " · tap a cam for live video" : ""} · `:""}${road.length? "Road cams: ODOT TripCheck · ":""}☆ saves a camera to Favorites</div>`:""}`;
     card.querySelectorAll("[data-cv]").forEach(b=>b.onclick=()=>{ store.set("camView", b.dataset.cv); draw(); });
     wireCamStars(card, draw);
-    if(v==="map" && window.L){ const m=L.map("camMini",{zoomControl:false,attributionControl:false}).setView([L0.lat,L0.lon],10); L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15}).addTo(m);
-      road.forEach(c=>L.marker([c.lat,c.lon],{icon:L.divIcon({className:"",html:`<div class="cam-pin">📷</div>`,iconSize:null})}).bindPopup(`<b>${c.name}</b><br><img src="${c.img}" style="width:220px;max-width:65vw;border-radius:8px;margin-top:6px">`,{maxWidth:240}).addTo(m)); setTimeout(()=>m.invalidateSize(),60); }
+    if(v==="map" && window.L) camMapInit(L0, rc, road);
   };
   draw();
+}
+
+/* ---------- Cam map: live pictures on a satellite map, with ski runs and lifts ---------- */
+const SAT_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const SAT_ATTR = "Imagery © Esri, Maxar, Earthstar Geographics";
+const PISTE_COL = { novice:"#22c55e", easy:"#22c55e", intermediate:"#3b82f6", advanced:"#0b0b0b", expert:"#0b0b0b", freeride:"#f59e0b", extreme:"#ef4444" };
+S.pistes = {};
+async function loadPistes(L0){
+  const k = L0.lat.toFixed(2)+","+L0.lon.toFixed(2); if(S.pistes[k]) return S.pistes[k];
+  const q = `/pistes?lat=${L0.lat.toFixed(3)}&lon=${L0.lon.toFixed(3)}`;
+  let j = await api(q).catch(()=>null);
+  if(!j || (j.error && !(j.runs||[]).length)){ await new Promise(r=>setTimeout(r,2500)); j = await api(q).catch(()=>null); }   // first lookup for a spot can be slow; the server keeps it after that
+  return S.pistes[k] = j || {runs:[], lifts:[]};
+}
+function drawPistes(m, j){
+  const g = L.layerGroup();
+  (j.runs||[]).forEach(r=>{
+    const pts = r.pts; if(!pts || pts.length<2) return;
+    if(r.area){ L.polygon(pts,{stroke:false, fillColor:PISTE_COL[r.diff]||"#94a3b8", fillOpacity:.12, interactive:false}).addTo(g); return; }
+    const nordic = r.type==="nordic", col = PISTE_COL[r.diff] || (nordic? "#a78bfa" : "#cbd5e1");
+    if(col==="#0b0b0b") L.polyline(pts,{color:"#fff", weight:4.5, opacity:.75, interactive:false}).addTo(g);   // white edge so black runs show on dark imagery
+    L.polyline(pts,{color:col, weight:nordic? 2.2 : 2.8, opacity:.95, dashArray: nordic? "5 5" : r.diff==="expert"? "7 4" : null})
+      .bindTooltip(`${r.name||"Unnamed"}${r.diff? " · "+r.diff : ""}${nordic? " (Nordic)" : ""}`,{sticky:true}).addTo(g);
+  });
+  (j.lifts||[]).forEach(l=>{
+    L.polyline(l.pts,{color:"#fff", weight:4, opacity:.6, interactive:false}).addTo(g);
+    L.polyline(l.pts,{color:"#111827", weight:2.2}).bindTooltip(l.name||"Lift",{sticky:true}).addTo(g);
+    if(l.name) L.marker(l.pts[l.pts.length-1],{interactive:false, icon:L.divIcon({className:"", html:`<div class="lift-lab">${esc(l.name)}</div>`, iconSize:null})}).addTo(g);
+  });
+  return g;
+}
+function esc(t){ return String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function camSrc(c){ return c.img + (c.img.includes("?")?"&":"?") + "t=" + Math.floor(Date.now()/3e5); }
+// Group cams that would overlap on screen into one "N cams" callout; regroup on every zoom.
+function camCallouts(m, cams){
+  const layer = L.layerGroup().addTo(m);
+  const draw = () => {
+    layer.clearLayers(); const groups = [];
+    cams.forEach(c=>{ const p = m.latLngToLayerPoint([c.lat,c.lon]); const g = groups.find(g=>Math.abs(g.p.x-p.x)<92 && Math.abs(g.p.y-p.y)<70); if(g) g.c.push(c); else groups.push({p, c:[c]}); });
+    groups.forEach(g=>{
+      const n = g.c.length, lat = g.c.reduce((a,c)=>a+c.lat,0)/n, lon = g.c.reduce((a,c)=>a+c.lon,0)/n;
+      const html = n===1
+        ? `<div class="cco"><div class="cco-img">${g.c[0].live? `<span class="cco-live">Live</span>`:""}<img src="${camSrc(g.c[0])}" alt="" onerror="this.style.opacity=0"></div><span>${esc(g.c[0].name)}</span></div>`
+        : `<div class="cco multi"><div class="cco-grid">${g.c.slice(0,4).map(c=>`<img src="${camSrc(c)}" alt="" onerror="this.style.opacity=0">`).join("")}</div><span>${n} cams</span></div>`;
+      L.marker([lat,lon],{icon:L.divIcon({className:"cco-ic", html, iconSize:null}), zIndexOffset: n*10})
+        .on("click", ()=>{ if(n===1) camLightbox(g.c[0]); else if(m.getZoom() >= m.getMaxZoom()-1) camLightbox(g.c[0], g.c); else m.fitBounds(L.latLngBounds(g.c.map(c=>[c.lat,c.lon])).pad(.6), {maxZoom: m.getZoom()+3}); })
+        .addTo(layer);
+    });
+  };
+  m.on("zoomend", draw); draw(); return layer;
+}
+function camLightbox(c, list){
+  let i = list? list.indexOf(c) : 0; const all = list || [c];
+  let box = $("#camBox"); if(!box){ box = document.createElement("div"); box.id = "camBox"; document.body.appendChild(box); }
+  const show = () => { const x = all[i];
+    box.innerHTML = `<div class="cb-in"><div class="cb-h"><span><b>${esc(x.name)}</b><small>${esc(x.src || x.route || "ODOT TripCheck")}</small></span><button class="cb-x" aria-label="Close">✕</button></div>
+      <img src="${camSrc(x)}" alt="${esc(x.name)}">
+      <div class="cb-f">${all.length>1? `<button class="btn" data-d="-1">‹</button><span class="muted">${i+1} of ${all.length}</span><button class="btn" data-d="1">›</button>` : ""}<a class="btn" href="${x.page||x.img}" target="_blank" rel="noopener" style="margin-left:auto;text-decoration:none">${x.live? "▶ Live video ↗" : "Source ↗"}</a></div></div>`;
+    box.querySelector(".cb-x").onclick = () => box.classList.remove("on");
+    box.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{ i = (i + +b.dataset.d + all.length) % all.length; show(); });
+  };
+  box.onclick = e => { if(e.target===box) box.classList.remove("on"); };
+  show(); box.classList.add("on");
+}
+async function camMapInit(L0, rc, road){
+  const el = $("#camMini"); if(!el) return;
+  const m = L.map(el,{zoomControl:false, attributionControl:true, maxZoom:17}); m.attributionControl.setPrefix(false);
+  L.tileLayer(SAT_TILES,{maxZoom:17, maxNativeZoom:17, attribution:SAT_ATTR}).addTo(m);
+  const placed = [...rc, ...road].filter(c=>isNum(c.lat) && isNum(c.lon));
+  const focus = rc.filter(c=>isNum(c.lat)).length? rc.filter(c=>isNum(c.lat)) : placed;   // open on the mountain; road cams appear as you zoom out
+  if(focus.length>1) m.fitBounds(L.latLngBounds(focus.map(c=>[c.lat,c.lon])).pad(.25), {maxZoom:14}); else m.setView(focus[0]? [focus[0].lat, focus[0].lon] : [L0.lat,L0.lon], 12);
+  camCallouts(m, placed);
+  const wrap = $("#camWrap"), fs = $("#camFs");
+  if(fs) fs.onclick = () => { const on = wrap.classList.toggle("full"); fs.textContent = on? "✕" : "⤢"; document.body.style.overflow = on? "hidden" : ""; setTimeout(()=>m.invalidateSize(),60); };
+  setTimeout(()=>m.invalidateSize(),60);
+  const j = await loadPistes(L0); if(!document.body.contains(el)) return;
+  if((j.runs||[]).length || (j.lifts||[]).length){ drawPistes(m, j).addTo(m); m.attributionControl.addAttribution("Runs & lifts © OpenStreetMap"); }
+}
+
+/* ---------- Resort site link ---------- */
+const RESORT_SITE = {
+  "Mt. Bachelor, OR": "https://www.mtbachelor.com/",
+  "Mt. Bachelor Nordic Center, OR": "https://www.mtbachelor.com/nordic/overview/",
+  "Meissner Nordic (Bend), OR": "https://meissnernordic.org/",
+  "Methow Valley Trails, WA": "https://www.methowtrails.org/",
+  "Hoodoo, OR": "https://skihoodoo.com/",
+  "Willamette Pass, OR": "https://www.willamettepass.com/",
+  "Mt. Hood Meadows, OR": "https://www.skihood.com/",
+  "Timberline, OR": "https://www.timberlinelodge.com/",
+  "Mt. Ashland, OR": "https://www.mtashland.com/",
+  "Crystal Mountain, WA": "https://www.crystalmountainresort.com/",
+  "Stevens Pass, WA": "https://www.stevenspass.com/",
+  "Mt. Baker, WA": "https://www.mtbaker.us/",
+  "Whistler Blackcomb, BC": "https://www.whistlerblackcomb.com/",
+  "Birkie Trail (Cable, WI)": "https://www.birkie.com/trail/",
+  "Mt. Spokane, WA": "https://www.mtspokane.com/",
+  "Mission Ridge, WA": "https://www.missionridge.com/",
+  "Teacup Lake Nordic (Mt. Hood), OR": "https://www.teacupnordic.org/",
+  "Anthony Lakes, OR": "https://www.anthonylakes.com/",
+  "Mt. Washington Alpine, BC": "https://www.mountwashington.ca/",
+};
+const siteHost = u => new URL(u).hostname.replace(/^www\./,"");
+function resortSiteHTML(name){ const u = RESORT_SITE[name]; return u? `<a class="rs-link" href="${u}" target="_blank" rel="noopener">Resort site ↗</a>` : ""; }
+
+/* ---------- Trail maps: official maps, full screen with pinch zoom, saved for no-signal use ---------- */
+// PDFs load through Snowline's own address (see netlify.toml) so they can be drawn here and kept offline.
+const TM = (name, url, by) => ({ name, url, by });
+const BACH_WINTER = TM("Winter Map", "/tm/mtb/2025-11/FINAL_W2526_TrailMap_WithKey.pdf", "mtbachelor.com"),
+      BACH_NORDIC = TM("Nordic Trails", "/tm/mtb/2025-12/2526_MTBNordicMap_0.pdf", "mtbachelor.com"),
+      BACH_SPRING = TM("Spring Trail Map", "/tm/mtb/2025-05/Spring%20Operating%20Footprint.pdf", "mtbachelor.com");
+const TRAIL_MAPS = {
+  "Mt. Bachelor, OR": [BACH_WINTER, BACH_NORDIC, BACH_SPRING],
+  "Mt. Bachelor Nordic Center, OR": [BACH_NORDIC, BACH_WINTER],
+  "Meissner Nordic (Bend), OR": [TM("Meissner ski & snowshoe trails", "/tm/usfs/145569", "Deschutes National Forest & Meissner Nordic")],
+  "Methow Valley Trails, WA": [TM("Winthrop to Brown's Farm", "/tm/methow/wintertrails_winthroptobrownsfarm_2026.pdf", "methowtrails.org"), TM("Sun Mountain", "/tm/methow/wintertrails_sunmountain_2026.pdf", "methowtrails.org"), TM("Jack's to Brown's Farm", "/tm/methow/wintertrails_jackstobrownsfarm_2026.pdf", "methowtrails.org")],
+  "Birkie Trail (Cable, WI)": [TM("Birkie Trail pocket maps", "/tm/birkie/2025/10/Birkie-Pocket-Maps_Winter-2025-2026_101725.pdf", "birkie.com")],
+};
+const TM_CACHE = "sl-trailmaps";
+const tmThumbKey = u => "tmThumb:" + u;
+async function tmSaved(u){ try{ return !!(await (await caches.open(TM_CACHE)).match(u)); }catch(e){ return false; } }
+let pdfjsP;
+function loadPdfJs(){
+  return pdfjsP ||= new Promise((res, rej)=>{ const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; res(pdfjsLib); }; s.onerror = () => { pdfjsP = null; rej(new Error("Map viewer didn't load")); }; document.head.appendChild(s); });
+}
+async function tmBytes(u, onProg){
+  try{ const hit = await (await caches.open(TM_CACHE)).match(u); if(hit) return await hit.arrayBuffer(); }catch(e){}
+  const r = await fetch(u); if(!r.ok) throw new Error("The resort's server didn't send the map (" + r.status + ")");
+  const total = +r.headers.get("content-length") || 0;
+  if(!r.body || !onProg) return await r.arrayBuffer();
+  const rd = r.body.getReader(), parts = []; let got = 0;
+  for(;;){ const {done, value} = await rd.read(); if(done) break; parts.push(value); got += value.length; onProg(got, total); }
+  const out = new Uint8Array(got); let o = 0; for(const p of parts){ out.set(p, o); o += p.length; } return out.buffer;
+}
+// Render one PDF page as large as the phone can safely hold (iOS caps a canvas near 16 million pixels).
+async function tmRender(buf, pageNo, maxPx){
+  const lib = await loadPdfJs(); const doc = await lib.getDocument({data: new Uint8Array(buf.slice(0))}).promise;
+  const page = await doc.getPage(Math.min(pageNo, doc.numPages)); const v1 = page.getViewport({scale:1});
+  const scale = Math.min(maxPx / Math.max(v1.width, v1.height), Math.sqrt(15e6 / (v1.width*v1.height)));
+  const vp = page.getViewport({scale}); const cv = document.createElement("canvas"); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+  const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0,0,cv.width,cv.height);
+  await page.render({canvasContext:g, viewport:vp}).promise; return {cv, pages: doc.numPages};
+}
+function tmThumbFrom(cv, u){ try{ const w = 520, t = document.createElement("canvas"); t.width = w; t.height = Math.round(cv.height * w / cv.width); t.getContext("2d").drawImage(cv,0,0,t.width,t.height); const d = t.toDataURL("image/jpeg",.72); localStorage.setItem(tmThumbKey(u), d); return d; }catch(e){ return null; } }
+async function tmSave(tm){
+  const r = await fetch(tm.url); if(!r.ok) throw new Error("Download failed (" + r.status + ")");
+  const blob = await r.blob(); await (await caches.open(TM_CACHE)).put(tm.url, new Response(blob, {headers:{"Content-Type": blob.type || "application/pdf"}}));
+  await loadPdfJs();   // keep the viewer itself for no-signal use too
+  if(!localStorage.getItem(tmThumbKey(tm.url))){ try{ const {cv} = await tmRender(await blob.arrayBuffer(), 1, 1400); tmThumbFrom(cv, tm.url); }catch(e){} }
+  return blob.size;
+}
+async function tmUnsave(tm){ try{ await (await caches.open(TM_CACHE)).delete(tm.url); }catch(e){} }
+const fmtMB = b => (b/1048576).toFixed(b < 10485760? 1 : 0) + " MB";
+
+async function renderTrailMaps(){
+  const card = $("#tmCard"); if(!card || !S.loc) return; const L0 = S.loc;
+  const maps = TRAIL_MAPS[L0.name] || [], site = RESORT_SITE[L0.name];
+  if(!maps.length && !site){ card.remove(); return; }
+  const saved = await Promise.all(maps.map(t=>tmSaved(t.url))); if(S.loc!==L0) return;
+  card.innerHTML = `<div class="card-h"><h2>Trail Maps</h2>${maps.length? `<span class="muted">official maps</span>` : ""}</div>
+    ${maps.length? `<div class="tm-row">${maps.map((t,i)=>{ const th = localStorage.getItem(tmThumbKey(t.url));
+      return `<div class="tm-tile"><button class="tm-open" data-i="${i}">${th? `<img src="${th}" alt="">` : `<span class="tm-ph">🗺️<small>Tap to open</small></span>`}</button>
+        <div class="tm-cap"><b>${esc(t.name)}</b><button class="tm-dl ${saved[i]?"on":""}" data-s="${i}">${saved[i]? "✓ Saved offline" : "⤓ Download offline"}</button></div></div>`; }).join("")}</div>`
+    : `<a class="cam-resort" href="${site}" target="_blank" rel="noopener"><span class="cam-ic">🗺️</span><span><b>Trail map on ${siteHost(site)}</b><small>The resort's current lift and trail map</small></span><span style="color:var(--ice)">↗</span></a>`}
+    ${maps.length? `<div class="muted" style="font-size:11px;margin-top:6px">From ${[...new Set(maps.map(t=>t.by))].join(", ")}. Downloaded maps open with no signal.</div>` : ""}`;
+  card.querySelectorAll(".tm-open").forEach(b=>b.onclick=()=>tmViewer(maps[+b.dataset.i]));
+  card.querySelectorAll(".tm-dl").forEach(b=>b.onclick=async()=>{ const t = maps[+b.dataset.s];
+    if(b.classList.contains("on")){ if(confirm(`Remove the offline copy of ${t.name}?`)){ await tmUnsave(t); renderTrailMaps(); } return; }
+    b.disabled = true; b.textContent = "Downloading…";
+    try{ const n = await tmSave(t); toast(`${t.name} saved for offline (${fmtMB(n)})`); }catch(e){ toast(e.message || "Download failed"); }
+    renderTrailMaps(); });
+}
+async function tmViewer(tm){
+  let v = $("#tmView"); if(!v){ v = document.createElement("div"); v.id = "tmView"; document.body.appendChild(v); }
+  v.innerHTML = `<div class="tv-h"><span><b>${esc(tm.name)}</b><small>${esc(S.loc?.name.replace(/,\s*\w\w$/,"")||"")}</small></span><button class="cb-x" id="tvX" aria-label="Close">✕</button></div>
+    <div id="tvMap"><div class="tv-msg" id="tvMsg">Loading map…</div></div>
+    <div class="tv-f"><span id="tvPg"></span><button class="btn" id="tvDl"></button><a class="btn" style="text-decoration:none" href="${tm.url}" target="_blank" rel="noopener">Original ↗</a></div>`;
+  v.classList.add("on"); document.body.style.overflow = "hidden";
+  let m, url, page = 1, buf;
+  const close = () => { v.classList.remove("on"); document.body.style.overflow = ""; if(m) m.remove(); if(url) URL.revokeObjectURL(url); v.innerHTML = ""; renderTrailMaps(); };
+  $("#tvX").onclick = close;
+  const setDl = async () => { const b = $("#tvDl"); if(!b) return; const on = await tmSaved(tm.url); b.textContent = on? "✓ Saved offline" : "⤓ Download offline"; b.disabled = on;
+    b.onclick = async () => { b.disabled = true; b.textContent = "Saving…"; try{ const n = await tmSave(tm); toast(`Saved for offline (${fmtMB(n)})`); }catch(e){ toast(e.message||"Download failed"); } setDl(); }; };
+  setDl();
+  const msg = t => { const el = $("#tvMsg"); if(el) el.textContent = t; };
+  try{
+    buf = await tmBytes(tm.url, (got, tot) => msg(tot? `Loading map… ${Math.round(got/tot*100)}%` : `Loading map… ${fmtMB(got)}`));
+    const draw = async () => {
+      msg("Drawing map…"); const {cv, pages} = await tmRender(buf, page, 4096);
+      if(page===1 && !localStorage.getItem(tmThumbKey(tm.url))) tmThumbFrom(cv, tm.url);
+      const blob = await new Promise(r=>cv.toBlob(r, "image/jpeg", .9)); if(url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob);
+      const host = $("#tvMap"); if(!host) return; if(m){ m.remove(); m = null; } host.innerHTML = "";
+      const b = [[0,0],[cv.height, cv.width]];
+      m = L.map(host,{crs:L.CRS.Simple, minZoom:-6, maxZoom:3, zoomSnap:0, attributionControl:false, zoomControl:false, maxBoundsViscosity:.8});
+      L.imageOverlay(url, b).addTo(m); m.fitBounds(b); m.setMinZoom(m.getZoom()-.5); m.setMaxBounds(L.latLngBounds(b).pad(.15));
+      const pg = $("#tvPg"); if(pg) pg.innerHTML = pages>1? `<button class="btn" data-p="-1" ${page<=1?"disabled":""}>‹</button> Page ${page} of ${pages} <button class="btn" data-p="1" ${page>=pages?"disabled":""}>›</button>` : `<span class="muted">Pinch to zoom</span>`;
+      pg?.querySelectorAll("[data-p]").forEach(x=>x.onclick=()=>{ page += +x.dataset.p; draw(); });
+    };
+    await draw();
+  }catch(e){ msg((navigator.onLine? "" : "You're offline and this map isn't downloaded. ") + (e.message || "The map didn't load.")); }
 }
 
 /* ---------- Favorites view switcher ---------- */
