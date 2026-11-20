@@ -2146,8 +2146,10 @@ function renderGroom(){
       <div class="muted" style="font-size:11px;margin-top:6px">Live grooming for this area is published on its own report; Snowline links to it rather than copying it.</div>`; return; }
   if(G.error){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><a href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor's grooming report ↗</a>`; return; }
   const nordic = !isAlp(), D = nordic ? G.nordic : G.alpine, R = G.report; card.hidden = false;
+  if(!D.total && !D.groomed){ D.preseason = true; }
   const kinds = Object.entries(D.kinds||{}).map(([k,n])=>`<span class="chip-s">${esc(k)} · ${n}</span>`).join("");
   const head = D.groomed ? `<div class="gr-big"><b class="num">${D.groomed}</b><span>of ${D.total} ${nordic? "trails" : "runs"} groomed${D.latest? `<br><small>last update ${ago(D.latest)}</small>` : ""}</span></div>`
+    : D.preseason ? `<p class="muted" style="margin:4px 0">Mt. Bachelor hasn't posted ${nordic? "Nordic trail" : "run"} grooming yet. It shows here once the mountain opens.</p>`
     : `<p class="muted" style="margin:4px 0">No ${nordic? "trails" : "runs"} marked groomed right now${D.open? ` · ${D.open} open` : ""}.</p>`;
   card.innerHTML = `<div class="card-h"><h2>${nordic? "Grooming · Nordic" : "Grooming & resort report"}</h2><a class="muted" href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor ↗</a></div>
     ${head}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
@@ -2162,6 +2164,8 @@ async function loadAvyObs(loc){
 }
 function avyObsHTML(){
   const O = extrasFor(S.loc).avyobs; if(!O) return `<div class="loading"><div class="spin"></div>Loading field observations…</div>`;
+  if(O.error) return `<p class="muted" style="margin:4px 0 8px">Recent observations from skiers and forecasters (cracking, collapsing, avalanches seen) are posted on the avalanche center's site.</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><a class="btn" style="text-decoration:none" href="https://coavalanche.org/pages/observations" target="_blank" rel="noopener">Read field observations ↗</a></div>`;
   const list = (O.obs||[]).slice(0, 6);
   const chip = (on, t) => on? `<span class="ob-chip">${t}</span>` : "";
   const items = list.map(o=>{ const f=o.flags||{}, txt = o.avalanches || o.instability || o.summary;

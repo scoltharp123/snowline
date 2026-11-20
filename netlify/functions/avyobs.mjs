@@ -21,6 +21,6 @@ export default async (req) => {
         photo: (o.media || []).find((m) => m.type === "image")?.url?.thumbnail || null, link: (CENTER_LINK[c] || "https://avalanche.org/#") + o.id };
     });
     return json({ obs, total: j.total || obs.length, from: ymd(start) }, { cache: 900 });
-  } catch (e) { return json({ obs: [], error: String(e.message || e) }, { cache: 120 }); }
+  } catch (e) { return json({ obs: [], error: String(e.message || e) }, { cache: 21600 }); }
 };
 export const config = { path: "/api/avyobs" };
