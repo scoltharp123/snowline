@@ -35,14 +35,15 @@ export default async (req) => {
   for (const model of MODELS) {
     try {
       const m = await client.messages.create({
-        model, max_tokens: 500, system: SYSTEM,
+        model, max_tokens: 1600, system: SYSTEM,
         messages: [{ role: "user", content: `Spot: ${spot}\nMode: ${mode}\nElevation band: ${band}\nFacts (JSON):\n${JSON.stringify(facts)}` }],
       });
       text = (m.content || []).filter(b => b.type === "text").map(b => b.text).join("").trim();
       if (text) break;
+      lastErr = `${model}: no text (stop_reason=${m.stop_reason}, blocks=${(m.content || []).map(b => b.type).join(",")})`;
     } catch (e) { lastErr = e; }
   }
-  if (!text) return json({ error: "ai-failed", detail: String(lastErr?.message || lastErr) }, { status: 502 });
+  if (!text) return json({ error: "ai-failed", detail: String(lastErr?.message || lastErr).slice(0, 300) }, { status: 502 });
   const [headline, ...rest] = text.split(/\n\s*\n/);
   const out = { headline: headline.replace(/^#+\s*/, "").trim(), body: rest.join("\n\n").trim() || "", at: new Date().toISOString() };
   try { await s.setJSON(key, out); } catch (e) {}
