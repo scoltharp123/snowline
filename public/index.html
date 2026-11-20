@@ -2163,10 +2163,15 @@ async function renderRoads(){
   const sno = (NORDIC_SPOTS[L0.name]?.snopark) ; const m = new Date().getMonth(); const season = m>=10 || m<=3;
   let r = null; try{ r = await api(`/roads?spot=${encodeURIComponent(L0.name)}&lat=${L0.lat}&lon=${L0.lon}`); }catch(e){}
   if(S.loc!==L0) return;
-  const cams = r?.cams||[], cond = [...(r?.conditions||[]), ...(r?.incidents||[])];
+  const cams = r?.cams||[], sts = r?.stations||[], inc = r?.incidents||[];
+  const tF = c => isNum(c)? fmtT(c) : "—";
   el.innerHTML = `<div class="card-h"><h2>Getting there</h2><span class="muted">${r?.route || "ODOT TripCheck"}</span></div>
-    ${cond.length? `<div class="list">${cond.slice(0,4).map(t=>`<div class="li" style="min-height:44px;padding:8px 0"><span class="nm" style="white-space:normal;font-size:14px">${/chain|traction/i.test(t)? "⛓️ " : "🛣️ "}${t}</span></div>`).join("")}</div>` : r?.configured? `<div class="muted">No restrictions or incidents reported on this route right now.</div>` : ""}
-    ${cams.length? `<div class="cams">${cams.map(c=>`<figure><img loading="lazy" src="${c.img}" alt="${c.name}"><figcaption>${c.name} · ${c.mi} mi</figcaption></figure>`).join("")}</div><div class="muted" style="font-size:11px">Cameras courtesy of ODOT</div>`:""}
+    ${sts.length? `<div class="list">${sts.map(x=>`<div class="li" style="min-height:44px;padding:8px 0;display:block"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b style="text-transform:capitalize">${x.name.toLowerCase()}</b><span class="muted">${x.mi} mi</span></div>
+        <div class="muted" style="font-size:14px">${tF(x.tempC)} at the road${isNum(x.snowIn)? ` · ${fmtSnow(x.snowIn,0)} snow beside it` : ""}${x.rate>0? " · snowing" : ""}</div>
+        ${x.restriction? `<div style="color:var(--warn);font-size:14px">⛓️ ${x.restriction}</div>`:""}${x.comments? `<div style="font-size:14px">${x.comments}</div>`:""}</div>`).join("")}</div>` : ""}
+    ${inc.length? `<div class="list">${inc.map(x=>`<div class="li" style="min-height:44px;padding:8px 0;display:block"><div style="font-size:14px">🚧 ${x.headline}</div><div class="muted" style="font-size:12px">${x.where} · ${x.mi} mi</div></div>`).join("")}</div>`
+      : r?.configured? `<div class="muted" style="margin:6px 0">No incidents reported nearby.</div>` : ""}
+    ${cams.length? `<div class="cams">${cams.map(c=>`<figure><a href="${c.img}" target="_blank" rel="noopener"><img loading="lazy" src="${c.img}" alt="${c.name}" onerror="this.closest('figure').remove()"></a><figcaption>${c.name} · ${c.mi} mi</figcaption></figure>`).join("")}</div><div class="muted" style="font-size:11px">Road data and cameras courtesy of ODOT TripCheck</div>`:""}
     ${sno && season? `<div class="callout" style="margin:10px 0 0">🅿️ <b>Sno-Park permit required</b> Nov 1–Apr 30 ($4 day · $9 3-day · $25 season). <a href="${r?.links?.snopark || "https://www.oregon.gov/odot/DMV/Pages/Vehicle/sno_park_permits.aspx"}" target="_blank" rel="noopener">Buy online ↗</a></div>`:""}
     <div class="row" style="gap:8px;margin-top:10px;flex-wrap:nowrap"><a class="btn" style="flex:1;text-align:center;text-decoration:none" href="https://www.tripcheck.com/" target="_blank" rel="noopener">TripCheck map ↗</a><a class="btn" style="flex:1;text-align:center;text-decoration:none" href="https://www.tripcheck.com/Pages/Chain-Law" target="_blank" rel="noopener">Chain rules ↗</a></div>`;
 }
