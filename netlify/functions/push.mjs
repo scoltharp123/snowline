@@ -1,0 +1,26 @@
+// POST /api/push   {action:"subscribe", sub, spots, prefs} | {action:"unsubscribe", endpoint} | {action:"test", endpoint}
+import { json } from "../lib/shared.mjs";
+import { subs, subKey, send, buildAlert } from "../lib/push.mjs";
+
+export default async (req) => {
+  if (req.method === "GET") return json({ publicKey: process.env.VAPID_PUBLIC_KEY || null });
+  if (req.method !== "POST") return json({ error: "POST only" }, { status: 405 });
+  let b; try { b = await req.json(); } catch (e) { return json({ error: "bad json" }, { status: 400 }); }
+  const s = subs();
+  if (b.action === "subscribe") {
+    if (!b.sub?.endpoint || !Array.isArray(b.spots)) return json({ error: "sub and spots required" }, { status: 400 });
+    const rec = { sub: b.sub, spots: b.spots.slice(0, 6).map(x => ({ name: String(x.name).slice(0, 80), lat: +x.lat, lon: +x.lon, base: +x.base, top: +x.top })), prefs: { overnight: +b.prefs?.overnight || 4, forecast: +b.prefs?.forecast || 8 }, created: Date.now() };
+    await s.setJSON(subKey(b.sub.endpoint), rec);
+    return json({ ok: true });
+  }
+  if (b.action === "unsubscribe") { if (b.endpoint) await s.delete(subKey(b.endpoint)); return json({ ok: true }); }
+  if (b.action === "test") {
+    const rec = b.endpoint && await s.get(subKey(b.endpoint), { type: "json" });
+    if (!rec) return json({ error: "not subscribed" }, { status: 404 });
+    const alert = await buildAlert(rec).catch(() => null);
+    const res = await send(rec.sub, alert ? { ...alert, title: "Test · " + alert.title } : { title: "Snowline alerts are on ❄️", body: `You'll hear from us around 6am when ${rec.spots.map(x => x.name.replace(/,\s*[A-Z]{2}$/, "")).slice(0, 3).join(", ")} gets snow.`, url: "/#alerts", tag: "snowline-test" });
+    return json({ ok: res === "ok", result: res });
+  }
+  return json({ error: "unknown action" }, { status: 400 });
+};
+export const config = { path: "/api/push" };
