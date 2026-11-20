@@ -637,7 +637,11 @@ function snowAt(P, Tref, FLmodel, ref, e){
 }
 
 /* ================= Data ================= */
-async function getJSON(url, tries=2){ const r = await fetch(url); if(r.status===429 && tries>1){ await new Promise(z=>setTimeout(z, 1200+Math.random()*800)); return getJSON(url, tries-1); } if(!r.ok) throw new Error(r.status); const j = await r.json(); if(j.error) throw new Error(j.reason||"error"); return j; }
+// Open-Meteo answers 429 when busy (per phone/network); retry busy, server and network errors with growing waits.
+async function getJSON(url, tries=3, wait=1500){
+  let r; try{ r = await fetch(url); }catch(e){ if(tries>1){ await new Promise(z=>setTimeout(z, wait)); return getJSON(url, tries-1, wait*2.5); } throw e; }
+  if((r.status===429 || r.status>=500) && tries>1){ await new Promise(z=>setTimeout(z, wait+Math.random()*800)); return getJSON(url, tries-1, wait*2.5); }
+  if(!r.ok) throw new Error(r.status); const j = await r.json(); if(j.error) throw new Error(j.reason||"error"); return j; }
 async function fetchDet(m, loc, ref){
   for(const api of m.api){
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&hourly=${DET_VARS}&models=${api}&timezone=auto&past_days=3&forecast_days=16`;
@@ -686,9 +690,10 @@ async function load(loc){
   // quorum: show as soon as 5+ models are in (≥1.2s), or whatever has arrived by 3s; all done → show immediately
   await new Promise(resolve=>{
     const check = () => { const ok = got.filter(d=>d && d!==TIMEOUT).length, el = Date.now()-t0;
-      if(done===detPs.length || (ok>=5 && el>=1200) || (ok>=1 && el>=3000)) resolve(); };
+      const long = got.filter((d,i)=>d && d!==TIMEOUT && MODELS[i].id!=="hrrr").length;   // HRRR only covers 48 h
+      if(done===detPs.length || (ok>=5 && long>=3 && el>=1200) || (long>=2 && el>=3000) || (ok>=1 && el>=9000)) resolve(); };
     detPs.forEach((p,i)=>p.then(d=>{ got[i] = d; done++; check(); }));
-    const iv = setInterval(()=>{ check(); if(done===detPs.length || Date.now()-t0>3000 && got.some(d=>d && d!==TIMEOUT)) clearInterval(iv); }, 150);
+    const iv = setInterval(()=>{ check(); if(done===detPs.length || Date.now()-t0>9000 && got.some(d=>d && d!==TIMEOUT)) clearInterval(iv); }, 150);
   });
   let det = got.slice();
   if(S.loc !== loc) return;
@@ -701,7 +706,8 @@ async function load(loc){
   MEM.set(loc.name, {t:Date.now(), data:S.data});
   render(); saveSnap(loc); loadExtras(loc);
   const data = S.data;
-  det.forEach((d,i)=>{ if(d===TIMEOUT) detPs[i].then(x=>{ if(x){ data.models[MODELS[i].id] = x; scheduleRender(loc); } }); });
+  const retry = i => { data.retrying = (data.retrying||0)+1; setTimeout(()=>fetchDet(MODELS[i], loc, ref).then(x=>{ data.retrying--; if(x){ data.models[MODELS[i].id] = x; data.fetched = new Date(); } if(S.loc===loc) scheduleRender(loc); }), 5000 + i*700); };
+  det.forEach((d,i)=>{ if(d===TIMEOUT) detPs[i].then(x=>{ if(x){ data.models[MODELS[i].id] = x; scheduleRender(loc); } else retry(i); }); else if(!d) retry(i); });
   Promise.all(ensPs).then(ens=>{ data.ens = ens.filter(Boolean); data.ensNames = ens.map((e,i)=>e?ENS[i].name:null).filter(Boolean); data.ensPending = false; scheduleRender(loc); });
 }
 // season history is the biggest download (10 winters, hourly), so it loads only when needed
@@ -840,13 +846,14 @@ function snowBarsSVG(vals, dates, o={}){
   let g = "";
   const ti = dates.indexOf(localToday()); if(ti>=0) g += `<rect x="${ti*cw+1}" y="${top-8}" width="${cw-2}" height="${H+46}" rx="7" fill="#232327"/>`;
   [[0,5,"Next 1–5 Days"],[5,10,"Next 6–10 Days"],[10,15,"Next 11–15 Days"]].forEach(([a,b,lab])=>{
-    if(a >= n) return; const bb = Math.min(b,n); const tot = vals.slice(a,bb).reduce((x,y)=>x+(y||0),0);
-    const x1 = a*cw+4, x2 = bb*cw-4, xm = (x1+x2)/2, t = fmtSnow(tot,0);
+    if(a >= n) return; const bb = Math.min(b,n); const seg = vals.slice(a,bb), tot = seg.reduce((x,y)=>x+(y||0),0);
+    const x1 = a*cw+4, x2 = bb*cw-4, xm = (x1+x2)/2, t = seg.filter(v=>v==null).length*2 > seg.length ? "—" : fmtSnow(tot,0);
     g += `<text x="${xm}" y="10" class="t-l">${lab}</text><path d="M${x1} 15v6M${x2} 15v6M${x1} 18H${xm-16}M${xm+16} 18H${x2}" class="t-br"/><text x="${xm}" y="22" class="t-tot">${t}</text>`;
   });
   vv.forEach((v,i)=>{
     const x = i*cw + 5, bw = cw - 10; const val = v||0; const h = Math.max(2, val/mx*H);
     const inch = vals[i]||0;
+    if(v==null) g += `<text x="${x+bw/2}" y="${top+H-4}" class="t-v" opacity=".5">—</text>`; else
     g += `<rect x="${x}" y="${top+H-h}" width="${bw}" height="${h}" rx="2" fill="${val<0.05 ? "#e8e8ea" : barColor(inch)}" ${val<0.05?'opacity=".8"':''}/>`;
     if(o.labels && v!=null){ const lab = v<0.5? "0" : String(Math.round(v)); g += `<text x="${x+bw/2}" y="${top+H-h-4}" class="t-v" ${inch>=12?'fill="#f39a44"':''}>${lab}</text>`; }
     const d = dates[i]; const wd = new Date(d+"T12:00:00Z").getUTCDay(); const we = wd===0||wd===6;
@@ -902,12 +909,14 @@ function render(){
   const sv = { models: LV? `Tuned to ${LV.station.name} · ${MODELS.find(m=>m.id===LV.best)?.name||""} leads` : `${Object.keys(D.models).length} models · ${conf.label}`, elev:`Snow level ${fmtEl(slNow)}`, outlook:"Weeks 1–5 · season · 6 months", avy:S.avyLabel||"", hourly:"5 days", wax:"" };
   if(S.mode!=="alpine"){ const w = wax(SIM[C.nowIdx], C.cons[C.nowIdx]); if(w) sv.wax = S.mode==="classic"? w.kick.split(" (")[0] : w.glide.split(" (")[0] + " glide"; }
 
+  const nIn = Object.keys(D.models).length, longIn = Object.keys(D.models).filter(id=>id!=="hrrr").length;
+  const modelNote = nIn < MODELS.length-2 ? `<div class="callout rain">⏳ <b>${nIn} of ${MODELS.length} models loaded.</b> ${longIn<3? "The forecast past 2 days is incomplete until more arrive." : "The rest are still coming in."} ${D.retrying? "Retrying now…" : `<a href="#" id="modelRetry">Try again</a>`}</div>` : "";
   $("#app").innerHTML = `
-  ${a2hsHTML()}
+  ${a2hsHTML()}${modelNote}
   ${callouts.slice(0,2).join("")}
   <section class="card">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend"><span class="spin"></span>ensembles</span>` : `<span class="badge b-${conf.lvl}">${conf.label}</span>`}</div>
-    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, consDaily, C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg"><span>Ski quality</span><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
   </section>
   <section class="card" id="nowCard"></section>
@@ -929,6 +938,7 @@ function render(){
   ${SECTIONS.filter(s=>!s.nordic || S.mode!=="alpine").map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
   <div class="muted" style="text-align:center;margin:18px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
+  const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
   $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read more" : "Show less"; };
   $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
   $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
@@ -1717,13 +1727,13 @@ function wireTimeline(){
 }
 async function drawGrid(){
   if(!S.loc || !bigMap) return; tlStop();
-  const bnd = bigMap.getBounds(), c = bigMap.getCenter(); const N = 13;
+  const bnd = bigMap.getBounds(), c = bigMap.getCenter(); const N = 11;
   const span = Math.min(3.2, Math.max(0.5, Math.max(bnd.getNorth()-bnd.getSouth(), (bnd.getEast()-bnd.getWest())/1.35) * 1.1));
   const step = span/(N-1); const lat0 = c.lat - span/2, lon0 = c.lng - span*1.35/2;
   const pts = []; for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([lat0 + a*step, lon0 + b*step*1.35]);
   $("#mapStatus").textContent = "Modeling the snow map…";
   try{
-    let j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&past_days=1&forecast_days=11`);
+    let j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&past_days=1&forecast_days=10`);
     if(!Array.isArray(j)) j=[j];
     const H0 = j[0].hourly; const nk = new Date(Date.now()+j[0].utc_offset_seconds*1000).toISOString().slice(0,13)+":00"; const i0 = Math.max(0, H0.time.findIndex(t=>t>=nk));
     const snow = j.map(r=>{ const H=r.hourly, ref=r.elevation; return H.time.map((_,k)=>{ const v=snowAt(H.precipitation[k],H.temperature_2m[k],H.freezing_level_height?.[k],ref,ref); return v? v.snow : 0; }); });
