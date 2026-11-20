@@ -17,7 +17,7 @@ export async function send(sub, payload) {
 }
 
 // model snow (inches) from Open-Meteo best match at the spot's summit: past 12h + next N days by day
-export async function modelSnow(spot, days = 5) {
+export async function modelSnow(spot, days = 10) {
   const elev = Math.round((spot.top || spot.base || 5000) / 3.28084);
   const j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${spot.lat}&longitude=${spot.lon}&elevation=${elev}&hourly=snowfall&past_days=1&forecast_days=${days + 1}&timezone=auto`);
   const h = j.hourly; const off = j.utc_offset_seconds * 1000;
@@ -28,8 +28,9 @@ export async function modelSnow(spot, days = 5) {
   const byDay = {}; for (let i = i0; i < h.time.length; i++) { const d = h.time[i].slice(0, 10); byDay[d] = (byDay[d] || 0) + cm2in(h.snowfall[i]); }
   const dayList = Object.entries(byDay).slice(0, days);
   const next = (n) => dayList.slice(0, n).reduce((a, [, v]) => a + v, 0);
+  const next10 = next(10);
   const peak = dayList.reduce((b, [d, v]) => v > b.v ? { d, v } : b, { d: null, v: 0 });
-  return { past12, next1: next(1), next3: next(3), next5: next(5), peak };
+  return { past12, next1: next(1), next3: next(3), next5: next(5), next10, peak };
 }
 export async function measuredOvernight(spot) {
   try {
@@ -41,23 +42,23 @@ export async function measuredOvernight(spot) {
 }
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const r = (v) => Math.round(v);
+const WIN = { h24: ["next1", "next 24 hours"], d3: ["next3", "next 3 days"], d5: ["next5", "next 5 days"], d10: ["next10", "next 10 days"] };
 export async function buildAlert(sub) {
-  const lines = []; let top = null;
-  for (const spot of (sub.spots || []).slice(0, 6)) {
-    let m; try { m = await modelSnow(spot); } catch (e) { continue; }
-    const meas = await measuredOvernight(spot);
-    const over = meas ? meas.inches : m.past12;
-    const p = sub.prefs || {};
-    const short = spot.name.replace(/,\s*[A-Z]{2}$/, "");
-    if (over >= (p.overnight ?? 4)) {
-      const msg = `${r(over)}" ${meas ? "fell" : "estimated"} overnight at ${short}`;
-      lines.push(msg); if (!top || over > top.v) top = { v: over, title: `❄️ ${r(over)}" overnight at ${short}` };
-    } else if (m.next3 >= (p.forecast ?? 8)) {
-      const pk = m.peak.d ? ` (most on ${DOW[new Date(m.peak.d + "T12:00:00Z").getUTCDay()]})` : "";
-      lines.push(`${r(m.next3)}" forecast at ${short} next 3 days${pk}`);
-      if (!top) top = { v: m.next3, title: `🌨 ${r(m.next3)}" coming to ${short}` };
+  const rules = Array.isArray(sub.rules) && sub.rules.length ? sub.rules
+    : [{ spot: "*favs", type: "overnight", inches: sub.prefs?.overnight ?? 4 }, { spot: "*favs", type: "forecast", win: "d3", inches: sub.prefs?.forecast ?? 8 }];
+  const cache = new Map(); const hits = [];
+  const getM = async (sp) => { if (!cache.has(sp.name)) cache.set(sp.name, Promise.all([modelSnow(sp).catch(() => null), measuredOvernight(sp)])); return cache.get(sp.name); };
+  for (const r of rules.slice(0, 12)) {
+    const spots = r.spot === "*favs" || r.spot === "*all" ? (sub.spots || []) : (r.spotObj ? [r.spotObj] : []);
+    for (const sp of spots.slice(0, 6)) {
+      const [m, meas] = await getM(sp); if (!m) continue;
+      const short = sp.name.replace(/,\s*[A-Z]{2}$/, "");
+      if (r.type === "overnight") { const v = meas ? meas.inches : m.past12; if (v >= r.inches) hits.push({ v, title: `❄️ ${Math.round(v)}" overnight at ${short}`, line: `${Math.round(v)}" ${meas ? "fell" : "estimated"} overnight at ${short}` }); }
+      else { const [k, lab] = WIN[r.win] || WIN.d3; const v = m[k]; if (v >= r.inches) { const pk = m.peak.d ? ` (most on ${DOW[new Date(m.peak.d + "T12:00:00Z").getUTCDay()]})` : ""; hits.push({ v: v * 0.6, title: `🌨 ${Math.round(v)}" coming to ${short}`, line: `${Math.round(v)}" forecast at ${short}, ${lab}${pk}` }); } }
     }
   }
-  if (!lines.length) return null;
-  return { title: top.title, body: lines.slice(0, 3).join(" · "), url: "/#forecast", tag: "snowline-daily" };
+  if (!hits.length) return null;
+  const seen = new Set(); const lines = hits.filter(h => !seen.has(h.line) && seen.add(h.line));
+  const top = lines.slice().sort((a, b) => b.v - a.v)[0];
+  return { title: top.title, body: lines.slice(0, 3).map(h => h.line).join(" · "), url: "/#forecast", tag: "snowline-daily" };
 }

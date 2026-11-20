@@ -9,7 +9,9 @@ export default async (req) => {
   const s = subs();
   if (b.action === "subscribe") {
     if (!b.sub?.endpoint || !Array.isArray(b.spots)) return json({ error: "sub and spots required" }, { status: 400 });
-    const rec = { sub: b.sub, spots: b.spots.slice(0, 6).map(x => ({ name: String(x.name).slice(0, 80), lat: +x.lat, lon: +x.lon, base: +x.base, top: +x.top })), prefs: { overnight: +b.prefs?.overnight || 4, forecast: +b.prefs?.forecast || 8 }, created: Date.now() };
+    const rec = { sub: b.sub, spots: b.spots.slice(0, 6).map(x => ({ name: String(x.name).slice(0, 80), lat: +x.lat, lon: +x.lon, base: +x.base, top: +x.top })), prefs: { overnight: +b.prefs?.overnight || 4, forecast: +b.prefs?.forecast || 8 },
+      rules: (Array.isArray(b.rules) ? b.rules : []).slice(0, 12).map(r => ({ spot: String(r.spot).slice(0, 100), type: r.type === "overnight" ? "overnight" : "forecast", win: ["h24","d3","d5","d10"].includes(r.win) ? r.win : "d3", inches: Math.max(0.5, Math.min(60, +r.inches || 6)), spotObj: r.spotObj ? { name: String(r.spotObj.name).slice(0, 80), lat: +r.spotObj.lat, lon: +r.spotObj.lon, base: +r.spotObj.base, top: +r.spotObj.top } : null })),
+      created: Date.now() };
     await s.setJSON(subKey(b.sub.endpoint), rec);
     return json({ ok: true });
   }

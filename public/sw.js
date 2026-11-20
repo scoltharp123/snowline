@@ -1,5 +1,5 @@
 // Snowline service worker: offline app + saved forecasts, and push notifications
-const V = "snowline-v4";
+const V = "snowline-v5";
 const SHELL = ["/", "/index.html", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
 const WEATHER = /(^|\.)open-meteo\.com$/;
 const STATIC_CDN = /(cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)$/;
