@@ -582,15 +582,15 @@ const PRESETS = [
   {name:"Paulina Peak, OR", lat:43.6892, lon:-121.2548, base:6330, top:7984, bc:{from:"Paulina Lake (road closed in winter)"}}
 ];
 const MODELS = [
-  {id:"ecmwf", name:"ECMWF IFS",   api:["ecmwf_ifs025"], w:1.4, c:"#60a5fa"},
-  {id:"aifs",  name:"ECMWF AIFS",  api:["ecmwf_aifs025_single","ecmwf_aifs025"], w:1.0, c:"#22d3ee"},
-  {id:"gfs",   name:"GFS",         api:["gfs_seamless"], w:1.0, c:"#f472b6"},
-  {id:"hrrr",  name:"HRRR (48h)",  api:["ncep_hrrr_conus","gfs_hrrr"], w:1.3, c:"#fb923c"},
-  {id:"nbm",   name:"NBM",         api:["ncep_nbm_conus"], w:1.2, c:"#facc15"},
-  {id:"gem",   name:"GEM",         api:["gem_seamless"], w:1.0, c:"#f87171"},
-  {id:"icon",  name:"ICON",        api:["icon_seamless"], w:1.0, c:"#4ade80"},
-  {id:"ukmo",  name:"UKMO",        api:["ukmo_seamless"], w:1.0, c:"#c084fc"},
-  {id:"jma",   name:"JMA",         api:["jma_seamless"], w:0.7, c:"#94a3b8"},
+  {id:"ecmwf", name:"ECMWF IFS",   api:["ecmwf_ifs025"], w:1.4, c:"#60a5fa", days:15},
+  {id:"aifs",  name:"ECMWF AIFS",  api:["ecmwf_aifs025_single","ecmwf_aifs025"], w:1.0, c:"#22d3ee", days:15},
+  {id:"gfs",   name:"GFS",         api:["gfs_seamless"], w:1.0, c:"#f472b6", days:16},
+  {id:"hrrr",  name:"HRRR (48h)",  api:["ncep_hrrr_conus","gfs_hrrr"], w:1.3, c:"#fb923c", days:3},
+  {id:"nbm",   name:"NBM",         api:["ncep_nbm_conus"], w:1.2, c:"#facc15", days:11},
+  {id:"gem",   name:"GEM",         api:["gem_seamless"], w:1.0, c:"#f87171", days:10},
+  {id:"icon",  name:"ICON",        api:["icon_seamless"], w:1.0, c:"#4ade80", days:8},
+  {id:"ukmo",  name:"UKMO",        api:["ukmo_seamless"], w:1.0, c:"#c084fc", days:7},
+  {id:"jma",   name:"JMA",         api:["jma_seamless"], w:0.7, c:"#94a3b8", days:11},
 ];
 const ENS = [
   {id:"ecmwf_ens", name:"ECMWF ENS", api:["ecmwf_ifs025"]},
@@ -651,13 +651,26 @@ function snowAt(P, Tref, FLmodel, ref, e){
 
 /* ================= Data ================= */
 // Open-Meteo answers 429 when busy (per phone/network); retry busy, server and network errors with growing waits.
+const OM_CACHE = "om-answers-v1";
+const isOM = u => /open-meteo\.com\//.test(u) && !/geocoding-api|\/elevation\?/.test(u);
+const omMaxAge = () => (S.freshAsk && Date.now() < S.freshAsk) ? 10*60e3 : 60*60e3;   // pull-to-refresh accepts answers up to 10 min old
+async function omCacheGet(url){ try{ const c = await caches.open(OM_CACHE), hit = await c.match(url); if(hit && Date.now() - (+hit.headers.get("x-at")||0) < omMaxAge()) return await hit.json(); }catch(e){} return null; }
+function omCachePut(url, j){ try{ caches.open(OM_CACHE).then(c=>c.put(url, new Response(JSON.stringify(j), {headers:{"content-type":"application/json","x-at":String(Date.now())}}))).catch(()=>{}); }catch(e){} }
+(async()=>{ try{ const c = await caches.open(OM_CACHE); for(const req of await c.keys()){ const r = await c.match(req); if(!r || Date.now() - (+r.headers.get("x-at")||0) > 6*3600e3) await c.delete(req); } }catch(e){} })();   // tidy old answers
+const omInflight = new Map();   // the same request asked twice at once goes out once
 async function getJSON(url, tries=3, wait=1500){
-  let r; try{ r = await fetch(url); }catch(e){ if(tries>1){ await new Promise(z=>setTimeout(z, wait)); return getJSON(url, tries-1, wait*2.5); } throw e; }
-  if((r.status===429 || r.status>=500) && tries>1){ await new Promise(z=>setTimeout(z, wait+Math.random()*800)); return getJSON(url, tries-1, wait*2.5); }
+  if(isOM(url)){ const hit = await omCacheGet(url); if(hit) return hit;
+    if(omInflight.has(url)) return omInflight.get(url);
+    const p = getJSONnet(url, tries, wait).then(j=>{ omCachePut(url, j); return j; }).finally(()=>omInflight.delete(url)); omInflight.set(url, p); return p; }
+  return getJSONnet(url, tries, wait);
+}
+async function getJSONnet(url, tries=3, wait=1500){
+  let r; try{ r = await fetch(url); }catch(e){ if(tries>1){ await new Promise(z=>setTimeout(z, wait)); return getJSONnet(url, tries-1, wait*2.5); } throw e; }
+  if((r.status===429 || r.status>=500) && tries>1){ await new Promise(z=>setTimeout(z, wait+Math.random()*800)); return getJSONnet(url, tries-1, wait*2.5); }
   if(r.status===429){ S.omLimited = Date.now(); } if(!r.ok) throw new Error(r.status); const j = await r.json(); if(j.error) throw new Error(j.reason||"error"); S.omLimited = 0; return j; }
 async function fetchDet(m, loc, ref){
   for(const api of m.api){
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&hourly=${DET_VARS}&models=${api}&timezone=auto&past_days=3&forecast_days=16`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&hourly=${DET_VARS}&models=${api}&timezone=auto&past_days=3&forecast_days=${m.days||16}`;
     try{
       const j = await getJSON(url); const h = j.hourly;
       const P = getVar(h,"precipitation");
@@ -719,7 +732,7 @@ async function load(loc){
   if(S.loc !== loc) return;
   if(S.loc !== loc) return;
   const models = {}; det.forEach((d,i)=>{ if(d && d!==TIMEOUT) models[MODELS[i].id] = d; });
-  const first = Object.values(models)[0];
+  const first = Object.values(models).sort((a,b)=>b.time.length-a.time.length)[0];   // models now cover different ranges: use the longest as the timeline
   $("#upd").classList.remove("on"); $("#app").classList.remove("stale");
   if(!first){
     const limited = S.omLimited && Date.now()-S.omLimited < 120e3, sn = (store.get("snap", {}) || {})[loc.name];
@@ -732,8 +745,8 @@ async function load(loc){
   MEM.set(loc.name, {t:Date.now(), data:S.data});
   render(); saveSnap(loc); loadExtras(loc);
   const data = S.data;
-  const retry = i => { data.retrying = (data.retrying||0)+1; setTimeout(()=>fetchDet(MODELS[i], loc, ref).then(x=>{ data.retrying--; if(x){ data.models[MODELS[i].id] = x; data.fetched = new Date(); } if(S.loc===loc) scheduleRender(loc); }), 5000 + i*700); };
-  det.forEach((d,i)=>{ if(d===TIMEOUT) detPs[i].then(x=>{ if(x){ data.models[MODELS[i].id] = x; scheduleRender(loc); } else retry(i); }); else if(!d) retry(i); });
+  const retry = i => { data.retrying = (data.retrying||0)+1; setTimeout(()=>fetchDet(MODELS[i], loc, ref).then(x=>{ data.retrying--; if(x){ data.models[MODELS[i].id] = x; if(x.time.length > data.time.length) data.time = x.time; data.fetched = new Date(); } if(S.loc===loc) scheduleRender(loc); }), 5000 + i*700); };
+  det.forEach((d,i)=>{ if(d===TIMEOUT) detPs[i].then(x=>{ if(x){ data.models[MODELS[i].id] = x; if(x.time.length > data.time.length) data.time = x.time; scheduleRender(loc); } else retry(i); }); else if(!d) retry(i); });
   Promise.all(ensPs).then(ens=>{ data.ens = ens.filter(Boolean); data.ensNames = ens.map((e,i)=>e?ENS[i].name:null).filter(Boolean); data.ensPending = false; scheduleRender(loc); });
 }
 // season history is the biggest download (10 winters, hourly), so it loads only when needed
@@ -1876,7 +1889,7 @@ const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset()*60
 function miniBars(vals){ const w=4, gap=2, H=18; const mx=Math.max(4,...vals); return `<svg width="${vals.length*(w+gap)}" height="${H}" viewBox="0 0 ${vals.length*(w+gap)} ${H}">${vals.map((v,i)=>{ const h=Math.max(1.5, v/mx*H); return `<rect x="${i*(w+gap)}" y="${H-h}" width="${w}" height="${h}" rx="1" fill="${v<0.05?'#3a3a3e':barColor(v)}"/>`; }).join("")}</svg>`; }
 function a2hsHTML(){ const ios=/iPhone|iPad|iPod/.test(navigator.userAgent); if(!ios || navigator.standalone || store.get("a2hs")) return "";
   return `<div class="callout tip" id="a2hs"><b>Get the app:</b> tap <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> Share, then <b>Add to Home Screen</b>.<button aria-label="Dismiss" onclick="store.set('a2hs',1);this.parentElement.remove()">✕</button></div>`; }
-async function refreshView(){ const v=S.view||"forecast"; if(v==="forecast" && S.loc){ const all=store.get("snap",{})||{}; delete all[S.loc.name]; store.set("snap",all); await load(S.loc); } else if(v==="favs") await renderFavs(true); else if(v==="finder") await renderFinder(true); else if(v==="maps") await drawGrid(); }
+async function refreshView(){ S.freshAsk = Date.now() + 30e3; const v=S.view||"forecast"; if(v==="forecast" && S.loc){ const all=store.get("snap",{})||{}; delete all[S.loc.name]; store.set("snap",all); await load(S.loc); } else if(v==="favs") await renderFavs(true); else if(v==="finder") await renderFinder(true); else if(v==="maps") await drawGrid(); }
 // scroll: compact title + auto-hide controls
 (function(){ let lastY=0; addEventListener("scroll",()=>{ const y=scrollY; $("#top").classList.toggle("scrolled", y>44);
   const c=$("#ctrl"); if(c){ if(y>lastY+6 && y>220) c.classList.add("hide"); else if(y<lastY-6 || y<160) c.classList.remove("hide"); } lastY=y; }, {passive:true}); })();
@@ -2804,8 +2817,16 @@ function wireHourlyChart(C, SIM, el){ el.querySelectorAll("[data-hc]").forEach(b
 
 /* ---------- mini snow map with play ---------- */
 let miniMap=null, miniTimer=null;
-async function renderMiniMap(){
-  const card=$("#miniMapCard"); if(!card || !S.loc || !window.L) { card && card.remove(); return; } const L0=S.loc;
+let mmObs = null;
+function renderMiniMap(){
+  const card=$("#miniMapCard"); if(!card || !S.loc || !window.L) { card && card.remove(); return; }
+  if(!card.innerHTML) card.innerHTML = `<div class="card-h"><h2>Snow map</h2></div><div id="miniMap"></div>`;
+  if(mmObs) mmObs.disconnect();
+  if(!("IntersectionObserver" in window)) return drawMiniMap();
+  mmObs = new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ mmObs.disconnect(); drawMiniMap(); } }, {rootMargin:"300px"}); mmObs.observe(card);
+}
+async function drawMiniMap(){
+  const card=$("#miniMapCard"); if(!card || !S.loc || !window.L) return; const L0=S.loc;
   card.innerHTML = `<div class="card-h"><h2>Snow map</h2><button class="link" id="mmBig">Full map ↗</button></div><div id="miniMap"></div>
     <div class="mm-ctl"><button class="mm-play" id="mmPlay" aria-label="Play">▶</button><input type="range" id="mmSlide" min="0" max="6" value="6" aria-label="Day"><span class="mm-lbl" id="mmLbl">Loading…</span></div>`;
   $("#mmBig").onclick = () => { location.hash="maps"; };
