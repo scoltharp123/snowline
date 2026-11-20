@@ -2767,7 +2767,7 @@ const BACH_WINTER = TM("Winter Map", "/tm/mtb/2025-11/FINAL_W2526_TrailMap_WithK
 const TRAIL_MAPS = {
   "Mt. Bachelor, OR": [BACH_WINTER, BACH_NORDIC, BACH_SPRING],
   "Mt. Bachelor Nordic Center, OR": [BACH_NORDIC, BACH_WINTER],
-  "Meissner Nordic (Bend), OR": [TM("Meissner ski & snowshoe trails", "/tm/usfs/145569", "Deschutes National Forest & Meissner Nordic")],
+  "Meissner Nordic (Bend), OR": [TM("Meissner ski & snowshoe trails", "/tm/usfs/deschutes/2021%20Meissner%20Nordic%20Map_UPDATED.pdf", "Deschutes National Forest & Meissner Nordic")],
   "Methow Valley Trails, WA": [TM("Winthrop to Brown's Farm", "/tm/methow/wintertrails_winthroptobrownsfarm_2026.pdf", "methowtrails.org"), TM("Sun Mountain", "/tm/methow/wintertrails_sunmountain_2026.pdf", "methowtrails.org"), TM("Jack's to Brown's Farm", "/tm/methow/wintertrails_jackstobrownsfarm_2026.pdf", "methowtrails.org")],
   "Birkie Trail (Cable, WI)": [TM("Birkie Trail pocket maps", "/tm/birkie/2025/10/Birkie-Pocket-Maps_Winter-2025-2026_101725.pdf", "birkie.com")],
 };
@@ -2789,8 +2789,9 @@ async function tmBytes(u, onProg){
   const out = new Uint8Array(got); let o = 0; for(const p of parts){ out.set(p, o); o += p.length; } return out.buffer;
 }
 // Render one PDF page as large as the phone can safely hold (iOS caps a canvas near 16 million pixels).
-async function tmRender(buf, pageNo, maxPx){
-  const lib = await loadPdfJs(); const doc = await lib.getDocument({data: new Uint8Array(buf.slice(0))}).promise;
+async function tmDoc(buf){ const lib = await loadPdfJs(); return lib.getDocument({data: new Uint8Array(buf.slice(0))}).promise; }
+async function tmRender(buf, pageNo, maxPx){ return tmRenderDoc(await tmDoc(buf), pageNo, maxPx); }
+async function tmRenderDoc(doc, pageNo, maxPx){
   const page = await doc.getPage(Math.min(pageNo, doc.numPages)); const v1 = page.getViewport({scale:1});
   const scale = Math.min(maxPx / Math.max(v1.width, v1.height), Math.sqrt(15e6 / (v1.width*v1.height)));
   const vp = page.getViewport({scale}); const cv = document.createElement("canvas"); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
@@ -2841,16 +2842,23 @@ async function tmViewer(tm){
   const msg = t => { const el = $("#tvMsg"); if(el) el.textContent = t; };
   try{
     buf = await tmBytes(tm.url, (got, tot) => msg(tot? `Loading map… ${Math.round(got/tot*100)}%` : `Loading map… ${fmtMB(got)}`));
+    msg("Drawing map…"); const doc = await tmDoc(buf); let gen = 0;
+    // Draw a quick sharp-enough version first, then swap in a detailed one for zooming in.
+    const toURL = async cv => URL.createObjectURL(await new Promise(r=>cv.toBlob(r, "image/jpeg", .88)));
     const draw = async () => {
-      msg("Drawing map…"); const {cv, pages} = await tmRender(buf, page, 4096);
+      const my = ++gen; msg("Drawing map…");
+      const {cv, pages} = await tmRenderDoc(doc, page, 1600); if(my!==gen || !$("#tvMap")) return;
       if(page===1 && !localStorage.getItem(tmThumbKey(tm.url))) tmThumbFrom(cv, tm.url);
-      const blob = await new Promise(r=>cv.toBlob(r, "image/jpeg", .9)); if(url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob);
-      const host = $("#tvMap"); if(!host) return; if(m){ m.remove(); m = null; } host.innerHTML = "";
+      if(url) URL.revokeObjectURL(url); url = await toURL(cv);
+      const host = $("#tvMap"); if(m){ m.remove(); m = null; } host.innerHTML = "";
       const b = [[0,0],[cv.height, cv.width]];
       m = L.map(host,{crs:L.CRS.Simple, minZoom:-6, maxZoom:3, zoomSnap:0, attributionControl:false, zoomControl:false, maxBoundsViscosity:.8});
-      L.imageOverlay(url, b).addTo(m); m.fitBounds(b); m.setMinZoom(m.getZoom()-.5); m.setMaxBounds(L.latLngBounds(b).pad(.15));
+      const ov = L.imageOverlay(url, b).addTo(m); m.fitBounds(b); m.setMinZoom(m.getZoom()-.5); m.setMaxBounds(L.latLngBounds(b).pad(.15));
       const pg = $("#tvPg"); if(pg) pg.innerHTML = pages>1? `<button class="btn" data-p="-1" ${page<=1?"disabled":""}>‹</button> Page ${page} of ${pages} <button class="btn" data-p="1" ${page>=pages?"disabled":""}>›</button>` : `<span class="muted">Pinch to zoom</span>`;
       pg?.querySelectorAll("[data-p]").forEach(x=>x.onclick=()=>{ page += +x.dataset.p; draw(); });
+      const hi = await tmRenderDoc(doc, page, 3600).catch(()=>null); if(!hi || my!==gen || !m) return;
+      const u2 = await toURL(hi.cv); if(my!==gen || !m){ URL.revokeObjectURL(u2); return; }
+      ov.setUrl(u2); URL.revokeObjectURL(url); url = u2;
     };
     await draw();
   }catch(e){ msg((navigator.onLine? "" : "You're offline and this map isn't downloaded. ") + (e.message || "The map didn't load.")); }

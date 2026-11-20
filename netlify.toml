@@ -28,5 +28,5 @@
   status = 200
 [[redirects]]
   from = "/tm/usfs/*"
-  to = "https://www.fs.usda.gov/media/:splat"
+  to = "https://www.fs.usda.gov/sites/nfs/files/legacy-media/:splat"
   status = 200
