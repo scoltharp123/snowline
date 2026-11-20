@@ -6,7 +6,7 @@ export default async (req) => {
   const lat = +u.searchParams.get("lat"), lon = +u.searchParams.get("lon");
   if (!isFinite(lat) || !isFinite(lon)) return json({ error: "lat/lon required" }, { status: 400 });
   try {
-    const st = await nearestStations(lat, lon, 2, 45);
+    const st = await nearestStations(lat, lon, 5, 60);
     if (!st.length) return json({ stations: [] }, { cache: 3600 });
     const ids = st.map(s => s.id);
     const tomorrow = ymd(Date.now() + 864e5);
@@ -35,6 +35,7 @@ export default async (req) => {
         density: new24 && swe24 && new24 >= 1 ? Math.round(100 * swe24 / new24) : null,
         tempF: last(temp)?.value ?? null,
         hist,
+        hourly: depth.slice(-25).map(v => ({ t: String(v.date).slice(5, 16), d: v.value })),
       };
     });
     return json({ stations, source: "USDA NRCS SNOTEL" }, { cache: 1200 });

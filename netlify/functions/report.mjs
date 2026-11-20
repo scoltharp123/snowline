@@ -33,7 +33,9 @@ async function resortReport(slug) {
   if ((m = t.match(/(\d+)\/(\d+) open/))) { out.runsOpen = +m[1]; out.runs = +m[2]; }
   if ((m = t.match(/Snow Reporter Comments:\s*(.{20,600}?)(?=\s(?:Acres Open|Runs Open|Firsthand|Nordic Open|Terrain Park)|$)/))) out.comment = m[1].trim();
   if ((m = t.match(/Recent Snowfall\s+((?:\d+"\s*){1,8})/))) { const v = m[1].match(/\d+/g).map(Number); out.recent = v; out.new24 = v[v.length - 1]; }
-  if (/\bClosed\b/.test(t.slice(0, 600)) && !/\bOpen\b/.test(t.slice(0, 300))) out.status = "Closed";
+  if ((m = t.match(/Projected (?:re)?opening:?\s*([A-Z][a-z]{2}\.? \d{1,2})/i)) || (m = t.match(/([A-Z][a-z]{2} \d{1,2})\s*Projected Opening/))) out.opening = m[1].replace(".", "");
+  if ((m = t.match(/(?:is )?closed for the season/i))) out.status = "Closed";
+  else if (/\bClosed\b/.test(t.slice(0, 600)) && !/\bOpen\b/.test(t.slice(0, 300))) out.status = "Closed";
   else if (/Mt\.?[^.]{0,40}\bOpen\b/.test(t.slice(0, 1500))) out.status = "Open";
   return out;
 }
