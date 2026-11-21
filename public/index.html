@@ -447,6 +447,8 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .ob-h b{display:block;font-size:14px}.ob-h small{color:var(--mute);font-size:12px}.ob p{margin:4px 0 0;font-size:13px;line-height:1.45;color:#d6d6da}
 .ob-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.ob-chip{font-size:11px;font-weight:700;color:#ffd9d9;background:#3a1518;border:1px solid #6b2a2e;border-radius:6px;padding:2px 6px}
 .stake-img{position:relative;border-radius:12px;overflow:hidden;background:#000}.stake-img img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}.stake-img span{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:3px 8px;border-radius:6px}
+.qinfo{background:none;border:0;color:inherit;font:inherit;font-weight:600;padding:0;cursor:pointer}.qinfo span{color:var(--ice);margin-left:2px}
+.qexp{margin-top:10px;padding:12px;border-radius:12px;background:var(--card2);font-size:13px;line-height:1.5}.qexp p{margin:0 0 8px}.qexp p:last-child{margin:0}
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -970,7 +972,8 @@ function render(){
   <section class="card">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend"><span class="spin"></span>ensembles</span>` : `<span class="badge b-${conf.lvl}">${conf.label}</span>`}</div>
     ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
-    <div class="qleg"><span>Ski quality</span><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
+    <div class="qleg"><button class="qinfo" onclick="this.closest('section').querySelector('.qexp').toggleAttribute('hidden')" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
+    <div class="qexp" hidden>${qualityExplainHTML()}</div>
   </section>
   <section class="card" id="nowCard"></section>
   <section class="card" id="groomCard" hidden></section>
@@ -2136,6 +2139,17 @@ function buildFacts(C, SIM, e){
 
 
 
+
+function qualityExplainHTML(){
+  const m = S.mode==="skate"? "skate skiing" : S.mode==="classic"? "classic skiing" : S.mode==="bc"? "touring" : "alpine skiing";
+  const likes = S.mode==="skate"? "Firm, fast, packed snow scores highest. Fresh unpacked snow, slush and very cold, slow-gliding snow score lower."
+    : S.mode==="classic"? "Packed snow and settled new snow with easy grip score highest. Ice, slush and rain score lowest."
+    : "Fresh powder scores highest, more so the deeper and newer it is. Packed groomers are good; ice, slush and rain score lowest.";
+  return `<p><b>A 0–10 score for how the snow should ski for ${m}</b>, from the forecast at the elevation you picked. Each color is that day's best 3 hours between 8am and 5pm.</p>
+    <p>Snowline plays the weather forward hour by hour (new snow, settling, melting and refreezing, rain, wind) to guess the surface: powder, packed, corn, crust, slush and so on. Each surface has a starting score for your mode. ${likes}</p>
+    <p>Then it adjusts for <b>wind</b> (gusts over 30 mph knock it down), <b>light</b> (sun helps, flat light hurts alpine), <b>cold</b> (below about −4°F hurts) and <b>snow falling</b> (slows skating).</p>
+    <p class="muted">Epic 8+ · Great 6.5+ · Good 5+ · Fair 3.5+ · Poor below. It's a forecast of the surface, not a grooming report or a safety rating.${S.mode==="bc"? " <b>It says nothing about avalanche danger.</b>" : ""} Switch Alpine / Skate / Classic to see each sport's score.</p>`;
+}
 /* ================= Grooming, avalanche observations, snow stake time-lapse ================= */
 const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Methow Valley Trails, WA", "Birkie Trail (Cable, WI)", "Mt. Spokane, WA"];
 function renderGroom(){
