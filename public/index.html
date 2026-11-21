@@ -3106,6 +3106,7 @@ function renderTrack(){
     const bar = (val, col, lab) => `<div class="tk-row"><span class="tk-l">${lab}</span><div class="tk-bar"><i style="width:${Math.max(3,val/maxV*100)}%;background:${col}"></i></div><b class="num">${fmtSnow(val,0)}</b></div>`;
     last = `<div class="grp">Last storm · ${range(L0.start,L0.end)}<span style="float:right;color:${vd.c};text-transform:none;letter-spacing:0">${vd.t}</span></div>
       ${isNum(s1)? bar(s1, "#38bdf8", "Snowline") : ""}${bar(L0.fcstSnow, "#5a6b85", "Models avg")}${bar(L0.obsSnow, "#e6edf7", "Measured")}
+      ${L0.obsSnow >= 2? `<button class="btn wide" style="margin:8px 0 4px" onclick="openRecapSheet()">📣 Share the storm recap</button>` : ""}
       <div class="muted" style="margin:2px 0 4px;font-size:13px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)}${L0.closest? ` · closest: <b style="color:var(--text)">${MNAME(L0.closest.id)}</b> (${fmtSnow(L0.closest.s,0)})` : ""}</div>
       ${st.length>1? `<div class="list" style="margin-top:6px">${st.slice(1,5).map(x=>{ const f = isNum(x.snowline?.s)? x.snowline.s : x.fcstSnow, w=verdict(f,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(f,0)} ${isNum(x.snowline?.s)? "Snowline" : "fcst"} · ${fmtSnow(x.obsSnow,0)} fell</span><b style="color:${w.c};margin-left:10px;font-size:12px;white-space:nowrap">${w.t}</b></div>`; }).join("")}</div>` : ""}`; }
   el.dataset.sv = R && R.storms? `${R.within} of ${R.storms} storms within 2″` : v.status==="ok"? "Model scorecard" : "Last storms";
@@ -3709,6 +3710,55 @@ function updateOnline(){ document.body.classList.toggle("offline", !navigator.on
 addEventListener("online", ()=>{ updateOnline(); if(S.loc) load(S.loc); }); addEventListener("offline", updateOnline);
 
 /* ---------- Powder card (shareable image) ---------- */
+
+/* ---------- Storm recap card: what Snowline said vs what fell ---------- */
+function recapData(){
+  const v = extrasFor(S.loc).verify; const st = (v?.storms||[]).filter(x=>!x.ongoing)[0]; if(!st) return null;
+  const said = isNum(st.snowline?.s)? st.snowline.s : st.fcstSnow, who = isNum(st.snowline?.s)? "Snowline said" : "Forecast said";
+  const miss = said - st.obsSnow, close = Math.abs(miss) <= Math.max(2, .25*st.obsSnow), nailed = Math.abs(miss) <= Math.max(1, .1*st.obsSnow);
+  const verdict = nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "IT OVERDELIVERED" : "IT CAME UP SHORT";
+  const range = st.start===st.end? `${dow(st.start)} ${md(st.start)}` : `${dow(st.start)}–${dow(st.end)} ${md(st.start)}`;
+  return {st, said, who, verdict, nailed, close, range, station: v.station.name, record: v.record};
+}
+async function drawRecapCard(fmt="post"){
+  const R = recapData(), W=1080, H = fmt==="story"? 1920 : 1350, top = fmt==="story"? 240 : 0;
+  const cv=document.createElement("canvas"); cv.width=W; cv.height=H; const g=cv.getContext("2d"); try{ await document.fonts.ready; }catch(_){}
+  const good = R.close || R.st.obsSnow > R.said;
+  const sky=g.createLinearGradient(0,0,0,H); sky.addColorStop(0, good? "#0f3b3a" : "#2a1d4f"); sky.addColorStop(.55,"#0a1220"); sky.addColorStop(1,"#030508"); g.fillStyle=sky; g.fillRect(0,0,W,H);
+  let seed = 11; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+  for(let i=0;i<120;i++){ g.globalAlpha=.2+rnd()*.5; g.fillStyle="#fff"; g.beginPath(); g.arc(rnd()*W, rnd()*H, .8+rnd()*rnd()*4, 0, 7); g.fill(); } g.globalAlpha=1;
+  try{ const logo=new Image(); logo.src="/icon.svg"; await logo.decode(); g.drawImage(logo,72,top+64,76,76); }catch(_){}
+  g.fillStyle="#fff"; g.font="700 40px 'Space Grotesk', Inter, sans-serif"; g.fillText("Snowline", 166, top+116);
+  g.fillStyle="#9fb0cc"; g.font="700 34px Inter, sans-serif"; g.fillText("STORM RECAP", 72, top+230);
+  g.fillStyle="#fff"; g.font="800 76px 'Space Grotesk', Inter, sans-serif"; g.fillText(R.verdict, 72, top+320, 940);
+  g.fillStyle="#c7d2e4"; g.font="600 40px Inter, sans-serif"; g.fillText(`${S.loc.name} · ${R.range}`, 72, top+385, 940);
+  // two big numbers side by side
+  const col = (x, label, val, c1, c2) => { g.fillStyle="#8fa1bf"; g.font="600 34px Inter, sans-serif"; g.fillText(label, x, top+500);
+    const gr=g.createLinearGradient(0,top+520,0,top+760); gr.addColorStop(0,c1); gr.addColorStop(1,c2); g.fillStyle=gr; g.font="800 230px 'Space Grotesk', Inter, sans-serif"; g.fillText(fmtSnow(val,0).replace('"',"″"), x-8, top+740, 470); };
+  col(72, R.who, R.said, "#e0f2fe", "#38bdf8"); col(580, "What fell", R.st.obsSnow, "#ffffff", good? "#6ee7b7" : "#c4b5fd");
+  // bars
+  const mx = Math.max(R.said, R.st.obsSnow, 1), by = top+900, bh = 46, bwMax = 936;
+  [[R.said,"#38bdf8"],[R.st.obsSnow, good? "#6ee7b7" : "#a78bfa"]].forEach(([v,c],i)=>{ g.fillStyle="#1b2438"; g.beginPath(); g.roundRect(72, by+i*76, bwMax, bh, 23); g.fill(); g.fillStyle=c; g.beginPath(); g.roundRect(72, by+i*76, Math.max(46, v/mx*bwMax), bh, 23); g.fill(); });
+  g.fillStyle="#9fb0cc"; g.font="500 30px Inter, sans-serif"; g.fillText(`Measured at the ${R.station} snow gauge${isNum(R.st.obsWater)? ` · ${R.st.obsWater.toFixed(2)}″ of water` : ""}`, 72, by+200, 940);
+  if(R.record && R.record.storms>1){ g.fillStyle="#fff"; g.font="700 40px 'Space Grotesk', Inter, sans-serif"; g.fillText(`${R.record.within} of ${R.record.storms} storms within 2″ this season`, 72, by+280, 940); }
+  g.fillStyle="#6b7a94"; g.font="500 26px Inter, sans-serif"; g.fillText(`Free snow forecasts · ${location.host}`, 72, H-(fmt==="story"? 150 : 52));
+  return cv;
+}
+async function openRecapSheet(){
+  const R = recapData(); if(!R) return; openSheet("shareSheet"); const box=$("#shareBox"); let fmt = store.get("shareFmt","post"), url=null, file=null;
+  const place = S.loc.name.replace(/, [A-Z]{2}$/,""), link = location.origin + location.pathname + `?s=${encodeURIComponent(S.loc.name)}`;
+  const msg = R.st.obsSnow > R.said + 2? `${fmtSnow(R.st.obsSnow,0)} fell at ${place}! Even more than the ${fmtSnow(R.said,0)} forecast ❄️` : `${R.who} ${fmtSnow(R.said,0)} for ${place}, and ${fmtSnow(R.st.obsSnow,0)} fell. ${R.close? "Called it 🎯" : ""}`.trim();
+  const draw = async () => { box.innerHTML = `<div class="loading"><div class="spin"></div>Making your recap…</div>`;
+    const cv = await drawRecapCard(fmt); const blob = await new Promise(r=>cv.toBlob(r,"image/png")); if(url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob); file = new File([blob], "snowline-storm-recap.png", {type:"image/png"});
+    box.innerHTML = `<div class="seg sm" id="shFmt" style="margin-bottom:10px"><button data-f="post" class="${fmt==="post"?"on":""}">Post</button><button data-f="story" class="${fmt==="story"?"on":""}">Story</button></div>
+      <img src="${url}" alt="Storm recap" style="width:100%;${fmt==="story"? "max-height:58vh;object-fit:contain;" : ""}border-radius:16px;display:block;background:#05080f">
+      <textarea id="shMsg" rows="2" class="sh-msg">${esc(msg)}</textarea>
+      <div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:8px"><button class="btn primary" id="shImg" style="flex:1">Send to friends</button><button class="btn" id="shLink" style="flex:0 0 auto">Copy link</button></div>`;
+    box.querySelectorAll("#shFmt button").forEach(b=>b.onclick=()=>{ fmt=b.dataset.f; store.set("shareFmt",fmt); draw(); });
+    $("#shImg").onclick = async () => { const text = `${$("#shMsg").value.trim()}\n${link}`; try{ if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], text}); else if(navigator.share) await navigator.share({text, url:link}); else { const a=document.createElement("a"); a.href=url; a.download=file.name; a.click(); } }catch(e){} };
+    $("#shLink").onclick = async () => { try{ await navigator.clipboard.writeText(`${$("#shMsg").value.trim()} ${link}`); toast("Message and link copied"); }catch(e){ toast(link); } }; };
+  draw();
+}
 /* ---------- Share card: made to get friends fired up ---------- */
 function shareStory(){
   const {C, SIM} = S.ctx; const daily = C.consDays.map(d=>d.day+d.night).slice(0,10);
