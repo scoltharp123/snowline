@@ -976,7 +976,7 @@ function bucketRanges(C){
 }
 function snowSummaryHTML(last24, vals, dates, o={}){
   const nowLbl = (()=>{ const d = new Date(); return DOW[d.getDay()]+" "+d.getDate()+" "+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}).replace(" ","").toLowerCase(); })();
-  return `<div class="ss"><div class="ss-l"><div class="ss-k">Last 24 Hours</div><div class="ss-big num">${isNum(last24)? fmtSnow(last24,0) : "—"}</div><div class="ss-t">${nowLbl}<br>${o.measured? `<span class="u meas">Measured</span><br><span style="font-size:9.5px">${o.measured}</span>` : `<span class="u">Estimated</span>`}</div></div>
+  return `<div class="ss"><div class="ss-l"><div class="ss-k">Last 24 Hours</div><div class="ss-big num">${isNum(last24)? fmtSnow(last24,0) : "—"}</div><div class="ss-t">${nowLbl}<br>${o.measured? `<span class="u meas">Measured</span>` : `<span class="u">Estimated</span>`}</div></div>
     <div class="ss-r">${snowBarsSVG(vals, dates, o)}</div></div>`;
 }
 
@@ -1041,8 +1041,7 @@ function render(){
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend"><span class="spin"></span>ensembles</span>` : `<button class="badge b-${conf.lvl} tipbadge" data-tip="conf" aria-label="What confidence means">${conf.label} ⓘ</button>`}</div>
-    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, ranges: bucketRanges(C), measured: ob && isNum(ob.new24)? ob.name : null}); })()}
-    ${trustLineHTML()}
+    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
   </section>
   <section class="card" id="nowCard"></section>
@@ -2955,7 +2954,7 @@ function renderTrack(){
       ${isNum(s1)? bar(s1, "#38bdf8", "Snowline") : ""}${bar(L0.fcstSnow, "#5a6b85", "Models avg")}${bar(L0.obsSnow, "#e6edf7", "Measured")}
       <div class="muted" style="margin:2px 0 4px;font-size:13px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)}${L0.closest? ` · closest: <b style="color:var(--text)">${MNAME(L0.closest.id)}</b> (${fmtSnow(L0.closest.s,0)})` : ""}</div>
       ${st.length>1? `<div class="list" style="margin-top:6px">${st.slice(1,5).map(x=>{ const f = isNum(x.snowline?.s)? x.snowline.s : x.fcstSnow, w=verdict(f,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(f,0)} ${isNum(x.snowline?.s)? "Snowline" : "fcst"} · ${fmtSnow(x.obsSnow,0)} fell</span><b style="color:${w.c};margin-left:10px;font-size:12px;white-space:nowrap">${w.t}</b></div>`; }).join("")}</div>` : ""}`; }
-  el.dataset.sv = R && R.storms? `${R.within} of ${R.storms} storms within 2″` : v.status==="ok"? `Tuned to ${sn}` : "Last storms";
+  el.dataset.sv = R && R.storms? `${R.within} of ${R.storms} storms within 2″` : v.status==="ok"? "Model scorecard" : "Last storms";
   el.innerHTML = `<div class="card-h"><h2>Forecast accuracy${tipI("accuracy")}</h2></div><div class="muted" style="margin:-4px 0 10px;font-size:13px">Graded at the ${esc(sn)} snow gauge, ${fmtEl(v.station.elevFt/FT)}</div>
     ${rec}${leads}${last}
     <div class="muted" style="margin-top:10px;font-size:12px">Snowline uses this: models that have been right here get more say, separately for tomorrow and the days after, and models that run wet or dry here are corrected${v.slrFix && v.slrFix!==1? `. Snow-to-water ratio tuned to this gauge (${v.slrFix>1? "+" : ""}${Math.round((v.slrFix-1)*100)}%)` : ""}.</div>`;
