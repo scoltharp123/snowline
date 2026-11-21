@@ -664,6 +664,8 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
   <div class="grab"></div>
   <div class="sheet-h"><h2>Settings</h2><button class="link" data-close>Done</button></div>
   <div class="field">Units<div class="seg" id="unitSeg"><button data-u="imp">Inches · °F · ft</button><button data-u="met">cm · °C · m</button></div></div>
+  <div class="row" style="justify-content:space-between;align-items:center;gap:12px;margin-top:16px"><div><b>App health notices</b><div class="muted">A notification if one of Snowline's data sources breaks, and when it's fixed. Needs lock-screen notifications on.</div></div><button class="tog" id="healthTog" role="switch" aria-label="App health notices"><i></i></button></div>
+  <button class="link" id="setStatus" style="margin-top:6px;padding-left:0">Data source status</button>
   <div class="row" style="gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn" id="setInstall" style="flex:1">📲 Add to Home Screen</button><button class="btn" id="setWelcome" style="flex:1">👋 Welcome tour</button></div>
   <h3 style="margin:18px 0 6px">Sync across devices</h3><div id="syncBox"></div>
   <h3 style="margin:18px 0 6px">How Snowline works</h3>
@@ -2425,6 +2427,12 @@ function saveScore(loc){
     const fc = Object.entries(tot).filter(([d,o])=>o[2]>=22).sort().slice(0,5).map(([d,o])=>[d, Math.round(o[0]*10)/10, Math.round(o[1]*100)/100]);
     if(!fc.length) return;
     fetch(API+"/score", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({station: st.id, issued, fc})}).then(r=>{ if(r.ok) store.set(key, issued); }).catch(()=>{});
+    if(/^Mt\. Bachelor/.test(loc.name) && store.get("score-resort-bachelor") !== issued){
+      const B = PRESETS.find(p=>p.name==="Mt. Bachelor, OR"); const Cm = computeAt((B.base+B.top)/2/FT), tm = {};
+      Cm.time.forEach((t,i)=>{ const c = Cm.cons[i]; if(!c || i < Cm.nowIdx) return; const d = t.slice(0,10); if(d <= issued) return; const o = tm[d] ||= [0,0,0]; o[0] += c.snow; o[1] += (c.P||0)/25.4; o[2]++; });
+      const fr = Object.entries(tm).filter(([d,o])=>o[2]>=22).sort().slice(0,5).map(([d,o])=>[d, Math.round(o[0]*10)/10, Math.round(o[1]*100)/100]);
+      if(fr.length) fetch(API+"/score", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({station:"resort:bachelor", issued, fc:fr})}).then(r=>{ if(r.ok) store.set("score-resort-bachelor", issued); }).catch(()=>{});
+    }
   }catch(e){}
 }
 const MNAME = id => MODELS.find(m=>m.id===id)?.name || id;
@@ -2485,6 +2493,16 @@ function renderSeason(){
     <div class="qleg" style="margin-top:4px"><span><i style="background:#7dd3fc"></i>This season</span><span><i style="background:#8b93a7"></i>Normal</span></div>
     <div class="muted" style="font-size:11.5px;margin-top:6px">${esc(Z.station.name)} snow gauge, ${fmtEl(Z.station.elevFt/FT)}. Normal is the 1991–2020 median.</div>`;
 }
+
+/* ---------- Data source status (from the daily health check) ---------- */
+async function openStatus(){
+  $("#tipTitle").textContent = "Data source status"; $("#tipBox").innerHTML = `<div class="loading"><div class="spin"></div>Checking every source…</div>`; openSheet("tipSheet");
+  try{ const r = await api("/health");
+    $("#tipBox").innerHTML = `<p class="muted" style="margin:0 0 10px">Checked ${new Date(r.at).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"})}</p>
+      <div class="list">${r.results.map(x=>`<div class="li" style="min-height:44px"><span class="nm"><b>${esc(x.name)}</b>${x.ok? "" : `<small style="color:#fca5a5">${esc(x.error||"failing")}</small>`}</span><span style="color:${x.ok? "#6ee7a0" : "#fca5a5"};font-weight:700">${x.ok? "OK" : "Down"}</span></div>`).join("")}</div>`;
+  }catch(e){ $("#tipBox").innerHTML = `<p>Couldn't run the check right now.</p>`; }
+}
+if(location.hash==="#status"){ history.replaceState(null, "", location.pathname + location.search + "#forecast"); setTimeout(openStatus, 1200); }
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
@@ -3047,7 +3065,7 @@ function evalAlerts(F){
 }
 function pushSpots(){ const L = S.favs.length? S.favs : (S.loc? [S.loc] : []); return L.slice(0,6).map(x=>({name:x.name, lat:x.lat, lon:x.lon, base:x.base, top:x.top})); }
 function pushRules(){ const all=[...S.favs, ...PRESETS]; return alertRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
-async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true)}})}); }catch(e){} }
+async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false)}})}); }catch(e){} }
 function renderAlerts(){
   const el = $("#view-alerts"); const spots = finderSpots(); const on = store.get("pushOn", false);
   if(!alertRules().length && !store.get("alertsSeeded")){ store.set("alerts", [{spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); store.set("alertsSeeded", 1); }
@@ -3081,7 +3099,7 @@ function renderAlerts(){
     if(on){ try{ const sub = await pushSub(); if(sub){ await post({action:"unsubscribe", endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); } }catch(e){} store.set("pushOn", false); toast("Lock-screen alerts off"); renderAlerts(); return; }
     try{ const perm = await Notification.requestPermission(); if(perm!=="granted"){ toast("Notifications are blocked in Settings"); return; }
       const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
-      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
+      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
     }catch(e){ toast("Couldn't turn on notifications"); } };
   document.querySelectorAll("#briefSeg button").forEach(b=>b.onclick=()=>{ store.set("brief", b.dataset.b); document.querySelectorAll("#briefSeg button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(b.dataset.b==="off"? "Morning brief off" : b.dataset.b==="daily"? "Morning brief every day" : "Morning brief on snow days"); });
   const wt = $("#watchTog"); if(wt) wt.onclick = () => { const on = !store.get("watch", true); store.set("watch", on); wt.classList.toggle("on", on); wt.setAttribute("aria-checked", on); pushSync(); toast(on? "Storm watch on" : "Storm watch off"); };
@@ -3095,7 +3113,10 @@ function renderTrack(){
   const st = (v.storms||[]).filter(x=>!x.ongoing), R = v.record, sn = v.station.name;
   const range = (a,b) => a===b? md(a) : `${md(a)}–${md(b)}`;
   const verdict = (f,o) => { if(o < 1) return {t:"—", c:"var(--mute)"}; const d = f-o; return Math.abs(d) <= Math.max(2, 0.25*o)? {t:"Close", c:"#6ee7a0"} : d>0? {t:"Too high", c:"#ffb35c"} : {t:"Too low", c:"#ffb35c"}; };
-  // 1. Snowline's own record
+  // 1. Snowline's own record (against the resort's own report first, where we have it)
+  const RR = v.resort, rr = RR?.record, rl = (RR?.storms||[]).find(x=>x.snowline!=null && !x.ongoing);
+  const resortHero = rr? `<div class="ac-hero"><div class="ac-big num">${rr.within}<small>/${rr.storms}</small></div><div><b>storms within 2″ of ${RR.name}'s report</b><br><span class="muted">Average miss ${fmtSnow(rr.avgErr)}${rl? ` · last storm: reported ${fmtSnow(rl.reported,0)}, Snowline said ${fmtSnow(rl.snowline,0)}` : ""}</span></div></div>`
+    : RR? `<div class="muted" style="margin:0 0 10px;font-size:13px">Snowline is also logging ${RR.name}'s daily snow report; grades against it start with the next storm.</div>` : "";
   const rec = R && R.storms? `<div class="ac-hero"><div class="ac-big num">${R.within}<small>/${R.storms}</small></div><div><b>storms within 2″</b> (or 25% on big ones)<br><span class="muted">Average miss ${fmtSnow(R.avgErr)}${R.bias? ` · ran ${R.bias>1.08? Math.round((R.bias-1)*100)+"% high" : R.bias<0.92? Math.round((1-R.bias)*100)+"% low" : "about even"}` : ""}</span></div></div>`
     : `<div class="ac-hero"><div class="ac-big">🎯</div><div><b>Snowline keeps score here</b><br><span class="muted">Every morning it saves its forecast for ${esc(sn)}, then grades it against what the gauge measures. The first grades come after the next storm.</span></div></div>`;
   // 2. who has been right, by how far ahead
@@ -3108,12 +3129,12 @@ function renderTrack(){
     const bar = (val, col, lab) => `<div class="tk-row"><span class="tk-l">${lab}</span><div class="tk-bar"><i style="width:${Math.max(3,val/maxV*100)}%;background:${col}"></i></div><b class="num">${fmtSnow(val,0)}</b></div>`;
     last = `<div class="grp">Last storm · ${range(L0.start,L0.end)}<span style="float:right;color:${vd.c};text-transform:none;letter-spacing:0">${vd.t}</span></div>
       ${isNum(s1)? bar(s1, "#38bdf8", "Snowline") : ""}${bar(L0.fcstSnow, "#5a6b85", "Models avg")}${bar(L0.obsSnow, "#e6edf7", "Measured")}
-      ${L0.obsSnow >= 2? `<button class="btn wide" style="margin:8px 0 4px" onclick="openRecapSheet()">📣 Share the storm recap</button>` : ""}
+      ${L0.obsSnow >= 2 || rl? `<button class="btn wide" style="margin:8px 0 4px" onclick="openRecapSheet()">📣 Share the storm recap</button>` : ""}
       <div class="muted" style="margin:2px 0 4px;font-size:13px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)}${L0.closest? ` · closest: <b style="color:var(--text)">${MNAME(L0.closest.id)}</b> (${fmtSnow(L0.closest.s,0)})` : ""}</div>
       ${st.length>1? `<div class="list" style="margin-top:6px">${st.slice(1,5).map(x=>{ const f = isNum(x.snowline?.s)? x.snowline.s : x.fcstSnow, w=verdict(f,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(f,0)} ${isNum(x.snowline?.s)? "Snowline" : "fcst"} · ${fmtSnow(x.obsSnow,0)} fell</span><b style="color:${w.c};margin-left:10px;font-size:12px;white-space:nowrap">${w.t}</b></div>`; }).join("")}</div>` : ""}`; }
-  el.dataset.sv = R && R.storms? `${R.within} of ${R.storms} storms within 2″` : v.status==="ok"? "Model scorecard" : "Last storms";
+  el.dataset.sv = rr? `${rr.within} of ${rr.storms} storms within 2″` : R && R.storms? `${R.within} of ${R.storms} storms within 2″` : v.status==="ok"? "Model scorecard" : "Last storms";
   el.innerHTML = `<div class="card-h"><h2>Forecast accuracy${tipI("accuracy")}</h2></div><div class="muted" style="margin:-4px 0 10px;font-size:13px">Graded at the ${esc(sn)} snow gauge, ${fmtEl(v.station.elevFt/FT)}</div>
-    ${rec}${leads}${last}
+    ${resortHero}${rr? "" : rec}${leads}${last}
     <div class="muted" style="margin-top:10px;font-size:12px">Snowline uses this: models that have been right here get more say, separately for tomorrow and the days after, and models that run wet or dry here are corrected${v.slrFix && v.slrFix!==1? `. Snow-to-water ratio tuned to this gauge (${v.slrFix>1? "+" : ""}${Math.round((v.slrFix-1)*100)}%)` : ""}.</div>`;
 }
 
@@ -3715,7 +3736,11 @@ addEventListener("online", ()=>{ updateOnline(); if(S.loc) load(S.loc); }); addE
 
 /* ---------- Storm recap card: what Snowline said vs what fell ---------- */
 function recapData(){
-  const v = extrasFor(S.loc).verify; const st = (v?.storms||[]).filter(x=>!x.ongoing)[0]; if(!st) return null;
+  const v = extrasFor(S.loc).verify; const rs = (v?.resort?.storms||[]).find(x=>x.snowline!=null && !x.ongoing);
+  if(rs){ const said = rs.snowline, miss = said - rs.reported, close = Math.abs(miss) <= Math.max(2, .25*rs.reported), nailed = Math.abs(miss) <= Math.max(1, .1*rs.reported);
+    return {st:{obsSnow: rs.reported, start: rs.start, end: rs.end}, said, who:"Snowline said", fell:`${v.resort.name} reported`, verdict: nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "IT OVERDELIVERED" : "IT CAME UP SHORT",
+      nailed, close, range: rs.start===rs.end? `${dow(rs.start)} ${md(rs.start)}` : `${dow(rs.start)}–${dow(rs.end)} ${md(rs.start)}`, station: null, source: `${v.resort.name}'s own snow report`, record: v.resort.record}; }
+  const st = (v?.storms||[]).filter(x=>!x.ongoing)[0]; if(!st) return null;
   const said = isNum(st.snowline?.s)? st.snowline.s : st.fcstSnow, who = isNum(st.snowline?.s)? "Snowline said" : "Forecast said";
   const miss = said - st.obsSnow, close = Math.abs(miss) <= Math.max(2, .25*st.obsSnow), nailed = Math.abs(miss) <= Math.max(1, .1*st.obsSnow);
   const verdict = nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "IT OVERDELIVERED" : "IT CAME UP SHORT";
@@ -3737,11 +3762,11 @@ async function drawRecapCard(fmt="post"){
   // two big numbers side by side
   const col = (x, label, val, c1, c2) => { g.fillStyle="#8fa1bf"; g.font="600 34px Inter, sans-serif"; g.fillText(label, x, top+500);
     const gr=g.createLinearGradient(0,top+520,0,top+760); gr.addColorStop(0,c1); gr.addColorStop(1,c2); g.fillStyle=gr; g.font="800 230px 'Space Grotesk', Inter, sans-serif"; g.fillText(fmtSnow(val,0).replace('"',"″"), x-8, top+740, 470); };
-  col(72, R.who, R.said, "#e0f2fe", "#38bdf8"); col(580, "What fell", R.st.obsSnow, "#ffffff", good? "#6ee7b7" : "#c4b5fd");
+  col(72, R.who, R.said, "#e0f2fe", "#38bdf8"); col(580, R.fell || "What fell", R.st.obsSnow, "#ffffff", good? "#6ee7b7" : "#c4b5fd");
   // bars
   const mx = Math.max(R.said, R.st.obsSnow, 1), by = top+900, bh = 46, bwMax = 936;
   [[R.said,"#38bdf8"],[R.st.obsSnow, good? "#6ee7b7" : "#a78bfa"]].forEach(([v,c],i)=>{ g.fillStyle="#1b2438"; g.beginPath(); g.roundRect(72, by+i*76, bwMax, bh, 23); g.fill(); g.fillStyle=c; g.beginPath(); g.roundRect(72, by+i*76, Math.max(46, v/mx*bwMax), bh, 23); g.fill(); });
-  g.fillStyle="#9fb0cc"; g.font="500 30px Inter, sans-serif"; g.fillText(`Measured at the ${R.station} snow gauge${isNum(R.st.obsWater)? ` · ${R.st.obsWater.toFixed(2)}″ of water` : ""}`, 72, by+200, 940);
+  g.fillStyle="#9fb0cc"; g.font="500 30px Inter, sans-serif"; g.fillText(R.source? `As reported in ${R.source}` : `Measured at the ${R.station} snow gauge${isNum(R.st.obsWater)? ` · ${R.st.obsWater.toFixed(2)}″ of water` : ""}`, 72, by+200, 940);
   if(R.record && R.record.storms>1){ g.fillStyle="#fff"; g.font="700 40px 'Space Grotesk', Inter, sans-serif"; g.fillText(`${R.record.within} of ${R.record.storms} storms within 2″ this season`, 72, by+280, 940); }
   g.fillStyle="#6b7a94"; g.font="500 26px Inter, sans-serif"; g.fillText(`Free snow forecasts · ${location.host}`, 72, H-(fmt==="story"? 150 : 52));
   return cv;
@@ -4062,6 +4087,9 @@ setTimeout(()=>{ checkSharedList(); syncPull(); }, 600);
 if(!store.get("welcomed") && !linked && !last && !S.favs.length) setTimeout(openWelcome, 700); else if(!store.get("welcomed")) store.set("welcomed", 1);
 $("#setInstall").onclick = () => { closeSheet("setSheet"); openInstall(); };
 $("#setWelcome").onclick = () => { closeSheet("setSheet"); openWelcome(); };
+$("#setStatus").onclick = () => { closeSheet("setSheet"); openStatus(); };
+{ const ht = $("#healthTog"); const paint = () => { const on = store.get("health", false); ht.classList.toggle("on", on); ht.setAttribute("aria-checked", on); }; paint();
+  ht.onclick = () => { if(!store.get("pushOn")){ toast("Turn on lock-screen notifications in Alerts first"); return; } store.set("health", !store.get("health", false)); paint(); pushSync(); toast(store.get("health")? "Health notices on" : "Health notices off"); }; }
 </script>
 </body>
 </html>

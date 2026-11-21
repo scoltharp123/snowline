@@ -11,7 +11,7 @@ export default async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" }, { status: 405 });
   let b; try { b = await req.json(); } catch (e) { return json({ error: "bad json" }, { status: 400 }); }
   const station = String(b?.station || ""), issued = b?.issued, fc = b?.fc;
-  if (!/^\d{2,6}:[A-Z]{2}:SNTL$/.test(station) || !isDate(issued) || !Array.isArray(fc) || !fc.length || fc.length > 7) return json({ error: "bad request" }, { status: 400 });
+  if (!(/^\d{2,6}:[A-Z]{2}:SNTL$/.test(station) || station === "resort:bachelor") || !isDate(issued) || !Array.isArray(fc) || !fc.length || fc.length > 7) return json({ error: "bad request" }, { status: 400 });
   // only today's forecast (allowing for time zones)
   const ms = Date.parse(issued + "T12:00:00Z"); if (!isFinite(ms) || Math.abs(Date.now() - ms) > 36 * 3600e3) return json({ error: "stale" }, { status: 400 });
   const day = {};

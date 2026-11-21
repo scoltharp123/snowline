@@ -154,8 +154,29 @@ export default async (req) => {
       if (ratios.length >= 3) { const med = ratios[Math.floor(ratios.length / 2)]; slrFix = r2(clamp(1 + (med - 1) * Math.min(1, ratios.length / 6), 0.75, 1.3)); }
     }
 
+    // Mt. Bachelor: also grade against the resort's own snow report (what skiers see)
+    let resort = null;
+    if (Math.hypot(lat - 43.979, (lon + 121.688) * 0.72) < 0.15) {
+      try {
+        const sc = store("snowline-score");
+        const [log, rf] = await Promise.all([sc.get("resort-bachelor", { type: "json" }), sc.get("fc-resort:bachelor", { type: "json" })]);
+        if (log) {
+          const ds = Object.keys(log).sort(), rs = []; let c = null;
+          for (const d of ds) { const v = log[d].h24 ?? log[d].overnight ?? 0; if (v >= 1) { if (!c || minus(d, 1) !== c.days.at(-1)) { c && rs.push(c); c = { days: [] }; } c.days.push(d); } else if (c) { rs.push(c); c = null; } }
+          if (c) { c.ongoing = minus(today, 0) === c.days.at(-1); rs.push(c); }
+          // a report on day D covers snow since the morning before, so compare it with Snowline's forecast for D-1, made the day before that
+          const stormsR = rs.map(x => { const rep = x.days.reduce((a, d) => a + (log[d].h24 ?? log[d].overnight ?? 0), 0); let s = 0, ok = !!rf;
+              for (const d of x.days) { const v = rf?.[minus(d, 2)]?.[minus(d, 1)]; if (!v) { ok = false; break; } s += v[0]; }
+              return { start: minus(x.days[0], 1), end: minus(x.days.at(-1), 1), reported: r1(rep), snowline: ok ? r1(s) : null, ongoing: !!x.ongoing }; })
+            .filter(x => x.reported >= 2).reverse();
+          const g = stormsR.filter(x => x.snowline != null && !x.ongoing);
+          const rec = g.length ? { storms: g.length, within: g.filter(x => Math.abs(x.snowline - x.reported) <= Math.max(2, 0.25 * x.reported)).length, avgErr: r1(g.reduce((a, x) => a + Math.abs(x.snowline - x.reported), 0) / g.length) } : null;
+          resort = { name: "Mt. Bachelor", days: ds.length, since: ds[0] || null, storms: stormsR.slice(0, 6), record: rec };
+        }
+      } catch (e) {}
+    }
     const out = {
-      status, basis, station: { id: st.id, name: st.name, km: Math.round(st.km), elevFt: st.elevFt }, days: days.length, wetDays: wetUsed,
+      status, basis, resort, station: { id: st.id, name: st.name, km: Math.round(st.km), elevFt: st.elevFt }, days: days.length, wetDays: wetUsed,
       scores: K.scores[1] || {}, scoresByLead: K.scores, weights: K.wLead[1] || {}, wLead: K.wLead, corr: K.corr, best: K.best[1] || null, bestByLead: K.best,
       storms: all.slice(0, 6), stormCount: all.length, record, slrFix, updated: new Date().toISOString(),
     };

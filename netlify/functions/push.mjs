@@ -14,6 +14,7 @@ export default async (req) => {
       created: Date.now() };
     try { const old = await s.get(subKey(b.sub.endpoint), { type: "json" }); if (old?.watched) rec.watched = old.watched; } catch (e) {}   // don't re-announce storms already sent
     rec.prefs.watch = b.prefs?.watch !== false;
+    rec.prefs.health = b.prefs?.health === true;
     await s.setJSON(subKey(b.sub.endpoint), rec);
     return json({ ok: true });
   }

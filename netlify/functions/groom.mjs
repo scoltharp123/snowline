@@ -1,6 +1,7 @@
 // GET /api/groom?spot=<name> → grooming and trail status published by the area itself.
 // Mt. Bachelor (alpine and Nordic): its own public mountain-report feed (the same one its website and webcams use).
 // Other Nordic areas: links only. Nordic Pulse's terms forbid collecting its data, so Snowline never fetches it.
+import { mergeBachelorLog } from "../lib/resort.mjs";
 import { json } from "../lib/shared.mjs";
 
 const BACH = "https://api.mtbachelor.com/api/v1/dor/drupal";
@@ -31,6 +32,7 @@ export default async (req) => {
     const nordic = sum(trails.filter((t) => t.type === "cross_country_trail"));
     const alpine = sum(trails.filter((t) => t.type === "alpine_trail"));
     const r = Array.isArray(reports) ? reports[0] : null;
+    try { await mergeBachelorLog(reports); } catch (e) {}   // keep the report history for grading
     const report = r ? { date: r.date, overnight: r.overnight_amount, h24: r.computed?.["24_hour"], h48: r.computed?.["48_hour"], d7: r.computed?.["7_day"], season: r.computed?.total, base: r.base_depth, unit: r.unit_of_measurement || "in",
       text: String(r.report || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 700) } : null;
     return json({ spot, source: "Mt. Bachelor", link: spot.includes("Nordic") ? "https://www.mtbachelor.com/nordic/conditions-grooming-report/" : "https://www.mtbachelor.com/the-mountain/lift-trail-report/", nordic, alpine, report, at: Date.now() }, { cache: 600 });
