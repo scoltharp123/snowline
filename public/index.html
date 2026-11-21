@@ -492,6 +492,19 @@ details.more-today .kv{margin-top:8px}
 .trust > span:first-child{font-size:18px}.trust b{display:block;font-size:14px}.trust small{color:var(--mute);font-size:12px}
 .ac-hero{display:flex;gap:14px;align-items:center;margin:2px 0 6px}.ac-big{font-size:40px;font-weight:800;color:#6ee7a0;line-height:1;min-width:64px;text-align:center}.ac-big small{font-size:18px;color:var(--mute);font-weight:600}
 .ac-lr{display:grid;grid-template-columns:92px auto 1fr;gap:10px;align-items:baseline;padding:7px 0;border-top:1px solid var(--line);font-size:14px}.ac-lr .muted{font-size:12px;text-align:right}
+
+/* Snowline Forecaster */
+.fx-stats{display:flex;align-items:flex-end;gap:22px;margin:2px 0 14px}
+.fx-s b{display:block;font-family:"Space Grotesk",Inter,system-ui,sans-serif;font-size:30px;font-weight:700;line-height:1;color:#e6edf7}
+.fx-s:first-child b{color:#7cc4ff}.fx-s small{display:block;color:var(--mute);font-size:12.5px;margin-top:5px}
+.fx-c{margin-left:auto;align-self:flex-start}
+.fx-k{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 8px}
+.fx-days{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px 4px;scroll-snap-type:x proximity}.fx-days::-webkit-scrollbar{display:none}
+.fx-d{flex:0 0 78px;scroll-snap-align:start;background:var(--card2);border:1px solid var(--line);border-top:3px solid var(--q);border-radius:12px;padding:8px 6px 9px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px}
+.fx-d b{font-size:13px}.fx-i{font-size:22px;line-height:1.2}.fx-d small{font-size:11.5px;line-height:1.25;color:#c9d4e3}
+.disc.clamp .fx-more{display:none}.fx-more{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.disc.clamp p:nth-child(n+2), .disc.clamp p:nth-child(n+3){display:revert}
+#discMore{margin-top:10px;font-weight:600}
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -1049,7 +1062,7 @@ function render(){
   <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div></section>
   <section class="card"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
-    <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read more</button></section>
+    <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read the full forecast</button></section>
   <div class="more-h">More for this spot</div>
   ${grp("g-mtn", "On the mountain", `${isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
     <section class="card" id="reportCard"></section><section class="card" id="camCard"></section>
@@ -1065,7 +1078,7 @@ function render(){
   <div class="muted" style="text-align:center;margin:18px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
-  $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read more" : "Show less"; };
+  $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read the full forecast" : "Show less"; };
   $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
   $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
@@ -1301,8 +1314,9 @@ function renderDisc(C, e, winTot, lo, hi, modelTots, SIM){
   const daily = C.consDays.map(d=>d.day+d.night);
   const parts = [];
   if(SIM){ const keys = C.days.slice(0,Math.min(N,7)).map(d=>[at(C,SIM,d,10)?.sim, d]).filter(x=>x[0]);
-    const seq = keys.map(([s,d])=>`${dow(d)} ${s.icon} ${s.label.toLowerCase()}`).join(" → ");
-    if(seq) parts.push(`<p><b>How it'll ski (${MODE_NAME[S.mode].toLowerCase()}):</b> ${seq}. Surfaces are modeled hour by hour from new snow, wind, sun, melt-freeze and rain at ${fmtEl(e)}. ${byMode("Shaded north aspects will stay colder and drier than the model shows, and sunny south aspects will soften sooner.", "Open, sunny stretches will soften sooner than shaded trail in the trees.")}</p>`); }
+    var dayChips = keys.map(([s,d])=>{ const x = daySummary(C,SIM,d), sc = x? x.best.avg : null;
+      return `<div class="fx-d" style="--q:${scoreColor(sc)}"><b>${d===todayStr()? "Today" : dow(d)}</b><span class="fx-i">${s.icon}</span><small>${s.label}</small></div>`; }).join("");
+    if(keys.length) parts.push(`<p><b>How it'll ski:</b> surfaces are modeled hour by hour from new snow, wind, sun, melt-freeze and rain at ${fmtEl(e)}. ${byMode("Shaded north aspects will stay colder and drier than the model shows, and sunny south aspects will soften sooner.", "Open, sunny stretches will soften sooner than shaded trail in the trees.")}</p>`); }
   // storm detection
   const storms = []; let cur=null;
   for(let k=0;k<daily.length;k++){ if(daily[k]>=1){ if(!cur) cur={s:k,e:k,tot:0}; cur.e=k; cur.tot+=daily[k]; } else if(cur){ storms.push(cur); cur=null; } }
@@ -1344,7 +1358,17 @@ function renderDisc(C, e, winTot, lo, hi, modelTots, SIM){
   if(winTot < 0.5){ const nx = storms.find(s=>s.s>=N); head = nx? `Dry for now; snow returns around ${dow(C.days[nx.s])}` : `Dry stretch: little snow in the next ${N} days`; }
   else { const s0 = storms[0]; head = s0? `${fmtSnow(s0.tot)} ${s0.e>s0.s? `${dow(C.days[s0.s])}–${dow(C.days[s0.e])}` : dow(C.days[s0.s])}, ${fmtSnow(winTot)} over ${N} days` : `${fmtSnow(winTot)} over the next ${N} days`; }
   if(S.mode==="bc") parts.push(`<p class="bc-alert">⚠️ This write-up describes weather only. It does not assess avalanche danger or recommend where or whether to go. Read the avalanche center's forecast.</p>`);
-  $("#disc").innerHTML = `<p class="disc-h">${head}</p>` + parts.join("");
+  const s0 = storms[0], next = winTot < 0.5? storms.find(s=>s.s>=N) : s0;
+  const stat = (v, l) => `<div class="fx-s"><b class="num">${v}</b><small>${l}</small></div>`;
+  const stats = winTot < 0.5
+    ? stat("Dry", `next ${N} days`) + (next? stat(fmtSnow(next.tot,0), `${dow(C.days[next.s])} ${md(C.days[next.s])}`) : "")
+    : (()=>{ const big = daily.slice(0,N).reduce((b,v,k)=>v>b.v? {v,k} : b, {v:0,k:0});
+        const first = next? stat(fmtSnow(next.tot, next.tot<10?1:0), next.e>next.s? `${dow(C.days[next.s])}–${dow(C.days[next.e])}` : dow(C.days[next.s])) : "";
+        const same = next && Math.abs(next.tot - winTot) < 0.3;   // one storm is the whole window: show its biggest day instead of repeating the total
+        return first + (same? (next.e>next.s? stat(fmtSnow(big.v, big.v<10?1:0), `biggest day · ${dow(C.days[big.k])}`) : "") : stat(fmtSnow(winTot, winTot<10?1:0), `next ${N} days`)); })();
+  $("#disc").innerHTML = `<div class="fx-stats">${stats}<span class="badge b-${conf.lvl} fx-c">${conf.label}</span></div>
+    ${typeof dayChips!=="undefined" && dayChips? `<div class="fx-k">How it'll ski · ${MODE_NAME[S.mode]}</div><div class="fx-days">${dayChips}</div>` : ""}
+    <div class="fx-more">${parts.join("")}</div>`;
 }
 
 const chartBase = () => ({
