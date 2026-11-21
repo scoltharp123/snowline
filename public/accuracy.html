@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How accurate is Snowline? · Central Oregon snow forecast scorecard</title>
+<meta name="description" content="Snowline grades its own snow forecasts against real snow gauges and Mt. Bachelor's snow report, storm by storm. Free, no ads, no account.">
+<meta property="og:title" content="How accurate is Snowline?">
+<meta property="og:description" content="Snow forecasts graded against what actually fell, storm by storm, across Central Oregon.">
+<meta property="og:image" content="/og-image.png">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--mute:#8e8e93;--line:#1f1f22;--ice:#7dd3fc;--card:#111113}
+*{box-sizing:border-box}html,body{margin:0;background:#000;color:#f2f2f7;font:15px/1.5 Inter,system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 22px) 16px 48px}
+a{color:var(--ice)}h1,h2{font-family:"Space Grotesk",Inter,sans-serif;letter-spacing:-.4px;margin:0}
+h1{font-size:30px;line-height:1.15}.lead{color:#c9d4e3;margin:10px 0 22px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;font-weight:700;margin-bottom:22px}.brand img{width:34px;height:34px;border-radius:9px}
+.hero{background:var(--card);border-radius:20px;padding:18px;margin-bottom:14px;display:flex;gap:18px;align-items:center}
+.big{font-family:"Space Grotesk",Inter,sans-serif;font-size:48px;font-weight:700;color:#6ee7a0;line-height:1}.big small{font-size:20px;color:var(--mute)}
+.card{background:var(--card);border-radius:20px;padding:16px;margin-bottom:12px}
+.card h2{font-size:18px}.sub{color:var(--mute);font-size:13px;margin:2px 0 10px}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}.row:first-of-type{border-top:0}
+.row .r{text-align:right;font-weight:600}.row small{grid-column:1/-1;color:var(--mute);font-size:12.5px}
+.pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 8px}.ok{background:#12351f;color:#6ee7a0}.hi{background:#3b2a10;color:#fbbf24}.lo{background:#2a1f45;color:#c4b5fd}
+.muted{color:var(--mute);font-size:13px}.loading{color:var(--mute);padding:20px 0;text-align:center}
+.cta{display:block;text-align:center;background:#3b82f6;color:#fff;text-decoration:none;font-weight:600;border-radius:14px;padding:13px;margin:20px 0 10px}
+.how p{margin:0 0 10px;color:#c9d4e3;font-size:14px}
+</style>
+</head>
+<body><main>
+<a class="brand" href="/"><img src="/icon-192.png" alt="">Snowline</a>
+<h1>How accurate is Snowline?</h1>
+<p class="lead">Every morning Snowline saves its own snow forecast. After each storm it compares that forecast with what actually fell, using government snow gauges and Mt. Bachelor's own snow report. Here's the season so far.</p>
+<div id="hero"></div>
+<div id="spots"><div class="loading">Grading every spot…</div></div>
+<a class="cta" href="/">Open the forecast</a>
+<div class="card how"><h2>How it's graded</h2><div class="sub">Same rules for every spot</div>
+<p><b>The forecast:</b> the one Snowline showed the morning before each snow day, saved automatically and never edited afterward.</p>
+<p><b>What fell:</b> the nearest SNOTEL snow gauge (an automated U.S. government station that measures new snow and the water in it), and for Mt. Bachelor, the resort's daily 24-hour snow report.</p>
+<p><b>A storm counts as close</b> when Snowline was within 2″, or within 25% on storms over 8″. Measured depth runs a bit low because new snow settles, so the water amount is used when picking the closest weather model.</p>
+<p class="muted">Snowline is free forever, with no ads and no account. Snow data from USDA NRCS SNOTEL and Mt. Bachelor; weather models via Open-Meteo.</p></div>
+</main>
+<script>
+const SPOTS = [
+  {name:"Mt. Bachelor", lat:43.979, lon:-121.688},
+  {name:"Mt. Bachelor Nordic Center", lat:43.988, lon:-121.676},
+  {name:"Meissner Nordic", lat:44.006, lon:-121.548},
+  {name:"Tumalo Mountain", lat:44.0054, lon:-121.6427},
+  {name:"Hoodoo", lat:44.408, lon:-121.871},
+  {name:"Willamette Pass", lat:43.597, lon:-122.034},
+];
+const NAMES = {ecmwf:"ECMWF", aifs:"ECMWF AI", gfs:"GFS", hrrr:"HRRR", nbm:"National Blend", gem:"Canada GEM", icon:"Germany ICON", ukmo:"UK Met Office", jma:"Japan JMA"};
+const inch = v => v==null? "—" : (v < 10 ? Math.round(v*10)/10 : Math.round(v)) + "″";
+const md = d => new Date(d+"T12:00:00Z").toLocaleDateString([], {month:"short", day:"numeric", timeZone:"UTC"});
+const range = (a,b) => a===b? md(a) : `${md(a)}–${md(b)}`;
+const pill = (f,o) => { const d=f-o; return Math.abs(d) <= Math.max(2, .25*o)? `<span class="pill ok">Close</span>` : d>0? `<span class="pill hi">High</span>` : `<span class="pill lo">Low</span>`; };
+(async () => {
+  const res = await Promise.all(SPOTS.map(s => fetch(`/api/verify?lat=${s.lat}&lon=${s.lon}`).then(r=>r.json()).then(v=>({s, v})).catch(()=>({s, v:null}))));
+  // spots that share a gauge are graded together
+  const byStation = new Map();
+  res.forEach(({s,v}) => { if(!v || !v.station) return; const k = v.station.id; if(!byStation.has(k)) byStation.set(k, {v, names:[]}); byStation.get(k).names.push(s.name); });
+  let within = 0, storms = 0;
+  const cards = [...byStation.values()].map(({v, names}) => {
+    const R = v.record, RR = v.resort?.record; if(R){ within += R.within; storms += R.storms; } if(RR){ within += RR.within; storms += RR.storms; }
+    const graded = (v.storms||[]).filter(x=>x.snowline && !x.ongoing).slice(0,4), rs = (v.resort?.storms||[]).filter(x=>x.snowline!=null && !x.ongoing).slice(0,4);
+    const best = v.bestByLead || {};
+    return `<div class="card"><h2>${names.join(" · ")}</h2><div class="sub">${v.station.name} snow gauge, ${Math.round(v.station.elevFt).toLocaleString()} ft</div>
+      ${RR? `<div class="row"><span>Against Mt. Bachelor's snow report</span><span class="r">${RR.within} of ${RR.storms} close</span><small>Average miss ${inch(RR.avgErr)}</small></div>` : ""}
+      ${rs.map(x=>`<div class="row"><span>${range(x.start,x.end)} · resort report</span><span class="r">${pill(x.snowline,x.reported)}</span><small>Snowline said ${inch(x.snowline)} · Bachelor reported ${inch(x.reported)}</small></div>`).join("")}
+      ${R? `<div class="row"><span>Against the snow gauge</span><span class="r">${R.within} of ${R.storms} close</span><small>Average miss ${inch(R.avgErr)}</small></div>` : ""}
+      ${graded.map(x=>`<div class="row"><span>${range(x.start,x.end)}</span><span class="r">${pill(x.snowline.s,x.obsSnow)}</span><small>Snowline said ${inch(x.snowline.s)} · ${inch(x.obsSnow)} fell</small></div>`).join("")}
+      ${!R && !RR? `<div class="row"><span>No graded storms yet</span><span class="r muted">—</span><small>Snowline is saving its forecasts every morning; grades appear after the next storm.</small></div>` : ""}
+      ${best[1]? `<div class="row"><span>Closest models here</span><span class="r">${NAMES[best[1]]||best[1]}</span><small>Tomorrow: ${NAMES[best[1]]||best[1]}${best[3]? ` · 3 days out: ${NAMES[best[3]]||best[3]}` : ""}${best[5]? ` · 5+ days: ${NAMES[best[5]]||best[5]}` : ""}${v.basis==="last-season"? " (based on last winter)" : ""}</small></div>` : ""}</div>`;
+  });
+  document.getElementById("spots").innerHTML = cards.join("") || `<div class="card">Couldn't load the scorecard right now. Try again in a minute.</div>`;
+  document.getElementById("hero").innerHTML = storms
+    ? `<div class="hero"><div class="big">${within}<small>/${storms}</small></div><div><b>storms forecast within 2″ this season</b><br><span class="muted">Across Central Oregon, graded against what actually fell.</span></div></div>`
+    : `<div class="hero"><div class="big">🎯</div><div><b>The season's first grades are coming</b><br><span class="muted">Snowline saves its forecast every morning and grades it after each storm. Check back after the next snowfall.</span></div></div>`;
+})();
+</script>
+</body></html>

@@ -575,6 +575,15 @@ h1,.lt b,#ltName{letter-spacing:-.5px}
 #ltSub{cursor:pointer}#ltSub u{text-decoration:none;color:#c9d4e3;border-bottom:1px dashed #3a4660}
 .al-card{padding-top:6px}.al-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid #1f1f22}.al-row:last-of-type{border-bottom:0}.al-row b{font-size:15px}.al-row .muted{margin-top:2px;line-height:1.35}
 .al-note{padding:12px 0;color:var(--mute);font-size:13.5px;border-bottom:1px solid #1f1f22}
+.verdict{display:flex;align-items:center;gap:10px;background:#111113;border-radius:16px;padding:13px 14px;margin:0 0 10px;font-size:15px;line-height:1.35}
+.verdict i{flex:0 0 10px;height:10px;border-radius:50%;background:var(--q,#6ee7a0);box-shadow:0 0 0 4px color-mix(in srgb,var(--q,#6ee7a0) 22%,transparent)}
+.verdict > span:not(.sc){flex:1;min-width:0}.verdict .sc{flex:0 0 auto}.verdict.v-go{--q:#6ee7a0}.verdict.v-ok{--q:#7dd3fc}.verdict.v-meh{--q:#fde68a}.verdict.v-skip{--q:#fca5a5}
+.wk-r{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;border-top:1px solid #1f1f22;padding:11px 0;text-align:left;color:inherit}.wk-r:first-of-type{border-top:0}
+.wk-n{flex:0 0 26px;height:26px;border-radius:50%;background:#1c1c1f;color:var(--mute);font-weight:700;font-size:13px;display:grid;place-items:center}.wk-n.top{background:var(--ice2);color:#04121f}
+.wk-t{flex:1;min-width:0}.wk-t b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wk-t small{color:var(--mute);font-size:12.5px}
+.fb-link{display:block;margin:10px auto 0;font-size:12.5px;color:var(--mute)}
+.fb-k{display:flex;flex-wrap:wrap;gap:8px}.fb-k button{background:#1c1c1f;border:1px solid #2a2a2e;border-radius:999px;padding:8px 13px;font-size:14px;color:var(--text)}.fb-k button.on{background:var(--ice2);border-color:var(--ice2);color:#04121f;font-weight:600}
+.promise{text-align:center;margin:26px 8px 6px;display:flex;flex-direction:column;gap:3px;align-items:center}.promise b{font-size:14px;color:#e6edf7}.promise span{font-size:12.5px;color:var(--mute)}.promise a{font-size:13px;margin-top:6px;font-weight:600;text-decoration:none}
 /* ================= Clean pass: fewer boxes, more air, one clear hierarchy ================= */
 main{padding-top:4px}
 .card{background:#111113;border:0;border-radius:20px;padding:16px;margin:0 0 14px}
@@ -618,7 +627,7 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
   <div id="view-forecast"><div class="lt"><button id="ltBtn" aria-label="Change location"><span id="ltName">Snowline</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="lt-sub" id="ltSub"></div><div id="ltStatus"></div></div>
 <div class="ctrl" id="ctrl">
   <div class="seg" id="modeSeg"><button data-m="alpine">Alpine</button><button data-m="skate">Skate</button><button data-m="classic">Classic</button><button data-m="bc">Tour</button></div>
-  <div class="seg" id="bandSeg" hidden><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
+  <div class="seg" id="bandSeg" style="display:none"><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
 </div>
 <nav class="jtabs" id="jtabs" aria-label="Jump to"><button data-j="snowCard" class="on">Snow</button><button data-j="nowCard">Now</button><button data-j="hourCard">Hourly</button><button data-j="dailyCard">Daily</button><button data-j="fxCard">Forecast</button><button data-j="camCard" data-g="g-mtn">Cams</button><button data-j="moreH">More</button></nav>
   <div id="alertBanner"></div><div id="app"><div class="skel"></div><div class="skel" style="height:120px"></div><div class="skel" style="height:240px"></div></div></div>
@@ -1113,7 +1122,18 @@ function render(){
   else { const corn = days7.filter(d=>at(C,SIM,d,12)?.sim?.key==="corn"); if(corn.length) callouts.push(`<div class="callout">🌽 <b>Corn cycle ${corn.map(dow).join(", ")}:</b> start on east-facing slopes around 10am and follow the sun.</div>`); }
   const sums = days7.map(d=>daySummary(C,SIM,d));
   let bestK = -1; sums.forEach((x,k)=>{ if(x && (bestK<0 || x.best.avg > sums[bestK].best.avg)) bestK=k; });
-  if(bestK>=0 && callouts.length<2 && S.mode!=="bc"){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout quiet best"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="bt"><b>Best day: ${dayLabel(days7[bestK])}</b> · ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div>`); }
+  // The verdict: is it worth going today (tomorrow, late in the day)? Not shown in Tour mode.
+  let verdict = "", vDay = null;
+  if(S.mode!=="bc"){
+    const hrNow = +C.time[C.nowIdx].slice(11,13), vk = hrNow >= 15 || !(sums[0] && sums[0].best) ? 1 : 0, x = sums[vk], d = days7[vk]; vDay = d;
+    if(x){ const sc = x.best.avg, when = `${hl(x.best.from)}–${hl(x.best.to)}`, lab = x.best.sim.label.toLowerCase(), who = vk? "Tomorrow" : "Today";
+      let rain = 0, gust = 0; for(let h=8; h<=16; h++){ const q = at(C,SIM,d,h); if(q?.c){ if(q.c.P>0.2 && (q.c.frac??1)<0.5) rain += q.c.P; gust = Math.max(gust, q.c.G||0); } }
+      const wet = rain >= 2 && sc < 6.5, gale = gust >= 72 && sc < 6.5;
+      const [lvl, head] = wet? ["skip", `Skip it ${who.toLowerCase()}`] : gale? ["meh", `Windy ${who.toLowerCase()}`] : sc>=8? ["go", `Go! ${who} is epic`] : sc>=6.5? ["go", `Worth it ${who.toLowerCase()}`] : sc>=5? ["ok", `Good day ${who.toLowerCase()}`] : sc>=3.5? ["meh", `Fair ${who.toLowerCase()}`] : ["skip", `Skip it ${who.toLowerCase()}`];
+      const why = wet? `rain at ${fmtEl(e)}` : gale? `gusts to ${fmtWind(gust)} ${windU()}, ${lab}` : `${lab}, best ${when}`;
+      verdict = `<div class="verdict v-${lvl}"><i></i><span><b>${head}:</b> ${why}</span>${scoreChip(sc)}</div>`; }
+  }
+  if(bestK>=0 && callouts.length<2 && S.mode!=="bc" && days7[bestK]!==vDay){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout quiet best"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="bt"><b>Best day: ${dayLabel(days7[bestK])}</b> · ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div>`); }
   S.bestDay = bestK>=0 ? days7[bestK] : null;
 
   const quality = C.days.map(d=>{ const x = daySummary(C,SIM,d); return x? x.best.avg : null; });
@@ -1127,12 +1147,13 @@ function render(){
   $("#app").innerHTML = `
   ${a2hsHTML()}${modelNote}
   <div id="nwsAlerts"></div>
-  ${callouts.slice(0,2).join("")}
+  ${verdict}${callouts.slice(0,2).join("")}
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : `<button class="badge b-${conf.lvl} tipbadge" data-tip="conf" aria-label="What confidence means">${conf.label} ⓘ</button>`}</div>
     ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
+    <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
   <section class="card" id="nowCard"></section>
   ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
@@ -1153,13 +1174,15 @@ function render(){
     ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
   ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
-  <div class="muted" style="text-align:center;margin:18px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
+  <div class="promise"><b>Free forever · no ads · no account</b><span>Your favorites and settings stay on your phone.</span><a href="/accuracy">How accurate is Snowline? ›</a></div>
+  <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
   $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read the full forecast" : "Show less"; };
   $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
   const openHourly = () => { openSheet("dhSheet"); renderSection("hourly"); };
   $("#toDetailed").onclick = openHourly; $("#hourStrip").onclick = e => { if(!e.target.closest("button")) openHourly(); };
+  $("#fbOpen").onclick = openFeedback;
   $("#lrOpen").onclick = () => { openSheet("lrSheet"); renderSection("outlook"); };
   const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
@@ -1372,11 +1395,13 @@ async function renderFavs(force){
   el.innerHTML = `<div class="vh"><h1>Favorites</h1>${S.favs.length? `<span class="row" style="gap:14px;flex-wrap:nowrap"><button class="link" id="favShare">Share</button><button class="link" id="favEdit">${S.favEdit?"Done":"Edit"}</button></span>`:""}</div>
     ${a2hsHTML()}
     ${S.favs.length? "" : `<div class="callout">Tap ☆ on any forecast to add it here. Until then, here are some spots near Bend.</div>`}
+    ${weekendHTML(list, F.rows)}
     <div class="seg scroll fav-views" id="favViews">${FAV_VIEWS.map(([k,l])=>`<button data-fv="${k}" class="${(S.favView||"snow")===k?"on":""}">${l}</button>`).join("")}</div>
     ${list.map(sp=>{ const r = byName.get(sp.name); if(!r) return "";
       return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${sp.name}</b><div class="muted">${Math.round(sp.top).toLocaleString()} ft summit · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
         ${(S.favView && S.favView!=="snow" && favBodyHTML(S.favView, sp, r)) || snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</div>`; }).join("")}
     <div class="muted" style="text-align:center;margin:10px 0">Summit forecasts · Open-Meteo best-match blend through Snowline's snow model</div>`;
+  el.querySelectorAll("#wkSeg button").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); S.wkDay = b.dataset.d; renderFavs(); });
   el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ if(S.favEdit) return; const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
   const fe=$("#favEdit"); if(fe) fe.onclick = () => { S.favEdit=!S.favEdit; renderFavs(); };
   const fs=$("#favShare"); if(fs) fs.onclick = () => shareFavs();
@@ -1841,8 +1866,9 @@ async function loadFinder(force){
     const peak = Object.entries(daily).reduce((b,[d,v])=>v>b.v?{d,v}:b,{d:null,v:0});
     const d0 = periodOf(H.time[i0])[0]; const dates15 = Array.from({length:15},(_,k)=>dateAdd(d0,k)); const days15 = dates15.map(d=>daily[d]||0);
     let last24 = 0; for(let k=Math.max(0,i0-24); k<i0; k++){ const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, ref); if(v) last24+=v.snow; }
-    const dnMap = {}; for(let k=i0;k<H.time.length;k++){ const [d,part]=periodOf(H.time[k]); const x = dnMap[d] ||= {d, day:0, night:0, hi:-99, lo:99, cc:0, n:0}; const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, ref); if(v) x[part]+=v.snow;
-      const T=H.temperature_2m[k], h=+H.time[k].slice(11,13); if(isNum(T)){ if(h>=6&&h<18) x.hi=Math.max(x.hi,T); else x.lo=Math.min(x.lo,T); } if(isNum(H.cloud_cover?.[k])){ x.cc+=H.cloud_cover[k]; x.n++; } }
+    const dnMap = {}; for(let k=i0;k<H.time.length;k++){ const [d,part]=periodOf(H.time[k]); const x = dnMap[d] ||= {d, day:0, night:0, hi:-99, lo:99, cc:0, n:0, wmax:0, rain:0}; const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, ref); if(v) x[part]+=v.snow;
+      const T=H.temperature_2m[k], h=+H.time[k].slice(11,13); if(isNum(T)){ if(h>=6&&h<18) x.hi=Math.max(x.hi,T); else x.lo=Math.min(x.lo,T); } if(isNum(H.cloud_cover?.[k])){ x.cc+=H.cloud_cover[k]; x.n++; }
+      if(h>=8 && h<=16){ if(isNum(H.wind_speed_10m?.[k])) x.wmax=Math.max(x.wmax, H.wind_speed_10m[k]); if(!v && H.precipitation[k]>0.2) x.rain+=H.precipitation[k]; } }
     const dn = dates15.slice(0,7).map(d=>dnMap[d]).filter(Boolean).map(x=>({...x, cc:x.n? x.cc/x.n : 50, hi:x.hi>-90? x.hi : x.lo, lo:x.lo<90? x.lo : x.hi}));
     const now = { T:H.temperature_2m[i0], W:H.wind_speed_10m?.[i0], WD:H.wind_direction_10m?.[i0], CC:H.cloud_cover?.[i0], P:H.precipitation[i0] };
     return { dn, now, spot:sp, days15, dates15, last24, h24:sum(24,ref), d3:sum(72,ref), d5:sum(120,ref), d10:sum(240,ref), b5:sum(120, sp.base/FT), peak, regions:regionOf(sp.name) };
@@ -2515,9 +2541,51 @@ async function openStatus(){
   try{ const r = await api("/health");
     $("#tipBox").innerHTML = `<p class="muted" style="margin:0 0 10px">Checked ${new Date(r.at).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"})}</p>
       <div class="list">${r.results.map(x=>`<div class="li" style="min-height:44px"><span class="nm"><b>${esc(x.name)}</b>${x.ok? "" : `<small style="color:#fca5a5">${esc(x.error||"failing")}</small>`}</span><span style="color:${x.ok? "#6ee7a0" : "#fca5a5"};font-weight:700">${x.ok? "OK" : "Down"}</span></div>`).join("")}</div>`;
+    try{ const f = await api("/feedback"); if(f.items?.length) $("#tipBox").insertAdjacentHTML("beforeend", `<div class="grp">Forecast reports from users</div><div class="list">${f.items.slice(0,25).map(x=>`<div class="li" style="min-height:44px"><span class="nm"><b>${esc(x.spot)} · ${esc(x.kind)}</b><small>${new Date(x.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}${x.fc?.next24!=null? ` · showed ${x.fc.next24}″ next 24h` : ""}${x.note? ` · “${esc(x.note)}”` : ""}</small></span></div>`).join("")}</div>`); }catch(e){}
   }catch(e){ $("#tipBox").innerHTML = `<p>Couldn't run the check right now.</p>`; }
 }
 if(location.hash==="#status"){ history.replaceState(null, "", location.pathname + location.search + "#forecast"); setTimeout(openStatus, 1200); }
+
+/* ---------- This weekend: which favorite to ski, with drive time from Bend ---------- */
+const HOME = {name:"Bend", lat:44.058, lon:-121.315};
+const driveMin = sp => { const k = km(HOME.lat, HOME.lon, sp.lat, sp.lon); return k > 900? null : Math.round(k*1.3/72*60 + 8); };
+const fmtDrive = m => m==null? "" : m < 60? `${m} min` : `${Math.floor(m/60)} h ${String(m%60).padStart(2,"0")}`;
+function weekendDays(){ const t0 = todayStr(), dw = new Date(t0+"T12:00:00Z").getUTCDay(); const sat = dw===6? t0 : dw===0? dateAdd(t0,-1) : dateAdd(t0, 6-dw); return [sat, dateAdd(sat,1)].filter(d=>d>=t0); }
+function rankWeekend(rows, d){
+  const nordic = S.mode==="skate" || S.mode==="classic";
+  return rows.map(r=>{ const D = r.dn.find(x=>x.d===d), P = r.dn.find(x=>x.d===dateAdd(d,-1)); if(!D) return null;
+    const fresh = (P? P.night : 0) + D.day, hiF = D.hi*9/5+32, windy = D.wmax >= 40, rain = D.rain >= 2;
+    let s = nordic? 6 + Math.min(fresh,4)*.4 - Math.max(0, fresh-6)*.2 : 4 + Math.min(fresh,14)*.45;
+    if(rain) s -= 3; if(windy) s -= nordic? 1.5 : 1; if(hiF < 5) s -= 1; if(hiF > 40) s -= nordic? 1.5 : 1; if(D.cc < 40) s += .4;
+    const why = [fresh>=1? `${fmtSnow(fresh,0)} fresh` : "no new snow", `${fmtT(D.hi)}`, rain? "rain" : windy? "windy" : D.cc<40? "sunny" : D.cc>80? "cloudy" : "some sun"];
+    return {r, s: Math.max(0, Math.min(10, s)), why: why.join(" · "), drive: driveMin(r.spot)}; }).filter(Boolean).sort((a,b)=>b.s-a.s || (a.drive??999)-(b.drive??999));
+}
+function weekendHTML(list, rows){
+  const days = weekendDays(); if(list.length < 2 || !days.length) return "";
+  const pick = days.includes(S.wkDay)? S.wkDay : days[0], R = rankWeekend(rows.filter(r=>list.some(s=>s.name===r.spot.name)), pick);
+  if(!R.length) return "";
+  return `<div class="card wk"><div class="card-h"><h2>This weekend</h2>${days.length>1? `<div class="seg sm" id="wkSeg">${days.map(d=>`<button data-d="${d}" class="${d===pick?"on":""}">${d===todayStr()? "Today" : dow(d)}</button>`).join("")}</div>` : `<span class="muted">${dayLabel(pick)}</span>`}</div>
+    ${R.slice(0,5).map((x,i)=>`<button class="wk-r" data-n="${encodeURIComponent(x.r.spot.name)}"><span class="wk-n ${i===0?"top":""}">${i+1}</span><span class="wk-t"><b>${esc(x.r.spot.name.replace(/, [A-Z]{2}$/,""))}</b><small>${x.why}${x.drive!=null? ` · ${fmtDrive(x.drive)} from ${HOME.name}` : ""}</small></span>${scoreChip(x.s)}</button>`).join("")}
+    <div class="muted" style="font-size:11.5px;margin-top:6px">Ranked for ${MODE_NAME[S.mode].toLowerCase()} by fresh snow, temperature, wind and rain. Drive times are estimates.</div></div>`;
+}
+
+/* ---------- "Forecast look wrong?" reports: quick taps, saved with what Snowline showed ---------- */
+function openFeedback(){
+  if(!S.ctx || !S.loc) return; const {C, e} = S.ctx, daily = C.consDays.map(d=>d.day+d.night); let sel = null;
+  const K = [["more","More snow than shown"],["less","Less snow than shown"],["rain","It was rain"],["windier","Windier"],["colder","Colder"],["warmer","Warmer"],["other","Something else"]];
+  $("#tipTitle").textContent = "Forecast look wrong?";
+  $("#tipBox").innerHTML = `<p class="muted" style="margin:0 0 10px">Tell us what you're seeing at ${esc(S.loc.name)}. Reports show where the forecast misses so it can get better. Nothing personal is saved.</p>
+    <div class="fb-k">${K.map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
+    <textarea id="fbNote" rows="2" class="sh-msg" placeholder="Anything to add? (optional) e.g. 6 inches at the lodge, rain below 6,000 ft"></textarea>
+    <button class="btn primary wide" id="fbSend" style="margin-top:10px" disabled>Send report</button>`;
+  $("#tipBox").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{ sel = b.dataset.k; $("#tipBox").querySelectorAll("[data-k]").forEach(x=>x.classList.toggle("on", x===b)); $("#fbSend").disabled = false; });
+  $("#fbSend").onclick = async () => { if(!sel) return; $("#fbSend").disabled = true;
+    const c = C.cons[C.nowIdx], next24 = C.cons.slice(C.nowIdx, C.nowIdx+24).reduce((a,x)=>a+(x?.snow||0),0);
+    try{ await api("/feedback", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({spot:S.loc.name, lat:S.loc.lat, lon:S.loc.lon, elevFt: e*FT, mode:S.mode, kind:sel, note:$("#fbNote").value,
+      fc:{last24: S.ctx.last24 ?? null, today: daily[0], next24, tempF: c? c.Te*9/5+32 : null}})}); closeSheet("tipSheet"); toast("Thanks! Report sent"); }
+    catch(e){ $("#fbSend").disabled = false; toast("Couldn't send. Try again"); } };
+  openSheet("tipSheet");
+}
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
@@ -3157,6 +3225,7 @@ function renderTrack(){
   el.dataset.sv = rr? `${rr.within} of ${rr.storms} storms within 2″` : R && R.storms? `${R.within} of ${R.storms} storms within 2″` : v.status==="ok"? "Model scorecard" : "Last storms";
   el.innerHTML = `<div class="card-h"><h2>Forecast accuracy${tipI("accuracy")}</h2></div><div class="muted" style="margin:-4px 0 10px;font-size:13px">Graded at the ${esc(sn)} snow gauge, ${fmtEl(v.station.elevFt/FT)}</div>
     ${resortHero}${rr? "" : rec}${leads}${last}
+    <a class="link" href="/accuracy" style="display:inline-block;margin:10px 0 0;font-weight:600">See every Central Oregon spot ›</a>
     <div class="muted" style="margin-top:10px;font-size:12px">Snowline uses this: models that have been right here get more say, separately for tomorrow and the days after, and models that run wet or dry here are corrected${v.slrFix && v.slrFix!==1? `. Snow-to-water ratio tuned to this gauge (${v.slrFix>1? "+" : ""}${Math.round((v.slrFix-1)*100)}%)` : ""}.</div>`;
 }
 
