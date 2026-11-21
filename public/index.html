@@ -568,6 +568,8 @@ h1,.lt b,#ltName{letter-spacing:-.5px}
 .mm-play{background:var(--ice2) !important;border:0 !important;color:#04121f !important}
 .sh-msg{width:100%;margin-top:10px;background:#141416;border:1px solid #26262a;border-radius:12px;color:var(--text);padding:10px 12px;font:15px/1.4 Inter,sans-serif;resize:none}
 .tog{flex:0 0 auto;width:50px;height:30px;border-radius:16px;border:0;background:#2c2c30;position:relative;padding:0;transition:background .2s}.tog i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}.tog.on{background:#34c759}.tog.on i{transform:translateX(20px)}
+.se-hero{display:flex;align-items:center;gap:14px;margin:0 0 12px}.se-big{font-size:46px;font-weight:800;line-height:1}
+.se-fr{margin-bottom:10px}.se-ch{display:block;margin-top:4px}
 /* ================= Clean pass: fewer boxes, more air, one clear hierarchy ================= */
 main{padding-top:4px}
 .card{background:#111113;border:0;border-radius:20px;padding:16px;margin:0 0 14px}
@@ -1131,6 +1133,7 @@ function render(){
     <section class="card" id="tmCard"></section>
     ${!isAlp()? `<section class="card" id="openCard"></section>`:""}
     <section class="card" id="repCard"></section>`)}
+  ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
   ${grp("g-storm", "Storm & elevation", `<section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
   ${grp("g-plan", "Plan your day", `<section class="card" id="workCard"></section><section class="card" id="roadCard"></section>
     ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
@@ -1144,7 +1147,7 @@ function render(){
   $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeason(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -2233,6 +2236,7 @@ function loadExtras(loc){
   const q = `lat=${loc.lat.toFixed(4)}&lon=${loc.lon.toFixed(4)}`;
   const done = () => { if(S.loc===loc && S.data) scheduleRender(loc); };
   api(`/obs?${q}`).then(r=>{ X.obs=r; done(); }).catch(()=>{});
+  api(`/season?${q}`).then(r=>{ X.season=r; if(S.loc===loc) renderSeason(); }).catch(()=>{});
   api(`/verify?${q}`).then(r=>{ X.verify=r; done(); setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
   api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
@@ -2455,6 +2459,30 @@ document.addEventListener("click", e=>{ const b = e.target.closest("[data-open]"
   new MutationObserver(()=>requestAnimationFrame(sync)).observe($("#app"), {childList:true});
   setInterval(sync, 2000);
 })();
+
+/* ---------- Season so far: snowpack vs normal at the nearest gauge ---------- */
+function renderSeason(){
+  const el = $("#seasonCard"); if(!el || !S.loc) return; const Z = extrasFor(S.loc).season;
+  if(!Z || Z.status!=="ok"){ el.innerHTML = ""; return; }
+  const N = Z.now, P = N.pct, sr = Z.series.filter(r=>r[1]!=null || r[3]!=null);
+  const word = P==null? "" : P>=130? "Way above normal" : P>=110? "Above normal" : P>=90? "About normal" : P>=70? "Below normal" : "Well below normal";
+  const col = P==null? "#e6edf7" : P>=110? "#7dd3fc" : P>=90? "#86efac" : P>=70? "#fde68a" : "#fca5a5";
+  el.dataset.sv = P!=null? `${P}% of normal snowpack` : `${fmtSnow(N.depth||0,0)} on the ground`;
+  // chart: this season's snow water vs the median for each date
+  const W = 320, H = 110, n = sr.length, mx = Math.max(1, ...sr.map(r=>Math.max(r[1]||0, r[3]||0)))*1.1;
+  const X = i => i/(Math.max(1,n-1))*W, Y = v => H - v/mx*H;
+  const line = k => sr.map((r,i)=> r[k]==null? null : `${X(i).toFixed(1)},${Y(r[k]).toFixed(1)}`).filter(Boolean).join(" ");
+  const area = sr.some(r=>r[1]!=null)? `M0,${H} L${sr.map((r,i)=>`${X(i).toFixed(1)},${Y(r[1]??0).toFixed(1)}`).join(" L")} L${W},${H}Z` : "";
+  const months = sr.map((r,i)=>[r[0],i]).filter(([d])=>d.slice(8)==="01").map(([d,i])=>`<text x="${X(i)}" y="${H+14}" font-size="10" fill="var(--mute)" text-anchor="middle">${new Date(d+"T12:00:00Z").toLocaleString([], {month:"short", timeZone:"UTC"})}</text>`).join("");
+  const unit = imp()? "″" : " cm", sw = v => v==null? "—" : imp()? v.toFixed(1)+"″" : Math.round(v*2.54)+" cm";
+  el.innerHTML = `<div class="card-h"><h2>Season so far${tipI("season")}</h2></div>
+    <div class="se-hero">${P!=null? `<div class="se-big num" style="color:${col}">${P}%</div><div><b>${word}</b><br><span class="muted">snowpack for ${new Date(N.date+"T12:00:00Z").toLocaleDateString([], {month:"short", day:"numeric", timeZone:"UTC"})}</span></div>` : `<div><b>Early season</b><br><span class="muted">Not enough snow yet to compare with normal.</span></div>`}</div>
+    <div class="fr se-fr"><div><b class="num">${N.depth!=null? fmtSnow(N.depth,0) : "—"}</b><small>On the ground</small></div><div><b class="num">${fmtSnow(Z.fallen,0)}</b><small>Measured since Oct 1</small></div><div><b class="num">${sw(N.swe)}</b><small>Snow water${N.med!=null? ` · normal ${sw(N.med)}` : ""}</small></div></div>
+    <svg viewBox="0 -4 ${W} ${H+20}" width="100%" class="se-ch"><defs><linearGradient id="seG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8" stop-opacity=".45"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs>
+      ${area? `<path d="${area}" fill="url(#seG)"/>` : ""}<polyline points="${line(3)}" fill="none" stroke="#8b93a7" stroke-width="1.5" stroke-dasharray="4 4"/><polyline points="${line(1)}" fill="none" stroke="#7dd3fc" stroke-width="2.2"/>${months}</svg>
+    <div class="qleg" style="margin-top:4px"><span><i style="background:#7dd3fc"></i>This season</span><span><i style="background:#8b93a7"></i>Normal</span></div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px">${esc(Z.station.name)} snow gauge, ${fmtEl(Z.station.elevFt/FT)}. Normal is the 1991–2020 median.</div>`;
+}
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
@@ -2469,6 +2497,8 @@ const TIPS = {
   snowlevel: () => ["Snow level", `<p><b>The elevation where falling precipitation turns from rain to snow.</b> Above it you get snow; below it, rain or a mix.</p>
     <p>Snowline takes the freezing level from the models and sets the snow level about 1,000 ft below it, since snowflakes take a while to melt on the way down.</p>
     <p class="muted">If the snow level is close to your elevation, small changes decide rain or snow, so expect wetter, heavier snow and less certain totals.</p>`],
+  season: () => ["Season so far", `<p><b>Snowpack % of normal</b> compares the water stored in the snow at the nearest SNOTEL gauge with the median for the same date over 1991–2020. 100% is a typical year; it's the number water managers and forecasters use.</p>
+    <p><b>On the ground</b> is today's snow depth at the gauge. <b>Measured since Oct 1</b> adds up each day's rise in depth. Snow settles between storms, so the real snowfall is a bit higher.</p>`],
   accuracy: () => ["How accuracy is measured", `<p><b>The gauge:</b> the nearest SNOTEL station, an automated government snow gauge in the mountains, measures new snow depth and the water in it every day.</p>
     <p><b>Snowline's record:</b> each morning Snowline saves its own forecast for that gauge's elevation. After a storm it's compared with what fell. "Within 2″" counts a storm as close when the miss is 2″ or less, or 25% on big storms.</p>
     <p><b>Model by model:</b> every model's forecasts made 1, 3 and 5 days ahead are compared with the gauge over the last 90 days (last winter when it's been dry). The models that have been closest get more weight in Snowline's blend for that lead time, and models that run wet or dry are corrected, within limits.</p>
