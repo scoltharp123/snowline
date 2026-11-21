@@ -1,7 +1,8 @@
 // GET /api/nws?lat=..&lon=.. → National Weather Service data for a US point (public domain, free):
 //   alerts: active watches, warnings and advisories for the point
 //   afd:    the local office's Area Forecast Discussion, written by its meteorologists, split into sections
-// Points → office is kept for 30 days, the discussion for 30 minutes per office, alerts for 5 minutes per point.
+// Points → office is kept for 30 days, the discussion for 30 minutes per office (then re-downloaded only if the office
+// has issued a new one), alerts for 5 minutes per point. Alerts and the discussion are fetched at the same time.
 import { json, store } from "../lib/shared.mjs";
 
 const UA = { "User-Agent": "Snowline (snowline-forecast.netlify.app)", Accept: "application/geo+json" };
@@ -46,32 +47,36 @@ export default async (req) => {
   }
   if (!pt.office) return json({ covered: false }, { cache: 3600 });
 
-  // alerts for the point
-  let alerts = [];
-  try {
-    const a = await nws(`/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`);
-    alerts = (a.features || []).map(f => f.properties).filter(Boolean).map(p => ({
-      event: p.event, headline: p.headline, severity: p.severity, onset: p.onset || p.effective, ends: p.ends || p.expires,
-      area: p.areaDesc, desc: String(p.description || "").replace(/\s*\n\s*/g, " ").slice(0, 1200), instr: String(p.instruction || "").replace(/\s*\n\s*/g, " ").slice(0, 500),
-    }));
-  } catch (e) {}
-
-  // the office's latest Area Forecast Discussion
+  // Alerts for the point and the office's latest Area Forecast Discussion are fetched side by side
+  // (they used to run one after the other, which made a first load take 3-4 s).
+  const getAlerts = async () => {
+    try {
+      const a = await nws(`/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`);
+      return (a.features || []).map(f => f.properties).filter(Boolean).map(p => ({
+        event: p.event, headline: p.headline, severity: p.severity, onset: p.onset || p.effective, ends: p.ends || p.expires,
+        area: p.areaDesc, desc: String(p.description || "").replace(/\s*\n\s*/g, " ").slice(0, 1200), instr: String(p.instruction || "").replace(/\s*\n\s*/g, " ").slice(0, 500),
+      }));
+    } catch (e) { return []; }
+  };
   const ak = `nws-afd-${pt.office}`;
-  let afd = null;
-  try { const c = await s.get(ak, { type: "json" }); if (c && now - c.at < 30 * 60e3) afd = c; } catch (e) {}
-  if (!afd) {
+  const getAFD = async () => {
+    let cached = null;
+    try { cached = await s.get(ak, { type: "json" }); } catch (e) {}
+    if (cached && now - cached.at < 30 * 60e3) return cached;
     try {
       const list = await nws(`/products/types/AFD/locations/${pt.office}`);
       const latest = (list["@graph"] || [])[0];
-      if (latest) {
-        const prod = await nws(`/products/${latest.id}`);
-        afd = { at: now, issued: prod.issuanceTime, office: pt.office, officeName: (prod.issuingOffice || pt.office), sections: parseAFD(prod.productText),
-          url: `https://forecast.weather.gov/product.php?site=NWS&issuedby=${pt.office}&product=AFD&format=txt&version=1&glossary=1` };
-        try { await s.setJSON(ak, afd); } catch (e) {}
-      }
-    } catch (e) { try { const c = await s.get(ak, { type: "json" }); if (c) afd = c; } catch (_) {} }
-  }
+      if (!latest) return cached;
+      // Same discussion as the copy we have (offices issue a few a day): keep it and just mark it checked.
+      if (cached && cached.id === latest.id) { const kept = { ...cached, at: now }; try { await s.setJSON(ak, kept); } catch (e) {} return kept; }
+      const prod = await nws(`/products/${latest.id}`);
+      const afd = { at: now, id: latest.id, issued: prod.issuanceTime, office: pt.office, officeName: (prod.issuingOffice || pt.office), sections: parseAFD(prod.productText),
+        url: `https://forecast.weather.gov/product.php?site=NWS&issuedby=${pt.office}&product=AFD&format=txt&version=1&glossary=1` };
+      try { await s.setJSON(ak, afd); } catch (e) {}
+      return afd;
+    } catch (e) { return cached; }
+  };
+  const [alerts, afd] = await Promise.all([getAlerts(), getAFD()]);
   return json({ covered: true, office: pt.office, alerts, afd }, { cache: 300 });
 };
 export const config = { path: "/api/nws" };
