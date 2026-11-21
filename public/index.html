@@ -2722,7 +2722,7 @@ function liftsHTML(L){
   const waits = open.filter(l=>l.wait && /\d/.test(l.wait));
   return `<div class="grp">Lifts</div>
     <div class="lf-top"><b class="num">${open.length}</b><span>of ${L.length} lifts open${waits.length? ` · longest wait ${esc(waits.map(l=>l.wait).sort((a,b)=>parseInt(b)-parseInt(a))[0])}` : ""}</span></div>
-    <details class="nb" style="margin-top:6px"><summary>All lifts</summary><div class="list">${L.map(l=>`<div class="li lf"><i style="background:${dot(l.status)}"></i><span class="nm"><b>${esc(l.name)}</b><small>${esc(l.area||"")}${l.hours? " · "+esc(l.hours) : ""}</small></span><span class="lf-s">${l.status==="open"? (l.wait? esc(l.wait) : "Open") : esc(l.status.charAt(0).toUpperCase()+l.status.slice(1))}</span></div>`).join("")}</div></details>`;
+    <details class="nb" style="margin-top:6px"><summary>All lifts</summary><div class="list">${L.map(l=>`<div class="li lf"><i style="background:${dot(l.status)}"></i><span class="nm"><b>${esc(l.name)}</b><small>${esc(l.area||"")}${l.hours? " · "+esc(l.hours.replace(/:00/g,"").replace(/\s*([ap])\.m\./gi,"$1").replace(/\s*-\s*/g,"–")) : ""}</small></span><span class="lf-s">${l.status==="open"? (l.wait? esc(l.wait) : "Open") : esc(l.status.charAt(0).toUpperCase()+l.status.slice(1))}</span></div>`).join("")}</div></details>`;
 }
 async function loadAvyObs(loc){
   const X = extrasFor(loc); if(X.avyobs && Date.now()-X.avyobsAt < 15*60e3) return;
