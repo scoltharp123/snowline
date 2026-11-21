@@ -21,31 +21,31 @@ async function meissnerStation() {
 }
 
 async function wanoga() {
-  const j = await (await get("https://api.weather.gov/stations/ODT31/observations?limit=36", { Accept: "application/geo+json" })).json();
+  const j = await (await get("https://api.weather.gov/stations/ODT31/observations?limit=160", { Accept: "application/geo+json" })).json();
   const f = (j.features || []).map(x => x.properties).filter(p => p && p.timestamp);
   if (!f.length) throw new Error("no observations");
   const c2f = c => (c == null ? null : Math.round((c * 9 / 5 + 32) * 10) / 10), k2m = k => (k == null ? null : Math.round(k * 0.621371));
   const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-  const L = f[0];
+  const L = f[0], last = k => { for (const p of f.slice(0, 12)) if (p[k]?.value != null) return p[k].value; return null; };
   return {
     name: "Wanoga Butte", elevFt: L.elevation?.value != null ? Math.round(L.elevation.value * 3.28084) : null, time: L.timestamp,
-    tempF: c2f(L.temperature?.value), rh: L.relativeHumidity?.value != null ? Math.round(L.relativeHumidity.value) : null,
-    windMph: k2m(L.windSpeed?.value), gustMph: k2m(L.windGust?.value), windDir: L.windDirection?.value != null ? dirs[Math.round(L.windDirection.value / 22.5) % 16] : null,
-    series: f.slice(0, 36).reverse().map(p => [p.timestamp, c2f(p.temperature?.value)]).filter(r => r[1] != null),
+    tempF: c2f(last("temperature")), rh: last("relativeHumidity") != null ? Math.round(last("relativeHumidity")) : null,
+    windMph: k2m(last("windSpeed")), gustMph: k2m(L.windGust?.value), windDir: last("windDirection") != null ? dirs[Math.round(last("windDirection") / 22.5) % 16] : null,
+    series: f.filter(p => Date.now() - Date.parse(p.timestamp) < 864e5).filter((p, i) => i % 3 === 0).reverse().map(p => [p.timestamp, c2f(p.temperature?.value)]).filter(r => r[1] != null),
     source: "ODOT weather station (ODT31) via the National Weather Service", link: "https://www.weather.gov/wrh/timeseries?site=ODT31&hours=24",
   };
 }
 
 export default async () => {
   const s = store("snowline-cache");
-  try { const c = await s.get("meissner-live", { type: "json" }); if (c && Date.now() - Date.parse(c.at) < 10 * 60e3) return json(c, { cache: 300 }); } catch (e) {}
+  try { const c = await s.get("meissner-live2", { type: "json" }); if (c && Date.now() - Date.parse(c.at) < 10 * 60e3) return json(c, { cache: 300 }); } catch (e) {}
   const [a, b] = await Promise.allSettled([meissnerStation(), wanoga()]);
   const out = { at: new Date().toISOString(),
     stations: [a.status === "fulfilled" ? a.value : { name: "Meissner Sno-Park", error: String(a.reason?.message || a.reason), link: "https://meissnernordic.org/weather/" },
                b.status === "fulfilled" ? b.value : { name: "Wanoga Butte", error: String(b.reason?.message || b.reason), link: "https://www.weather.gov/wrh/timeseries?site=ODT31&hours=24" }],
     cam: { name: "Meissner Sno-Park", img: "https://teacup-trailcams.fly.dev/meissner/photos/latest", page: "https://meissnernordic.org/webcam/", credit: "Meissner Nordic webcam, sponsored by Visit Bend · updates every 2 hours" },
     links: [["Grooming report", "https://meissnernordic.org/grooming/"], ["Trail descriptions", "https://meissnernordic.org/trail-descriptions/"], ["Meissner Nordic app", "https://meissnernordic.org/apps/"]] };
-  try { await s.setJSON("meissner-live", out); } catch (e) {}
+  try { await s.setJSON("meissner-live2", out); } catch (e) {}
   return json(out, { cache: 300 });
 };
 export const config = { path: "/api/meissner" };
