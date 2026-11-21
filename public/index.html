@@ -3638,7 +3638,7 @@ $("#q").oninput = e => { clearTimeout(qT); const q = e.target.value.trim(), seq 
     if(seq!==qSeq) return;
     // Of the places with this name, pick the one with the most ski areas around it (Sun Valley, Idaho over Sun Valley, Nevada)
     const around = x => AREAS.rows.reduce((n,a)=> n + (Math.abs(a.lat-x.latitude)<1.2 && Math.abs(a.lon-x.longitude)<1.6 && km(x.latitude,x.longitude,a.lat,a.lon)<130 && (!P.kind || a.kind.includes(P.kind))? 1 : 0), 0);
-    const g = (j.results||[]).map(x=>({x, n: around(x)})).sort((a,b)=> b.n-a.n || (b.x.population||0)-(a.x.population||0)).map(o=>o.x);
+    const g = (j.results||[]).map(x=>{ const n = around(x); return {x, n: n + (n && x.longitude < -102? 4 : 0)}; }).sort((a,b)=> b.n-a.n || (b.x.population||0)-(a.x.population||0))   // the mountain West wins ties.map(o=>o.x);
     let town = g[0];
     // "sun valley nordic", "tahoe xc": center on the ski area with that name when there is one
     if(P.kind && !areas.length){ const hit = matchAreas({kind:null, req:P.req}); if(hit[0] && !matchAreas.byPlace) town = {name: hit[0].name, admin1: STATES[hit[0].reg]? hit[0].reg : "", latitude: hit[0].lat, longitude: hit[0].lon}; }
