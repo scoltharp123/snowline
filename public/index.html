@@ -566,6 +566,7 @@ h1,.lt b,#ltName{letter-spacing:-.5px}
 .mm-leg{display:flex;flex-direction:column;gap:3px;margin-top:10px}.mm-bar{height:6px;border-radius:3px}
 .mm-ticks{display:flex;justify-content:space-between;font-size:10.5px;color:var(--mute)}.mm-ticks i{font-style:normal}
 .mm-play{background:var(--ice2) !important;border:0 !important;color:#04121f !important}
+.sh-msg{width:100%;margin-top:10px;background:#141416;border:1px solid #26262a;border-radius:12px;color:var(--text);padding:10px 12px;font:15px/1.4 Inter,sans-serif;resize:none}
 /* ================= Clean pass: fewer boxes, more air, one clear hierarchy ================= */
 main{padding-top:4px}
 .card{background:#111113;border:0;border-radius:20px;padding:16px;margin:0 0 14px}
@@ -3671,40 +3672,93 @@ function updateOnline(){ document.body.classList.toggle("offline", !navigator.on
 addEventListener("online", ()=>{ updateOnline(); if(S.loc) load(S.loc); }); addEventListener("offline", updateOnline);
 
 /* ---------- Powder card (shareable image) ---------- */
-async function drawPowderCard(){
-  const {C, SIM, e} = S.ctx; const W=1080, H=1350; const cv=document.createElement("canvas"); cv.width=W; cv.height=H; const g=cv.getContext("2d");
+/* ---------- Share card: made to get friends fired up ---------- */
+function shareStory(){
+  const {C, SIM} = S.ctx; const daily = C.consDays.map(d=>d.day+d.night).slice(0,10);
+  // the biggest storm in the next 7 days (consecutive days with 1"+), else the snowiest day
+  const storms = []; let cur = null;
+  daily.forEach((v,k)=>{ if(v>=1){ if(!cur) cur={s:k,e:k,tot:0}; cur.e=k; cur.tot+=v; } else if(cur){ storms.push(cur); cur=null; } }); if(cur) storms.push(cur);
+  const st = storms.filter(x=>x.s<7).sort((a,b)=>b.tot-a.tot)[0] || null;
+  let bk = 0; for(let k=0;k<7;k++) if(daily[k]>daily[bk]) bk=k;
+  const tot = st? st.tot : daily[bk], big = st? Math.max(...daily.slice(st.s, st.e+1)) : daily[bk], bigK = st? daily.indexOf(big, st.s) : bk;
+  const when = st? (st.e>st.s? `${dow(C.days[st.s])}–${dow(C.days[st.e])}` : dayLabel(C.days[st.s])) : dayLabel(C.days[bk]);
+  const ten = windowTotal(daily, 10);
+  const headline = tot>=18? "IT'S GONNA DUMP" : tot>=10? "POW DAY INCOMING" : tot>=5? "SNOW ON THE WAY" : tot>=1.5? "FRESH SNOW COMING" : "SKI DAY AHEAD";
+  const x = daySummary(C,SIM,C.days[bigK]);
+  return {daily, st, tot, big, bigK, when, ten, headline, x};
+}
+async function drawPowderCard(fmt="post"){
+  const {C, e} = S.ctx, W=1080, H = fmt==="story"? 1920 : 1350, top = fmt==="story"? 220 : 0;
+  const cv=document.createElement("canvas"); cv.width=W; cv.height=H; const g=cv.getContext("2d");
   try{ await document.fonts.ready; }catch(_){}
-  const daily = C.consDays.map(d=>d.day+d.night); let bk=0; for(let k=0;k<7;k++) if(daily[k]>daily[bk]) bk=k;
-  const big = daily[bk], d5 = windowTotal(daily,5), x = daySummary(C,SIM,C.days[bk]);
-  const grd=g.createLinearGradient(0,0,0,H); grd.addColorStop(0,"#13254a"); grd.addColorStop(.55,"#0a0f1d"); grd.addColorStop(1,"#000"); g.fillStyle=grd; g.fillRect(0,0,W,H);
-  g.fillStyle="#1a2747"; g.beginPath(); g.moveTo(0,H); g.lineTo(0,1060); g.lineTo(220,900); g.lineTo(380,1000); g.lineTo(600,760); g.lineTo(820,960); g.lineTo(1080,860); g.lineTo(1080,H); g.fill();
-  g.fillStyle="#eef5ff"; g.beginPath(); g.moveTo(520,850); g.lineTo(600,760); g.lineTo(690,860); g.lineTo(650,845); g.lineTo(610,870); g.lineTo(570,845); g.fill();
-  g.strokeStyle="#a78bfa"; g.lineWidth=5; g.setLineDash([26,14]); g.beginPath(); g.moveTo(60,890); g.lineTo(1020,890); g.stroke(); g.setLineDash([]);
-  try{ const logo = new Image(); logo.src="/icon.svg"; await logo.decode(); g.drawImage(logo, 72, 70, 92, 92); }catch(_){}
-  g.fillStyle="#fff"; g.font="700 46px 'Space Grotesk', Inter, sans-serif"; g.fillText("Snowline", 184, 132);
-  g.fillStyle="#8e8e93"; g.font="500 30px Inter, sans-serif"; g.fillText(`${dayLabel(C.days[bk])} · ${fmtEl(e)}`, 72, 300);
-  g.fillStyle="#fff"; g.font="700 64px 'Space Grotesk', Inter, sans-serif"; g.fillText(S.loc.name, 72, 250, 940);
-  g.fillStyle = big>=12? "#f39a44" : big>=6? "#b8a2ff" : "#7cc0ff"; g.font="800 300px 'Space Grotesk', Inter, sans-serif"; g.fillText(fmtSnow(big,0), 60, 590);
-  g.fillStyle="#d1d1d6"; g.font="600 40px Inter, sans-serif"; g.fillText(`${fmtSnow(d5,0)} next 5 days${x? ` · ${MODE_NAME[S.mode]} ${x.best.avg.toFixed(1)}/10` : ""}`, 72, 680);
-  const bw=66, gap=24, bx=72, by=1180, mx=Math.max(4,...daily.slice(0,10));
-  daily.slice(0,10).forEach((v,i)=>{ const h=Math.max(6, v/mx*220); g.fillStyle = v<0.05? "#3a3a40" : barColor(v); g.fillRect(bx+i*(bw+gap), by-h, bw, h);
-    g.fillStyle="#9aa3b5"; g.font="600 26px Inter, sans-serif"; g.textAlign="center"; g.fillText(LETTER[new Date(C.days[i]+"T12:00:00Z").getUTCDay()], bx+i*(bw+gap)+bw/2, by+40); g.textAlign="left"; });
-  g.fillStyle="#6b7280"; g.font="500 26px Inter, sans-serif"; g.fillText("snowline-forecast.netlify.app", 72, 1300);
+  const T = shareStory(), hot = T.tot>=10;
+  // night sky
+  const sky=g.createLinearGradient(0,0,0,H); sky.addColorStop(0, hot? "#241a4d" : "#132a52"); sky.addColorStop(.5,"#0b1226"); sky.addColorStop(1,"#030508"); g.fillStyle=sky; g.fillRect(0,0,W,H);
+  const glow=g.createRadialGradient(W*.75, top+380, 20, W*.75, top+380, 620); glow.addColorStop(0, hot? "rgba(192,132,252,.35)" : "rgba(56,189,248,.28)"); glow.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle=glow; g.fillRect(0,0,W,H);
+  // falling snow (fixed seed so the card looks the same every time)
+  let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+  const flakes = Math.round(60 + Math.min(T.tot, 30)*8);
+  for(let i=0;i<flakes;i++){ const r = .8 + rnd()*rnd()*5, y = rnd()*H*.82; g.globalAlpha = .25 + rnd()*.6; g.fillStyle="#fff"; g.beginPath(); g.arc(rnd()*W, y, r, 0, 7); g.fill(); }
+  g.globalAlpha = 1;
+  // mountains with snowy tops
+  const base = top + (fmt==="story"? 1300 : 1180);   // peaks stay below the numbers
+  const ridge = (pts, c1, c2) => { const gr=g.createLinearGradient(0,base-260,0,H); gr.addColorStop(0,c1); gr.addColorStop(1,c2); g.fillStyle=gr; g.beginPath(); g.moveTo(0,H); pts.forEach(([x,y])=>g.lineTo(x,base+y)); g.lineTo(W,H); g.fill(); };
+  ridge([[0,40],[180,-60],[330,20],[520,-210],[700,-40],[860,-120],[1080,-20]], "#2a3d6b", "#0b1226");
+  g.fillStyle="#eaf2ff"; g.beginPath(); g.moveTo(520,base-210); g.lineTo(588,base-150); g.lineTo(560,base-158); g.lineTo(530,base-135); g.lineTo(500,base-160); g.lineTo(458,base-152); g.fill();
+  g.beginPath(); g.moveTo(860,base-120); g.lineTo(912,base-80); g.lineTo(884,base-86); g.lineTo(856,base-70); g.lineTo(826,base-92); g.fill();
+  ridge([[0,120],[240,30],[420,110],[640,10],[880,100],[1080,40]], "#16244a", "#05080f");
+  // brand
+  try{ const logo = new Image(); logo.src="/icon.svg"; await logo.decode(); g.drawImage(logo, 72, top+64, 76, 76); }catch(_){}
+  g.fillStyle="#fff"; g.font="700 40px 'Space Grotesk', Inter, sans-serif"; g.fillText("Snowline", 166, top+116);
+  // headline
+  g.font="800 50px 'Space Grotesk', Inter, sans-serif"; const hw = g.measureText(T.headline).width + 56;
+  const pill = g.createLinearGradient(72,0,72+hw,0); pill.addColorStop(0, hot? "#f472b6" : "#38bdf8"); pill.addColorStop(1, hot? "#a78bfa" : "#6366f1");
+  g.fillStyle = pill; g.beginPath(); g.roundRect(72, top+190, hw, 84, 42); g.fill(); g.fillStyle="#fff"; g.fillText(T.headline, 100, top+250);
+  // the number
+  const num = fmtSnow(T.tot, T.tot<10 && T.tot%1>=.25? 1 : 0).replace('"',"″");
+  g.font="800 330px 'Space Grotesk', Inter, sans-serif"; const nw = g.measureText(num).width;
+  const ng = g.createLinearGradient(0, top+330, 0, top+640); ng.addColorStop(0,"#ffffff"); ng.addColorStop(1, hot? "#c4b5fd" : "#7dd3fc"); g.fillStyle = ng;
+  g.shadowColor = hot? "rgba(167,139,250,.55)" : "rgba(56,189,248,.45)"; g.shadowBlur = 60; g.fillText(num, 60, top+610, 960); g.shadowBlur = 0;
+  g.fillStyle="#e6edf7"; g.font="700 56px 'Space Grotesk', Inter, sans-serif"; g.fillText(T.when, 72, top+700, 940);
+  g.fillStyle="#9fb0cc"; g.font="600 40px Inter, sans-serif"; g.fillText(`at ${S.loc.name}`, 72, top+760, 940);
+  // facts row
+  const facts = [ T.st && T.st.e>T.st.s? [`${fmtSnow(T.big,0)}`, `biggest day · ${dow(C.days[T.bigK])}`] : null, [`${fmtSnow(T.ten,0)}`, "next 10 days"], T.x? [`${T.x.best.avg.toFixed(1)}`, `${S.mode==="alpine"? "ski" : MODE_NAME[S.mode].toLowerCase()} score`] : null ].filter(Boolean).slice(0,3);
+  facts.forEach(([v,l],i)=>{ const fx = 72 + i*330; g.fillStyle="#fff"; g.font="800 64px 'Space Grotesk', Inter, sans-serif"; g.fillText(v, fx, top+880); g.fillStyle="#8fa1bf"; g.font="500 28px Inter, sans-serif"; g.fillText(l, fx, top+922, 300); });
+  // 10-day bars, storm days lit
+  const n = 10, bw = 70, gap = (W - 144 - n*bw)/(n-1), by = H - (fmt==="story"? 250 : 150), mx = Math.max(4, ...T.daily);
+  T.daily.forEach((v,i)=>{ const h = Math.max(8, v/mx*(fmt==="story"? 300 : 210)), x = 72 + i*(bw+gap), inStorm = T.st && i>=T.st.s && i<=T.st.e;
+    const bg = g.createLinearGradient(0, by-h, 0, by); bg.addColorStop(0, v<0.5? "#2a3350" : inStorm? (hot? "#e879f9" : "#7dd3fc") : "#4b6b9a"); bg.addColorStop(1, v<0.5? "#1a2033" : inStorm? (hot? "#8b5cf6" : "#3b82f6") : "#2b3f63");
+    g.fillStyle = bg; g.beginPath(); g.roundRect(x, by-h, bw, h, 12); g.fill();
+    if(v>=1){ g.fillStyle = inStorm? "#fff" : "#c3cfe3"; g.font="700 28px 'Space Grotesk', Inter, sans-serif"; g.textAlign="center"; g.fillText(Math.round(snowNum(v))+"", x+bw/2, by-h-14); }
+    g.textAlign="center"; g.fillStyle = inStorm? "#fff" : "#7d8aa3"; g.font="700 26px Inter, sans-serif"; g.fillText(LETTER[new Date(C.days[i]+"T12:00:00Z").getUTCDay()], x+bw/2, by+40); g.textAlign="left"; });
+  g.fillStyle="#6b7a94"; g.font="500 26px Inter, sans-serif"; g.fillText(`Free snow forecasts · ${location.host}`, 72, H - (fmt==="story"? 150 : 52));
   return cv;
 }
 async function openShareSheet(){
-  if(!S.ctx || !S.loc) return; openSheet("shareSheet"); const box=$("#shareBox"); box.innerHTML = `<div class="loading"><div class="spin"></div>Making your powder card…</div>`;
-  const cv = await drawPowderCard(); const blob = await new Promise(r=>cv.toBlob(r,"image/png")); const url = URL.createObjectURL(blob);
+  if(!S.ctx || !S.loc) return; openSheet("shareSheet"); const box=$("#shareBox");
   const L0=S.loc, preset=PRESETS.some(p=>p.name===L0.name);
   const link = location.origin + location.pathname + (preset? `?s=${encodeURIComponent(L0.name)}` : `?n=${encodeURIComponent(L0.name)}&lat=${L0.lat.toFixed(4)}&lon=${L0.lon.toFixed(4)}&b=${Math.round(L0.base)}&t=${Math.round(L0.top)}`);
-  box.innerHTML = `<img src="${url}" alt="Powder card" style="width:100%;border-radius:14px;display:block"><div class="muted" style="margin:8px 0">Tip: press and hold the image to save it.</div>
-    <div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn primary" id="shImg" style="flex:1">Share card</button><button class="btn" id="shLink" style="flex:1">Share link</button></div>`;
-  const file = new File([blob], "snowline-powder.png", {type:"image/png"});
-  $("#shImg").onclick = async () => { try{ if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], title:"Snowline", text: link}); else { const a=document.createElement("a"); a.href=url; a.download="snowline-powder.png"; a.click(); } }catch(e){} };
-  $("#shLink").onclick = async () => { const C=S.ctx.C, d5=windowTotal(C.consDays.map(d=>d.day+d.night),5); const text=`${L0.name}: ${fmtSnow(d5)} in the next 5 days${S.bestDay? `. Best ${MODE_NAME[S.mode].toLowerCase()} day: ${dayLabel(S.bestDay)}`:""}. via Snowline`;
-    try{ if(navigator.share) await navigator.share({title:"Snowline", text, url:link}); else { await navigator.clipboard.writeText(text+" "+link); toast("Link copied"); } }catch(e){} };
+  const T = shareStory(), place = L0.name.replace(/, [A-Z]{2}$/,"");
+  const hype = T.tot>=10? `🚨 ${fmtSnow(T.tot,0)} coming to ${place} ${T.when}! Who's in? ❄️` : T.tot>=1.5? `❄️ ${fmtSnow(T.tot,0)} on the way to ${place} ${T.when}. Let's go?` : `${place} looks good ${T.when}. Who wants to ski?`;
+  let fmt = store.get("shareFmt","post"), file = null, url = null;
+  const draw = async () => {
+    box.innerHTML = `<div class="loading"><div class="spin"></div>Making your card…</div>`;
+    const cv = await drawPowderCard(fmt); const blob = await new Promise(r=>cv.toBlob(r,"image/png")); if(url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob);
+    file = new File([blob], `snowline-${place.toLowerCase().replace(/[^a-z0-9]+/g,"-")}.png`, {type:"image/png"});
+    box.innerHTML = `<div class="seg sm" id="shFmt" style="margin-bottom:10px"><button data-f="post" class="${fmt==="post"?"on":""}">Post</button><button data-f="story" class="${fmt==="story"?"on":""}">Story</button></div>
+      <img src="${url}" alt="Snow card" style="width:100%;${fmt==="story"? "max-height:58vh;object-fit:contain;" : ""}border-radius:16px;display:block;background:#05080f">
+      <textarea id="shMsg" rows="2" class="sh-msg">${esc(hype)}</textarea>
+      <div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:8px"><button class="btn primary" id="shImg" style="flex:1">Send to friends</button><button class="btn" id="shLink" style="flex:0 0 auto">Copy link</button></div>
+      <div class="muted" style="margin-top:8px;font-size:11.5px">The message and a link to this forecast go with the picture.</div>`;
+    box.querySelectorAll("#shFmt button").forEach(b=>b.onclick=()=>{ fmt=b.dataset.f; store.set("shareFmt",fmt); draw(); });
+    $("#shImg").onclick = async () => { const text = `${$("#shMsg").value.trim()}\n${link}`;
+      try{ if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], text});
+        else if(navigator.share) await navigator.share({text, url:link});
+        else { const a=document.createElement("a"); a.href=url; a.download=file.name; a.click(); await navigator.clipboard?.writeText(text); toast("Card saved · message copied"); } }catch(e){} };
+    $("#shLink").onclick = async () => { try{ await navigator.clipboard.writeText(`${$("#shMsg").value.trim()} ${link}`); toast("Message and link copied"); }catch(e){ toast(link); } };
+  };
+  draw();
 }
-
 
 /* ================= Sheets ================= */
 function openSheet(id){ $("#"+id).classList.add("on"); document.body.style.overflow="hidden"; if(id==="setSheet") renderSyncBox(); }
