@@ -544,6 +544,20 @@ details.more-today .kv{margin-top:8px}
 .jtabs::-webkit-scrollbar{display:none}
 .jtabs button{flex:0 0 auto;background:none;border:0;border-bottom:2.5px solid transparent;color:var(--mute);font-weight:600;font-size:14px;padding:8px 10px 9px;white-space:nowrap}
 .jtabs button.on{color:var(--text);border-bottom-color:var(--ice2)}
+
+/* premium details */
+*{-webkit-tap-highlight-color:transparent}
+button,.li,.dl-day,.fx-d,details.sec > summary,.jtabs button,.trust{transition:transform .12s ease,background-color .15s ease,opacity .15s}
+button:active,.li:active,.dl-day:active,.fx-d:active,details.sec > summary:active{transform:scale(.985);opacity:.85}
+.jtabs button:active,.seg button:active{transform:none}
+.ss-l{background:#141416;border-right-color:#1f1f22}.ss-big{background:#0d0d0f;border-radius:10px}
+.callout.best{display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden}
+.callout.best > *{flex:0 0 auto}.callout.best > .bt{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}.callout.best .tipb{margin-left:0}
+.dl-l .star{display:none}
+.hs .dash,.hs-s:empty{opacity:.35}
+details.gsec[open] > .grp-b, details.sec[open] > div{animation:secIn .22s ease}
+@keyframes secIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+h1,.lt b,#ltName{letter-spacing:-.5px}
 /* ================= Clean pass: fewer boxes, more air, one clear hierarchy ================= */
 main{padding-top:4px}
 .card{background:#111113;border:0;border-radius:20px;padding:16px;margin:0 0 14px}
@@ -1070,7 +1084,7 @@ function render(){
   else { const corn = days7.filter(d=>at(C,SIM,d,12)?.sim?.key==="corn"); if(corn.length) callouts.push(`<div class="callout">🌽 <b>Corn cycle ${corn.map(dow).join(", ")}:</b> start on east-facing slopes around 10am and follow the sun.</div>`); }
   const sums = days7.map(d=>daySummary(C,SIM,d));
   let bestK = -1; sums.forEach((x,k)=>{ if(x && (bestK<0 || x.best.avg > sums[bestK].best.avg)) bestK=k; });
-  if(bestK>=0 && callouts.length<2 && S.mode!=="bc"){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout quiet">🏆 <b>Best ${MODE_NAME[S.mode].toLowerCase()} day: ${dayLabel(days7[bestK])}</b>, ${hl(b.best.from)}–${hl(b.best.to)}, ${b.best.sim.label.toLowerCase()} ${scoreChip(b.best.avg)}${tipI("best")}</div>`); }
+  if(bestK>=0 && callouts.length<2 && S.mode!=="bc"){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout quiet best"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="bt"><b>Best day: ${dayLabel(days7[bestK])}</b> · ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div>`); }
   S.bestDay = bestK>=0 ? days7[bestK] : null;
 
   const quality = C.days.map(d=>{ const x = daySummary(C,SIM,d); return x? x.best.avg : null; });
@@ -1173,7 +1187,7 @@ function renderRightNow(C, SIM, e){
       ${ts? `<div class="full"><div class="l">Best window ${tsDay}${tipI("quality")}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
       ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
       <div><div class="l">New snow</div><div class="v">${fmtSnow(now.newSnow)}${now.newSnow>0.5? ` · ${now.age<24?"last 24h":Math.round(now.age/24)+"d ago"}`:""}</div></div>
-      ${S.mode==="alpine"? `<div><div class="l">Lifts · ridgetop ${fmtWind(c.RW)} ${windU()}${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : `<div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${fmtEl(c.sl)}</div></div>`}
+      ${S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span> <span class="muted" style="white-space:nowrap">ridge ${fmtWind(c.RW)} ${windU()}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : `<div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${fmtEl(c.sl)}</div></div>`}
 
     </div>
     ${(()=>{ const more = [
@@ -1190,8 +1204,8 @@ function renderHourStrip(C, SIM){
   for(let i=C.nowIdx; i<Math.min(C.time.length, C.nowIdx+48); i++){
     const c = C.cons[i]; if(!c) continue; const t = C.time[i], hr = +t.slice(11,13);
     const pp = C.pop.get(t); const pc = pp && pp[1] ? Math.round(100*pp[0]/pp[1]) : null; const ty = ptype(c);
-    h += `<div class="hc"><div class="hc-t">${i===C.nowIdx?"Now":hl(hr).replace("a","am").replace("p","pm")}</div><div class="hc-d">${dow(t.slice(0,10))}</div>
-      <div class="hc-p" style="border-color:${pc>=20?PT[ty==="none"?"snow":ty]:"#3a3a3e"};color:${pc>=20?PT[ty==="none"?"snow":ty]:"var(--mute)"}">${pc==null?"—":pc+"%"}</div>
+    h += `<div class="hc"><div class="hc-t">${i===C.nowIdx?"Now":hl(hr).replace("a","am").replace("p","pm")}</div><div class="hc-d">${i===C.nowIdx || hr===0? dow(t.slice(0,10)) : "&nbsp;"}</div>
+      <div class="hc-p" style="border-color:${pc==null? "transparent" : pc>=20?PT[ty==="none"?"snow":ty]:"#2a2a2e"};color:${pc>=20?PT[ty==="none"?"snow":ty]:"var(--mute)"}">${pc==null? "&nbsp;" : pc+"%"}</div>
       <div class="hc-i" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${wxIcon(c, hr, 24)}</div><div class="hc-v">${fmtT(c.Te)}</div>
       ${c.snow>=0.05? `<div class="hc-s">${fmtSnow(c.snow,1)}</div>`:`<div class="hc-s muted">&nbsp;</div>`}
       <div class="hc-w">${compass(c.WD)}${fmtWind(c.W)}</div></div>`;
