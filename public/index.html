@@ -558,6 +558,14 @@ button:active,.li:active,.dl-day:active,.fx-d:active,details.sec > summary:activ
 details.gsec[open] > .grp-b, details.sec[open] > div{animation:secIn .22s ease}
 @keyframes secIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 h1,.lt b,#ltName{letter-spacing:-.5px}
+
+/* snow map */
+#miniMap{height:240px;border-radius:14px;background:#0b0b0d}
+.mm-field{filter:blur(6px);image-rendering:auto}
+.mm-pin i{display:block;width:14px;height:14px;margin:2px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.25),0 1px 6px rgba(0,0,0,.6)}
+.mm-leg{display:flex;flex-direction:column;gap:3px;margin-top:10px}.mm-bar{height:6px;border-radius:3px}
+.mm-ticks{display:flex;justify-content:space-between;font-size:10.5px;color:var(--mute)}.mm-ticks i{font-style:normal}
+.mm-play{background:var(--ice2) !important;border:0 !important;color:#04121f !important}
 /* ================= Clean pass: fewer boxes, more air, one clear hierarchy ================= */
 main{padding-top:4px}
 .card{background:#111113;border:0;border-radius:20px;padding:16px;margin:0 0 14px}
@@ -3304,13 +3312,17 @@ function renderMiniMap(){
 }
 async function drawMiniMap(){
   const card=$("#miniMapCard"); if(!card || !S.loc || !window.L) return; const L0=S.loc;
-  card.innerHTML = `<div class="card-h"><h2>Snow map</h2><button class="link" id="mmBig">Full map ↗</button></div><div id="miniMap"></div>
+  card.innerHTML = `<div class="card-h"><h2>Snow map</h2><button class="link" id="mmBig">Full map ↗</button></div><div id="miniMap"></div>${snowLegendHTML()}
     <div class="mm-ctl"><button class="mm-play" id="mmPlay" aria-label="Play">▶</button><input type="range" id="mmSlide" min="0" max="6" value="6" aria-label="Day"><span class="mm-lbl" id="mmLbl">Loading…</span></div>`;
   $("#mmBig").onclick = () => { location.hash="maps"; };
   if(miniMap){ try{ miniMap.remove(); }catch(e){} miniMap=null; } clearInterval(miniTimer);
-  miniMap = L.map("miniMap", {zoomControl:false, attributionControl:false, dragging:!L.Browser.mobile, scrollWheelZoom:false, tap:false}).setView([L0.lat, L0.lon], 9);
-  L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:13}).addTo(miniMap);
-  L.circleMarker([L0.lat,L0.lon],{radius:6,color:"#fff",weight:2,fillColor:"#ff5a5f",fillOpacity:1}).addTo(miniMap);
+  miniMap = L.map("miniMap", {zoomControl:false, attributionControl:false, dragging:!L.Browser.mobile, scrollWheelZoom:false, tap:false, zoomSnap:.25}).setView([L0.lat, L0.lon], 9.25);
+  // dark terrain underneath, snow in the middle, place names on top
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}",{maxZoom:13}).addTo(miniMap);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",{maxZoom:13, opacity:.55}).addTo(miniMap);
+  miniMap.createPane("labels"); miniMap.getPane("labels").style.zIndex = 450; miniMap.getPane("labels").style.pointerEvents = "none";
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",{maxZoom:13, pane:"labels"}).addTo(miniMap);
+  L.marker([L0.lat,L0.lon],{icon:L.divIcon({className:"mm-pin", html:"<i></i>", iconSize:[18,18]}), pane:"labels"}).addTo(miniMap);
   const N=9, step=0.075, pts=[]; for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([L0.lat+(a-(N-1)/2)*step, L0.lon+(b-(N-1)/2)*step*1.35]);
   let j; try{ j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&forecast_days=8`); }catch(e){ $("#mmLbl").textContent="Snow map unavailable"; return; }
   if(S.loc!==L0) return; if(!Array.isArray(j)) j=[j];
@@ -3318,13 +3330,32 @@ async function drawMiniMap(){
   const cum = j.map(r=>{ const H=r.hourly, ref=r.elevation; const nk=new Date(Date.now()+r.utc_offset_seconds*1000).toISOString().slice(0,13)+":00"; const i0=Math.max(0,H.time.findIndex(t=>t>=nk)); const per=days.map(()=>0);
     for(let k=i0;k<H.time.length;k++){ const [d]=periodOf(H.time[k]); const di=days.indexOf(d); if(di<0) continue; const v=snowAt(H.precipitation[k],H.temperature_2m[k],H.freezing_level_height?.[k],ref,ref); if(v) per[di]+=v.snow; }
     let s=0; return per.map(v=>s+=v); });
-  const rects = pts.map(p=>L.rectangle([[p[0]-step/2,p[1]-step*1.35/2],[p[0]+step/2,p[1]+step*1.35/2]],{stroke:false,fillOpacity:0,interactive:false}).addTo(miniMap));
-  const show = k => { rects.forEach((r,i)=>{ const v=cum[i][k]; const c=snowColor(v); r.setStyle(c==="transparent"? {fillOpacity:0} : {fillColor:c, fillOpacity:.55}); });
+  // smooth field instead of squares: interpolate the grid onto a canvas, one image per day
+  const bounds = [[pts[0][0]-step/2, pts[0][1]-step*1.35/2], [pts.at(-1)[0]+step/2, pts.at(-1)[1]+step*1.35/2]];
+  const frames = days.map((_,k)=>snowFieldURL(cum.map(c=>c[k]), N));
+  const overlay = L.imageOverlay(frames[6], bounds, {opacity:1, interactive:false, className:"mm-field"}).addTo(miniMap);
+  const show = k => { overlay.setUrl(frames[k]);
     const here = cum[Math.floor(pts.length/2)][k]; $("#mmSlide").value=k; $("#mmLbl").innerHTML = `Snow through <b>${k===0?"tonight":dow(days[k])+" "+md(days[k])}</b> · ${fmtSnow(here,0)} here`; };
   show(6); $("#mmSlide").oninput = e => { clearInterval(miniTimer); miniTimer=null; $("#mmPlay").textContent="▶"; show(+e.target.value); };
   $("#mmPlay").onclick = () => { if(miniTimer){ clearInterval(miniTimer); miniTimer=null; $("#mmPlay").textContent="▶"; return; } let k=0; show(0); $("#mmPlay").textContent="❚❚"; miniTimer=setInterval(()=>{ k++; if(k>6){ clearInterval(miniTimer); miniTimer=null; $("#mmPlay").textContent="▶"; return; } show(k); }, 900); };
   setTimeout(()=>miniMap && miniMap.invalidateSize(), 80);
 }
+/* Continuous snow colors: light blue → blue → violet → magenta, fading in from clear */
+const SNOW_RAMP = [[0.3,[125,211,252,0]],[1,[56,189,248,.55]],[3,[59,130,246,.7]],[6,[99,102,241,.75]],[12,[139,92,246,.8]],[24,[217,70,239,.82]],[40,[244,171,252,.85]]];
+function snowRGBA(v){ if(!(v>0.3)) return [0,0,0,0]; const R=SNOW_RAMP; if(v>=R.at(-1)[0]) return R.at(-1)[1];
+  for(let i=1;i<R.length;i++) if(v<=R[i][0]){ const [a,ca]=R[i-1], [b,cb]=R[i], f=(v-a)/(b-a); return ca.map((x,j)=>x+(cb[j]-x)*f); } return R.at(-1)[1]; }
+function snowFieldURL(vals, N){
+  const W = 160, cv = document.createElement("canvas"); cv.width = cv.height = W; const ctx = cv.getContext("2d"), img = ctx.createImageData(W, W);
+  const g = (a,b) => vals[Math.min(N-1,Math.max(0,a))*N + Math.min(N-1,Math.max(0,b))] || 0;
+  for(let y=0;y<W;y++) for(let x=0;x<W;x++){
+    // grid row 0 is the south edge; canvas row 0 is the north edge
+    const fa = (W-1-y)/(W-1)*(N-1), fb = x/(W-1)*(N-1), a = Math.floor(fa), b = Math.floor(fb), da = fa-a, db = fb-b;
+    const v = g(a,b)*(1-da)*(1-db) + g(a+1,b)*da*(1-db) + g(a,b+1)*(1-da)*db + g(a+1,b+1)*da*db;
+    const c = snowRGBA(v), o = (y*W+x)*4; img.data[o]=c[0]; img.data[o+1]=c[1]; img.data[o+2]=c[2]; img.data[o+3]=c[3]*255;
+  }
+  ctx.putImageData(img, 0, 0); return cv.toDataURL();
+}
+function snowLegendHTML(){ const st = [1,3,6,12,24]; return `<div class="mm-leg"><span class="mm-bar" style="background:linear-gradient(90deg,${st.map(v=>`rgba(${snowRGBA(v).slice(0,3).map(Math.round).join(",")},1)`).join(",")})"></span><span class="mm-ticks">${st.map(v=>`<i>${imp()? v+"″" : Math.round(v*2.54)}</i>`).join("")}</span></div>`; }
 
 /* ---------- nearby stations (Snow Report) ---------- */
 function stationChartSVG(s){
