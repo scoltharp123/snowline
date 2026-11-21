@@ -572,7 +572,11 @@ h1,.lt b,#ltName{letter-spacing:-.5px}
 .se-fr{margin-bottom:10px}.se-ch{display:block;margin-top:4px}.se-m{position:relative;height:16px;font-size:10.5px;color:var(--mute)}.se-m span{position:absolute;top:2px;transform:translateX(-50%)}.se-m span:first-child{transform:none}
 .sheet-b.tall{max-height:88vh;overflow-y:auto}.dl-lr{display:block;margin:6px auto 0;font-size:13.5px;color:var(--mute)}
 #hourStrip{cursor:pointer}
-#ltSub{cursor:pointer}#ltSub u{text-decoration:none;color:#c9d4e3;border-bottom:1px dashed #3a4660}
+#ltSub{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+.elv{display:inline-flex;background:#141416;border-radius:10px;padding:2px;gap:2px}
+.elv button{background:none;border:0;border-radius:8px;padding:4px 9px;font-size:12px;color:var(--mute);white-space:nowrap;line-height:1.3}
+.elv button b{font-weight:600;color:#c9d4e3;margin-right:2px}.elv button.on{background:#26262a;color:#e6edf7}.elv button.on b{color:#fff}
+.elv-r{font-size:12px;color:var(--mute)}
 .al-card{padding-top:6px}.al-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid #1f1f22}.al-row:last-of-type{border-bottom:0}.al-row b{font-size:15px}.al-row .muted{margin-top:2px;line-height:1.35}
 .al-note{padding:12px 0;color:var(--mute);font-size:13.5px;border-bottom:1px solid #1f1f22}
 .verdict{display:flex;align-items:center;gap:10px;background:#111113;border-radius:16px;padding:13px 14px;margin:0 0 10px;font-size:15px;line-height:1.35}
@@ -1015,7 +1019,9 @@ function updateTop(){
   const bandName = {base:"Base", mid:"Mid", summit:"Summit"}[S.band];
   $("#locName").textContent = L.name; $("#ltName").textContent = L.name;
   $("#locSub").textContent = `${bandName} · ${fmtEl(bandElev())}`;
-  $("#ltSub").innerHTML = `Forecast point <u>${fmtEl(bandElev())} · ${bandName}</u> ▾ · ${regionOf2(L.name)==="Other"? (L.lat.toFixed(2)+", "+L.lon.toFixed(2)) : regionOf2(L.name)}`;
+  // Base · Mid · Summit as one quiet row: each shows its elevation, the sport's default is picked, a tap switches
+  const elv = [["base","Base",L.base],["mid","Mid",(L.base+L.top)/2],["summit","Summit",L.top]];
+  $("#ltSub").innerHTML = `<span class="elv" role="tablist" aria-label="Forecast elevation">${elv.map(([k,l,ft])=>`<button data-band="${k}" class="${S.band===k?"on":""}" role="tab" aria-selected="${S.band===k}"><b>${l}</b> ${fmtEl(ft/FT)}</button>`).join("")}</span><span class="elv-r">${regionOf2(L.name)==="Other"? (L.lat.toFixed(2)+", "+L.lon.toFixed(2)) : regionOf2(L.name)}</span>`;
   const fav = S.favs.some(f=>f.name===L.name);
   $("#favBtn").classList.toggle("on", fav); $("#favBtn svg").setAttribute("fill", fav? "currentColor" : "none");
 }
@@ -4160,7 +4166,9 @@ $("#pGo").onclick = () => { const [lat,lon] = $("#pLL").value.split(",").map(Num
 /* ================= Controls ================= */
 function seg(id, attr, key, cb){ const el=$(id); el.querySelectorAll("button").forEach(b=>{ b.classList.toggle("on", String(S[key])===b.dataset[attr]); b.onclick=()=>{ S[key] = key==="win"? +b.dataset[attr] : b.dataset[attr]; store.set(key,S[key]); el.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); cb(); }; }); }
 seg("#modeSeg","m","mode",()=>{ S.autoBC = false; applyBand(); if(S.mode==="bc") bcAcknowledge(); render(); });
-applyBand(); $("#ltSub").onclick = openBandPicker; seg("#bandSeg","b","band",render); seg("#unitSeg","u","units",()=>{ render(); if(location.hash==="#maps") renderFinder(); });
+applyBand();
+$("#ltSub").onclick = e => { const b = e.target.closest("[data-band]"); if(!b) return; const k = b.dataset.band, def = ({skate:"base", classic:"base", alpine:"mid", bc:"summit"})[S.mode];
+  store.set("band_"+S.mode, k===def? null : k); applyBand(); render(); }; seg("#bandSeg","b","band",render); seg("#unitSeg","u","units",()=>{ render(); if(location.hash==="#maps") renderFinder(); });
 seg("#mapWin","w","win",()=>{ render(); tlStop(); S.tl.h = Math.min(S.grid?.maxH||240, S.win*24); if(S.tl.mode!=="fc") setTlMode("fc"); else paintField(); });
 document.querySelectorAll("#mapLayers button").forEach(b=>b.onclick=()=>{ b.classList.toggle("on"); applyLayers(); });
 
