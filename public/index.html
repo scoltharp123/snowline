@@ -553,7 +553,7 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 <div class="sheet" id="locSheet"><div class="sheet-b">
   <div class="grab"></div>
   <div class="sheet-h"><h2>Choose a spot</h2><button class="link" data-close>Done</button></div>
-  <div class="search"><input id="q" placeholder="Search any town, peak or resort" autocomplete="off" enterkeyhint="search"></div>
+  <div class="search"><input id="q" placeholder="Search any ski area, Nordic trail or town" autocomplete="off" enterkeyhint="search"></div>
   <div class="results list" id="res"></div>
   <button class="btn wide" id="mapBtn" style="margin-top:10px">📍 Drop a pin on the map</button>
   <div id="locList"></div>
@@ -3498,7 +3498,7 @@ document.querySelectorAll(".sheet").forEach(sh=>{
 
 /* ================= Location sheet ================= */
 function spotRow(sp, opts={}){
-  const nordic = /Nordic|Trails|Lodge|XC|Birkie/i.test(sp.name);
+  const nordic = sp.xc || /Nordic|Trails|Lodge|XC|Birkie/i.test(sp.name);
   return `<button class="li" data-spot="${encodeURIComponent(sp.name)}">${opts.rank?`<span class="rk">${opts.rank}</span>`:""}<span class="nm"><b>${sp.name}${nordic?'<span class="tag">XC</span>':""}</b><small>${Math.round(sp.base).toLocaleString()}–${Math.round(sp.top).toLocaleString()} ft</small></span>${S.loc?.name===sp.name?'<span style="color:var(--ice)">●</span>':""}</button>`;
 }
 /* Central Oregon first: the spots most people here look for, plus easy search by everyday names */
@@ -3521,7 +3521,7 @@ const SPOT_AKA = {
   "Birkie Trail (Cable, WI)": "american birkebeiner birkie cable hayward telemark",
   "Methow Valley Trails, WA": "methow mazama winthrop cross country xc"
 };
-const normQ = s => s.toLowerCase().replace(/\bmount\b/g, "mt").replace(/\bmtn\b/g, "mountain").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+const normQ = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\bsainte?\b/g, "st").replace(/\bmount\b/g, "mt").replace(/\bmtn\b/g, "mountain").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
 function matchSpots(q){
   const words = normQ(q).split(" ").filter(Boolean); if(!words.length) return [];
   const seen = new Set(), all = [...S.favs, ...PRESETS].filter(p=> !seen.has(p.name) && seen.add(p.name));
@@ -3551,17 +3551,97 @@ $("#shareBtn").onclick = () => openShareSheet();
 $("#bellBtn").onclick = () => openBell();
 $("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.unshift({...S.loc}); store.set("favs",S.favs); updateTop(); pushSync(); toast(i>=0? "Removed from Favorites" : "Saved to Favorites"); };
 
-let qT;
-$("#q").oninput = e => { clearTimeout(qT); const q=e.target.value.trim(); if(q.length<2){ $("#res").innerHTML=""; $("#locList").hidden=false; return; }
-  const mine = matchSpots(q), localHTML = mine.length? `<div class="grp">Snowline spots</div><div class="list">${mine.map(p=>spotRow(p)).join("")}</div>` : "";
-  $("#res").innerHTML = localHTML; bindSpotRows($("#res")); $("#locList").hidden = true;
-  qT = setTimeout(async()=>{ try{ const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en&format=json`);
-    if($("#q").value.trim()!==q) return;
-    const r = (j.results||[]).filter(x=> !mine.some(p=>Math.abs(p.lat-x.latitude)<0.03 && Math.abs(p.lon-x.longitude)<0.03))
-      .sort((a,b)=>(b.admin1==="Oregon")-(a.admin1==="Oregon"));
-    $("#res").innerHTML = localHTML + (r.length? `<div class="grp">${mine.length? "Other places" : "Search results"}</div>` + r.map((x,i)=>`<button class="li" data-i="${i}"><span class="nm"><b>${x.name}</b><small>${[x.admin1,x.country_code].filter(Boolean).join(", ")} · ${Math.round((x.elevation||0)*FT).toLocaleString()} ft</small></span></button>`).join("") : mine.length? "" : `<div class="muted" style="padding:10px 2px">No matches</div>`); bindSpotRows($("#res"));
-    $("#res").querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{ const x=r[+b.dataset.i]; closeSheet("locSheet"); openPicker(x.latitude, x.longitude, `${x.name}${x.admin1?", "+x.admin1:""}`, Math.round((x.elevation||0)*FT)); });
-  }catch(err){} }, 300); };
+/* ---------- Search: Snowline spots, then every named ski area (OpenSkiMap), then towns and peaks ---------- */
+const STATES = {AL:"alabama",AK:"alaska",AZ:"arizona",AR:"arkansas",CA:"california",CO:"colorado",CT:"connecticut",DE:"delaware",FL:"florida",GA:"georgia",HI:"hawaii",ID:"idaho",IL:"illinois",IN:"indiana",IA:"iowa",KS:"kansas",KY:"kentucky",LA:"louisiana",ME:"maine",MD:"maryland",MA:"massachusetts",MI:"michigan",MN:"minnesota",MS:"mississippi",MO:"missouri",MT:"montana",NE:"nebraska",NV:"nevada",NH:"new hampshire",NJ:"new jersey",NM:"new mexico",NY:"new york",NC:"north carolina",ND:"north dakota",OH:"ohio",OK:"oklahoma",OR:"oregon",PA:"pennsylvania",RI:"rhode island",SC:"south carolina",SD:"south dakota",TN:"tennessee",TX:"texas",UT:"utah",VT:"vermont",VA:"virginia",WA:"washington",WV:"west virginia",WI:"wisconsin",WY:"wyoming",
+  AB:"alberta",BC:"british columbia",MB:"manitoba",NB:"new brunswick",NL:"newfoundland",NS:"nova scotia",ON:"ontario",QC:"quebec",SK:"saskatchewan",YT:"yukon",NT:"northwest territories"};
+const Q_ALIAS = { slc:"salt lake city", jh:"jackson hole", lcc:"little cottonwood", bcc:"big cottonwood", pc:"park city", cda:"coeur d alene", st:"st", saint:"st", ste:"st", sainte:"st", mtn:"mountain", xcountry:"xc" };
+const KIND_W = { xc:"n", nordic:"n", classic:"n", skate:"n", skating:"n", langlauf:"n", resort:"a", resorts:"a", alpine:"a", downhill:"a", lifts:"a" };
+const STOP_W = new Set(["near","in","by","around","at","the","of","ski","skiing","area","areas","center","centre","trail","trails","cross","country","place","places","to"]);
+const BEND = [44.058, -121.315];
+const AREAS = { rows:null, p:null, src:"" };
+function loadAreas(){ return AREAS.p ||= fetch("/skiareas.json").then(r=>r.ok? r.json() : {rows:[]}).then(j=>{ AREAS.src = j.source||"";
+  AREAS.rows = (j.rows||[]).map(r=>{ const [name,lat,lon,kind,cc,reg,loc,lo,hi] = r;
+    return {name, lat, lon, kind, cc, reg, loc, lo, hi, nt: normQ(name).split(" "), ot: normQ(`${loc} ${reg} ${STATES[reg]||""}`).split(" ").filter(Boolean)}; });
+  return AREAS.rows; }).catch(()=> (AREAS.rows = [])); }
+function lev(a, b){ if(Math.abs(a.length-b.length)>2) return 9; const d = Array.from({length:a.length+1}, (_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j;
+  for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++){ d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1]) d[i][j]=Math.min(d[i][j], d[i-2][j-2]+1); }
+  return d[a.length][b.length]; }
+function tokScore(q, toks){ let best = 0;
+  for(const h of toks){ if(!h) continue;
+    if(h===q) return 4; if(h.startsWith(q)) { best = Math.max(best, 3); continue; }
+    if(q.length>=4){ const tol = q.length>=7? 2 : 1; if(lev(q, h)<=tol || (h.length>q.length && lev(q, h.slice(0,q.length))<=1)) best = Math.max(best, 2); } }
+  return best; }
+function parseQ(q){
+  let words = normQ(q).split(" ").filter(Boolean).flatMap(w=> (Q_ALIAS[w]||w).split(" "));
+  if(/\bcross country\b/.test(normQ(q))) words.push("xc");
+  let kind = null; words.forEach(w=>{ if(KIND_W[w]) kind = KIND_W[w]; });
+  const req = words.filter(w=> !KIND_W[w] && !STOP_W.has(w));
+  return { kind, req, place: req.join(" ") };
+}
+function matchAreas(P){
+  if(!AREAS.rows || !P.req.length) return [];
+  const out = [], byPlace = [], nordicMode = S.mode==="skate" || S.mode==="classic";
+  for(const a of AREAS.rows){
+    if(P.kind && !a.kind.includes(P.kind)) continue;
+    let sc = 0, inName = 0;
+    for(const w of P.req){ const n = tokScore(w, a.nt), o = tokScore(w, a.ot); if(!n && !o){ sc = -1; break; } if(n>=o){ sc += n*2; inName++; } else sc += o; }
+    if(sc < 0) continue;
+    if(normQ(a.name).startsWith(P.req.join(" "))) sc += 3;
+    if(nordicMode? a.kind.includes("n") : a.kind.includes("a")) sc += 1;
+    const d = km(BEND[0], BEND[1], a.lat, a.lon); if(d < 250) sc += 2; else if(a.cc==="US"||a.cc==="CA") sc += 1;
+    (inName? out : byPlace).push({a, sc, d});
+  }
+  return (out.length? out : byPlace).sort((x,y)=> y.sc-x.sc || x.d-y.d).slice(0, 10).map(x=>x.a);
+}
+const areaKind = a => a.kind==="an"? "Resort + Nordic" : a.kind==="n"? "Nordic" : "Resort";
+const areaWhere = a => [a.loc && a.loc!==a.name? a.loc : "", (a.cc==="US"||a.cc==="CA")? a.reg : [a.reg, a.cc].filter(Boolean).join(", ")].filter(Boolean).join(", ");
+const areaEl = a => isNum(a.lo)&&isNum(a.hi)&&a.hi-a.lo>20? ` · ${Math.round(a.lo*FT).toLocaleString()}–${Math.round(a.hi*FT).toLocaleString()} ft` : "";
+function areaRow(a, i, dist){ return `<button class="li" data-area="${i}"><span class="nm"><b>${esc(a.name)}${a.kind.includes("n")? '<span class="tag">XC</span>' : ""}</b><small>${areaKind(a)} · ${esc(areaWhere(a))}${areaEl(a)}${dist!=null? ` · ${Math.round(dist*0.621)} mi` : ""}</small></span></button>`; }
+async function pickArea(a){
+  closeSheet("locSheet"); if(location.hash && !["#forecast","#maps","#outlook"].includes(location.hash)) location.hash = "forecast";
+  let lo = a.lo, hi = a.hi;
+  if(!isNum(lo)){ try{ const j = await getJSON(`https://api.open-meteo.com/v1/elevation?latitude=${a.lat}&longitude=${a.lon}`); lo = j.elevation[0]; }catch(e){ lo = 1500; } }
+  if(!isNum(hi) || hi-lo < 30) hi = lo + (a.kind==="n"? 120 : 450);
+  const st = (a.cc==="US"||a.cc==="CA")? a.reg : (a.reg || a.cc);
+  const loc = { name: st && !a.name.endsWith(st)? `${a.name}, ${st}` : a.name, lat:a.lat, lon:a.lon, base: Math.round(lo*FT), top: Math.round(hi*FT), xc: a.kind.includes("n") || undefined };
+  if(a.kind==="n" && S.mode==="alpine"){ setMode(store.get("xcMode","skate")); toast("Switched to Nordic for this trail system"); }
+  load(loc);
+}
+let qT, qSeq = 0;
+$("#q").oninput = e => { clearTimeout(qT); const q = e.target.value.trim(), seq = ++qSeq;
+  if(q.length<2){ $("#res").innerHTML=""; $("#locList").hidden=false; return; }
+  $("#locList").hidden = true;
+  const P = parseQ(q), mine = matchSpots(P.req.join(" ") || q);
+  const words = n => normQ(n).split(" ").filter(w=>w.length>=4);
+  const near = (p, list) => list.some(m=>{ const d = km(m.lat, m.lon, p.lat, p.lon); return d < 3 || (p.name && d < 45 && words(p.name).some(w=>words(m.name).includes(w))); });
+  let areas = [], nearby = [], places = [], nearName = "";
+  const draw = () => { if(seq!==qSeq) return;
+    const A = [...areas, ...nearby.map(x=>x.a)];
+    let h = mine.length? `<div class="grp">Snowline spots</div><div class="list">${mine.map(p=>spotRow(p)).join("")}</div>` : "";
+    if(areas.length) h += `<div class="grp">Ski areas</div><div class="list">${areas.map((a,i)=>areaRow(a,i)).join("")}</div>`;
+    if(nearby.length) h += `<div class="grp">${P.kind==="n"? "Nordic areas" : P.kind==="a"? "Ski resorts" : "Ski areas"} near ${esc(nearName)}</div><div class="list">${nearby.map((x,i)=>areaRow(x.a, areas.length+i, x.d)).join("")}</div>`;
+    if(places.length) h += `<div class="grp">Towns and peaks</div><div class="list">${places.map((x,i)=>`<button class="li" data-i="${i}"><span class="nm"><b>${esc(x.name)}</b><small>${[x.admin1,x.country_code].filter(Boolean).join(", ")} · ${Math.round((x.elevation||0)*FT).toLocaleString()} ft · pick a point</small></span></button>`).join("")}</div>`;
+    if(!h) h = `<div class="muted" style="padding:10px 2px">${AREAS.rows? "No matches yet. Try a town name, like “Bozeman xc” or “ski near Salt Lake City”." : "Searching…"}</div>`;
+    if(A.length && AREAS.src) h += `<div class="muted" style="font-size:11px;margin:10px 2px 0">Ski areas from OpenSkiMap.org · © OpenStreetMap contributors</div>`;
+    $("#res").innerHTML = h; bindSpotRows($("#res"));
+    $("#res").querySelectorAll("[data-area]").forEach(b=>b.onclick=()=>pickArea(A[+b.dataset.area]));
+    $("#res").querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{ const x=places[+b.dataset.i]; closeSheet("locSheet"); openPicker(x.latitude, x.longitude, `${x.name}${x.admin1?", "+x.admin1:""}`, Math.round((x.elevation||0)*FT)); });
+  };
+  draw();
+  loadAreas().then(()=>{ if(seq!==qSeq) return; areas = matchAreas(P).filter(a=>!near(a, mine)); draw(); });
+  qT = setTimeout(async()=>{ try{
+    if(!P.place) return;
+    const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(P.place)}&count=6&language=en&format=json`); await loadAreas();
+    if(seq!==qSeq) return;
+    const g = (j.results||[]).sort((a,b)=>(b.population||0)-(a.population||0) || (b.admin1==="Oregon")-(a.admin1==="Oregon"));
+    const town = g.find(x=>/^PPL/.test(x.feature_code||"PPL")) || g[0];
+    if(town && (P.kind || areas.length < 4)){ nearName = `${town.name}${town.admin1? ", "+town.admin1 : ""}`;
+      nearby = AREAS.rows.filter(a=> (!P.kind || a.kind.includes(P.kind)) && !areas.includes(a) && !near(a, mine)).map(a=>({a, d: km(town.latitude, town.longitude, a.lat, a.lon)})).filter(x=>x.d<130).sort((x,y)=>x.d-y.d).slice(0, 8); }
+    places = g.filter(x=> !mine.some(p=>near({lat:x.latitude, lon:x.longitude}, [p]))).slice(0, nearby.length? 3 : 6);
+    draw();
+  }catch(err){} }, 280);
+};
+setTimeout(()=>{ $("#locBtn").addEventListener("click", ()=>loadAreas(), {once:true}); }, 0);   // fetch the index the first time the picker opens
 
 /* ================= Map picker ================= */
 let map, pin;
