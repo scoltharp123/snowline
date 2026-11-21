@@ -631,6 +631,19 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .leaflet-container .cco-grid img{aspect-ratio:4/3;border-radius:4px}
 .leaflet-container .cco > span{font-size:10px;padding:3px 2px 1px}
 .leaflet-container .cco-live{font-size:8.5px;padding:2px 4px;left:3px;bottom:3px}
+
+/* ===== Polish pass 3: one visual language everywhere ===== */
+/* tiles inside cards become rows with hairlines (no boxes inside boxes) */
+.card .kv{gap:0 18px}.card .kv > div{background:transparent;border-radius:0;padding:10px 0;border-top:1px solid #1f1f22}
+.card .kv .l{font-size:10.5px;letter-spacing:.6px}
+.rep{background:transparent !important;border:0 !important;padding:0 !important;margin:0 0 14px !important}
+.rep + .rep{border-top:1px solid #1f1f22 !important;padding-top:14px !important}
+/* heads-up lines (big storm, rain risk, crust, corn): quiet strips with a colored edge */
+.callout.gold,.callout.rain,.callout.crust,.callout:not(.quiet):not(.tip):not(.ih){background:#111113;border:0;border-left:3px solid var(--ce,#3b82f6);border-radius:12px;padding:10px 13px;font-size:14px;color:#d6d6da}
+.callout.gold{--ce:#a78bfa}.callout.rain{--ce:#34d399}.callout.crust{--ce:#38bdf8}
+/* daily snow: amount sits after the bar, never on top of it */
+.dl-b{gap:7px}.dl-b i{position:static;height:14px;max-width:62%;flex:0 0 auto;border-radius:4px}.dl-b em{padding-left:0;text-shadow:none;white-space:nowrap}
+.v-sub > *{flex:0 0 auto}.v-sub .vs-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}.v-sub .tipb{margin-left:2px}
 </style>
 </head>
 <body>
@@ -1160,7 +1173,7 @@ function render(){
       verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}:</b> ${why}</span>${scoreChip(sc)}</div></div>`; }
   }
   if(verdict && bestK>=0 && days7[bestK]!==vDay){ const b = sums[bestK];
-    verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg>Best this week: <b>${dayLabel(days7[bestK])}</b> ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()} ${scoreChip(b.best.avg)}${tipI("best")}</div></div>`); bestK = -1; }
+    verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="vs-t">Best this week: <b>${dayLabel(days7[bestK])}</b> ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div></div>`); bestK = -1; }
   if(bestK>=0 && callouts.length<2 && S.mode!=="bc" && days7[bestK]!==vDay){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout quiet best"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="bt"><b>Best day: ${dayLabel(days7[bestK])}</b> · ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div>`); }
   S.bestDay = bestK>=0 ? days7[bestK] : null;
 
