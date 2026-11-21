@@ -1,57 +1,45 @@
 // GET /api/pistes?lat=..&lon=.. → ski runs, Nordic trails and lifts from OpenStreetMap around a spot.
-// Cached for a week in Netlify Blobs (runs rarely change) so Overpass is asked at most once per spot per week.
+// Kept for a week in Netlify Blobs (runs rarely change), so Overpass is asked at most once per spot per week.
+// The Overpass lookup itself runs in /api/pistes-fill (a background function). This function only reads Blobs,
+// starts a fill when there's nothing fresh, and waits a few seconds for it, so it always answers quickly.
+// When the fill isn't done yet the answer says { pending: true } and the app asks again a little later.
 import { json, store } from "../lib/shared.mjs";
+import { pisteKey, fillKey, okPoint, WEEK } from "../lib/pistes.mjs";
 
-const SERVERS = [
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
-  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-  "https://overpass.private.coffee/api/interpreter",
-];
-const UA = "Snowline/1.0 (snowline-forecast.netlify.app; ski run overlay)";
-
-// Netlify ends a function at 10 s, so all servers share one ~9 s budget.
-async function overpass(q) {
-  let last; const end = Date.now() + 9000;
-  for (const url of SERVERS) {
-    const left = end - Date.now(); if (left < 1500) break;
-    const c = new AbortController(), t = setTimeout(() => c.abort(), Math.min(6500, left));
-    try {
-      const r = await fetch(url, { method: "POST", body: "data=" + encodeURIComponent(q), signal: c.signal,
-        headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA, Accept: "application/json" } });
-      if (!r.ok) throw new Error(url + " " + r.status);
-      return await r.json();
-    } catch (e) { last = e; } finally { clearTimeout(t); }
-  }
-  throw last || new Error("Overpass unavailable");
-}
-const r5 = (v) => Math.round(v * 1e5) / 1e5;
+const FILL_GAP = 3 * 60e3;     // don't start another fill for a spot within 3 minutes of the last one
+const FAIL_WAIT = 20 * 60e3;   // after a failed fill, wait 20 minutes before trying Overpass again
+const WAIT = 7000;             // how long this request waits for a fill it started
+const get = async (s, k) => { try { return await s.get(k, { type: "json" }); } catch (e) { return null; } };
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export default async (req) => {
-  const q = new URL(req.url).searchParams;
+  const u = new URL(req.url), q = u.searchParams;
   const lat = +q.get("lat"), lon = +q.get("lon");
-  if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 85) return json({ error: "lat/lon required" }, { status: 400 });
-  const kLat = lat.toFixed(2), kLon = lon.toFixed(2);
-  const key = `pistes-v1-${kLat}-${kLon}`, s = store("snowline-cache");
-  try { const c = await s.get(key, { type: "json" }); if (c && Date.now() - c.at < 7 * 864e5) return json(c, { cache: 86400 }); } catch (e) {}
-  const d = 0.06, bb = [lat - d, lon - d * 1.4, lat + d, lon + d * 1.4].map(v => v.toFixed(4)).join(",");
-  const query = `[out:json][timeout:8];(way["piste:type"](${bb});way["aerialway"]["aerialway"!~"station|pylon|goods"](${bb});node["aerialway"="station"](${bb}););out tags geom;`;
-  try {
-    const j = await overpass(query);
-    const runs = [], lifts = [], stations = [];
-    for (const e of j.elements || []) {
-      const t = e.tags || {};
-      if (e.type === "node") { stations.push({ name: t.name || "", lat: r5(e.lat), lon: r5(e.lon) }); continue; }
-      const pts = (e.geometry || []).map(p => [r5(p.lat), r5(p.lon)]); if (pts.length < 2) continue;
-      if (t.aerialway) lifts.push({ name: t.name || "", kind: t.aerialway, pts });
-      else runs.push({ name: t.name || t["piste:name"] || "", type: t["piste:type"], diff: t["piste:difficulty"] || "", groom: t["piste:grooming"] || "", area: t.area === "yes", pts });
-    }
-    const out = { at: Date.now(), runs: runs.slice(0, 900), lifts, stations, source: "© OpenStreetMap contributors" };
-    try { await s.setJSON(key, out); } catch (e) {}
-    return json(out, { cache: 86400 });
-  } catch (e) {
-    try { const c = await s.get(key, { type: "json" }); if (c) return json(c, { cache: 600 }); } catch (_) {}
-    return json({ runs: [], lifts: [], stations: [], error: String(e.message || e) }, { cache: 300 });
+  if (!okPoint(lat, lon)) return json({ error: "lat/lon required" }, { status: 400 });
+  const key = pisteKey(lat, lon), s = store("snowline-cache"), now = Date.now();
+
+  const c = await get(s, key);
+  if (c && now - c.at < WEEK) return json(c, { cache: 86400 });
+
+  const f = await get(s, fillKey(key));
+  const recent = f && now - f.at < (f.ok === false ? FAIL_WAIT : FILL_GAP);
+  if (!recent) {
+    try {
+      await s.setJSON(fillKey(key), { at: now, ok: null });
+      await fetch(new URL("/api/pistes-fill", u.origin), { method: "POST", body: JSON.stringify({ lat, lon }),
+        headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(3000) });
+    } catch (e) {}
   }
+  if (c) return json({ ...c, stale: true }, { cache: 600 });   // an older copy beats an empty map while the fill runs
+  if (f && f.ok === false && recent) return json({ runs: [], lifts: [], stations: [], error: f.error || "Overpass unavailable" }, { cache: 300 });
+
+  // Wait briefly for the fill (it's often done in a few seconds), then let the app ask again.
+  const end = Date.now() + WAIT;
+  while (Date.now() < end) {
+    await sleep(1500);
+    const d = await get(s, key); if (d && Date.now() - d.at < WEEK) return json(d, { cache: 86400 });
+    const g = await get(s, fillKey(key)); if (g && g.ok === false && g.at >= now) return json({ runs: [], lifts: [], stations: [], error: g.error }, { cache: 300 });
+  }
+  return json({ runs: [], lifts: [], stations: [], pending: true });
 };
 export const config = { path: "/api/pistes" };

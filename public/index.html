@@ -3621,12 +3621,19 @@ const SAT_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Im
 const SAT_ATTR = "Imagery © Esri, Maxar, Earthstar Geographics";
 const PISTE_COL = { novice:"#22c55e", easy:"#22c55e", intermediate:"#3b82f6", advanced:"#0b0b0b", expert:"#0b0b0b", freeride:"#f59e0b", extreme:"#ef4444" };
 S.pistes = {};
-async function loadPistes(L0){
+// One lookup per spot at a time: the map can redraw while runs are loading, and every redraw shares the same request.
+// The first lookup for a spot runs in the background on the server; until it's done the answer says pending,
+// so ask again a few times. Only a real answer is kept for this visit, so a later map open tries again.
+function loadPistes(L0){
   const k = L0.lat.toFixed(2)+","+L0.lon.toFixed(2); if(S.pistes[k]) return S.pistes[k];
   const q = `/pistes?lat=${L0.lat.toFixed(3)}&lon=${L0.lon.toFixed(3)}`;
-  let j = await api(q).catch(()=>null);
-  if(!j || (j.error && !(j.runs||[]).length)){ await new Promise(r=>setTimeout(r,2500)); j = await api(q).catch(()=>null); }   // first lookup for a spot can be slow; the server keeps it after that
-  return S.pistes[k] = j || {runs:[], lifts:[]};
+  const p = (async () => {
+    let j = await api(q).catch(()=>null);
+    for(let i=0; i<4 && (!j || j.pending); i++){ await new Promise(r=>setTimeout(r, 4000)); j = await api(q).catch(()=>null); }
+    if(!j || j.pending || (j.error && !(j.runs||[]).length)) delete S.pistes[k];
+    return j && !j.pending ? j : {runs:[], lifts:[]};
+  })();
+  return S.pistes[k] = p;
 }
 function drawPistes(m, j){
   const g = L.layerGroup();
