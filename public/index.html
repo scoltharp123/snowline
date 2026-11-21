@@ -662,10 +662,10 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 <div id="offPill">Offline · showing saved forecast</div>
 <div class="sheet" id="setSheet"><div class="sheet-b">
   <div class="grab"></div>
-  <div class="sheet-h"><h2>Settings</h2><button class="link" data-close>Done</button></div>
+  <div class="sheet-h"><h2 id="setTitle">Settings</h2><button class="link" data-close>Done</button></div>
   <div class="field">Units<div class="seg" id="unitSeg"><button data-u="imp">Inches · °F · ft</button><button data-u="met">cm · °C · m</button></div></div>
-  <div class="row" style="justify-content:space-between;align-items:center;gap:12px;margin-top:16px"><div><b>App health notices</b><div class="muted">A notification if one of Snowline's data sources breaks, and when it's fixed. Needs lock-screen notifications on.</div></div><button class="tog" id="healthTog" role="switch" aria-label="App health notices"><i></i></button></div>
-  <button class="link" id="setStatus" style="margin-top:6px;padding-left:0">Data source status</button>
+  <div id="ownerBox" hidden><div class="row" style="justify-content:space-between;align-items:center;gap:12px;margin-top:16px"><div><b>App health notices</b><div class="muted">A notification if one of Snowline's data sources breaks, and when it's fixed. Needs lock-screen notifications on.</div></div><button class="tog" id="healthTog" role="switch" aria-label="App health notices"><i></i></button></div>
+  <button class="link" id="setStatus" style="margin-top:6px;padding-left:0">Data source status</button></div>
   <div class="row" style="gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn" id="setInstall" style="flex:1">📲 Add to Home Screen</button><button class="btn" id="setWelcome" style="flex:1">👋 Welcome tour</button></div>
   <h3 style="margin:18px 0 6px">Sync across devices</h3><div id="syncBox"></div>
   <h3 style="margin:18px 0 6px">How Snowline works</h3>
@@ -4088,6 +4088,12 @@ if(!store.get("welcomed") && !linked && !last && !S.favs.length) setTimeout(open
 $("#setInstall").onclick = () => { closeSheet("setSheet"); openInstall(); };
 $("#setWelcome").onclick = () => { closeSheet("setSheet"); openWelcome(); };
 $("#setStatus").onclick = () => { closeSheet("setSheet"); openStatus(); };
+/* Owner tools (health notices, data source status) stay hidden unless turned on on this device:
+   open the app once with ?owner=1, or tap "Settings" 5 times quickly (works inside the Home Screen app too). */
+{ const showOwner = () => { $("#ownerBox").hidden = !store.get("owner", false); };
+  const qs = new URLSearchParams(location.search); if(qs.has("owner")){ store.set("owner", qs.get("owner")!=="0"); qs.delete("owner"); history.replaceState(null, "", location.pathname + (qs.toString()? "?"+qs : "") + location.hash); }
+  showOwner(); let n = 0, t0 = 0;
+  $("#setTitle").onclick = () => { const now = Date.now(); n = now - t0 < 600? n+1 : 1; t0 = now; if(n >= 5){ n = 0; store.set("owner", !store.get("owner", false)); showOwner(); toast(store.get("owner")? "Owner tools on" : "Owner tools off"); } }; }
 { const ht = $("#healthTog"); const paint = () => { const on = store.get("health", false); ht.classList.toggle("on", on); ht.setAttribute("aria-checked", on); }; paint();
   ht.onclick = () => { if(!store.get("pushOn")){ toast("Turn on lock-screen notifications in Alerts first"); return; } store.set("health", !store.get("health", false)); paint(); pushSync(); toast(store.get("health")? "Health notices on" : "Health notices off"); }; }
 </script>
