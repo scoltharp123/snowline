@@ -38,14 +38,14 @@ async function wanoga() {
 
 export default async () => {
   const s = store("snowline-cache");
-  try { const c = await s.get("meissner-live2", { type: "json" }); if (c && Date.now() - Date.parse(c.at) < 10 * 60e3) return json(c, { cache: 300 }); } catch (e) {}
+  try { const c = await s.get("meissner-live3", { type: "json" }); if (c && Date.now() - Date.parse(c.at) < 10 * 60e3) return json(c, { cache: 300 }); } catch (e) {}
   const [a, b] = await Promise.allSettled([meissnerStation(), wanoga()]);
   const out = { at: new Date().toISOString(),
     stations: [a.status === "fulfilled" ? a.value : { name: "Meissner Sno-Park", error: String(a.reason?.message || a.reason), link: "https://meissnernordic.org/weather/" },
                b.status === "fulfilled" ? b.value : { name: "Wanoga Butte", error: String(b.reason?.message || b.reason), link: "https://www.weather.gov/wrh/timeseries?site=ODT31&hours=24" }],
     cam: { name: "Meissner Sno-Park", img: "https://teacup-trailcams.fly.dev/meissner/photos/latest", page: "https://meissnernordic.org/webcam/", credit: "Meissner Nordic webcam, sponsored by Visit Bend · updates every 2 hours" },
-    links: [["Grooming report", "https://meissnernordic.org/grooming/"], ["Trail descriptions", "https://meissnernordic.org/trail-descriptions/"], ["Meissner Nordic app", "https://meissnernordic.org/apps/"]] };
-  try { await s.setJSON("meissner-live2", out); } catch (e) {}
+    links: [["Live grooming map", "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park"], ["Trails", "https://meissnernordic.org/trail-descriptions/"], ["Meissner app", "https://meissnernordic.org/apps/"]] };
+  try { await s.setJSON("meissner-live3", out); } catch (e) {}
   return json(out, { cache: 300 });
 };
 export const config = { path: "/api/meissner" };

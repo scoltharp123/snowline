@@ -19,7 +19,11 @@ export default async (req) => {
   const spot = new URL(req.url).searchParams.get("spot") || "";
   if (!BACH_SPOTS.includes(spot)) return json({ spot, links: LINKS[spot] || [] }, { cache: 3600 });
   try {
-    const [trails, reports] = await Promise.all([get(BACH + "/trails"), get(BACH + "/snow-reports?sort=date&direction=desc").catch(() => [])]);
+    const [trails, reports, liftsRaw] = await Promise.all([get(BACH + "/trails"), get(BACH + "/snow-reports?sort=date&direction=desc").catch(() => []), get(BACH + "/lifts").catch(() => [])]);
+    const clean = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+    const lifts = (Array.isArray(liftsRaw) ? liftsRaw : []).filter((l) => l.season === "winter" && l.type !== "carpet")
+      .sort((a, b) => (a.weight || 0) - (b.weight || 0))
+      .map((l) => ({ name: l.name, status: l.status, hours: clean(l.hours), wait: clean(l.wait_time) || null, area: pretty(String(l.sector?.name || "").toLowerCase()), updated: l.updated ? l.updated * 1000 : null }));
     const sum = (list) => {
       const winter = list.filter((t) => t.season === "winter" && t.include !== false);
       const open = winter.filter((t) => t.status === "open"), groomed = winter.filter((t) => t.groom_status && t.groom_status !== "not_groomed");
@@ -35,7 +39,7 @@ export default async (req) => {
     try { await mergeBachelorLog(reports); } catch (e) {}   // keep the report history for grading
     const report = r ? { date: r.date, overnight: r.overnight_amount, h24: r.computed?.["24_hour"], h48: r.computed?.["48_hour"], d7: r.computed?.["7_day"], season: r.computed?.total, base: r.base_depth, unit: r.unit_of_measurement || "in",
       text: String(r.report || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 700) } : null;
-    return json({ spot, source: "Mt. Bachelor", link: spot.includes("Nordic") ? "https://www.mtbachelor.com/nordic/conditions-grooming-report/" : "https://www.mtbachelor.com/the-mountain/lift-trail-report/", nordic, alpine, report, at: Date.now() }, { cache: 600 });
+    return json({ spot, source: "Mt. Bachelor", link: spot.includes("Nordic") ? "https://www.mtbachelor.com/nordic/conditions-grooming-report/" : "https://www.mtbachelor.com/the-mountain/lift-trail-report/", lifts, nordic, alpine, report, at: Date.now() }, { cache: 600 });
   } catch (e) {
     return json({ spot, error: String(e.message || e), link: "https://www.mtbachelor.com/nordic/conditions-grooming-report/" }, { cache: 120 });
   }

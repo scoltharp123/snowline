@@ -334,7 +334,7 @@ body:not([data-view="forecast"]) .ibtn.fo{display:none}
 #ptr.busy .spin{animation:s .8s linear infinite}
 #toast{position:fixed;left:50%;bottom:calc(var(--sab) + 96px);transform:translate(-50%,20px);background:#2c2c30;color:#fff;padding:10px 16px;border-radius:14px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:120;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 #toast.on{opacity:1;transform:translate(-50%,0)}
-#upd{position:fixed;left:50%;top:calc(var(--sat) + 15px);transform:translate(-50%,-10px);display:flex;gap:8px;align-items:center;background:#1f1f23;border:1px solid #2c2c31;color:#d1d1d6;padding:7px 12px;border-radius:99px;font-size:12.5px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:70}
+#upd{position:fixed;left:50%;top:calc(var(--sat) + 68px);transform:translate(-50%,-10px);display:flex;gap:8px;align-items:center;background:#1f1f23;border:1px solid #2c2c31;color:#d1d1d6;padding:7px 12px;border-radius:99px;font-size:12.5px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:70}
 #upd .spin{width:12px;height:12px;border-width:2px}
 #upd.on{opacity:1;transform:translate(-50%,0)}
 #app.stale{opacity:.6;transition:opacity .3s}
@@ -650,7 +650,12 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .mx-kv{display:flex;flex-direction:column;font-size:12.5px;color:#c9d4e3;gap:1px}.mx-sp{display:block;margin-top:6px}.mx-u{font-size:11px;margin-top:4px}
 .mx-cam{display:block;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;background:#0b0b0d}.mx-cam img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
 .mx-cam span{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11.5px;padding:3px 8px;border-radius:6px}
-.mx-links{gap:8px;flex-wrap:wrap;margin-top:10px}.mx-links .btn{text-decoration:none;font-size:13px;padding:7px 11px}
+
+.lf-top{display:flex;align-items:baseline;gap:8px;margin:2px 0}.lf-top b{font-family:"Space Grotesk",Inter,sans-serif;font-size:26px}.lf-top span{color:#c9d4e3;font-size:13.5px}
+.li.lf{display:flex;align-items:center;gap:10px;min-height:40px}.li.lf>i{width:8px;height:8px;border-radius:50%;flex:none}.li.lf .nm{flex:1;display:flex;flex-direction:column}.li.lf .nm small{color:#8e8e93;font-size:11.5px}.lf-s{font-size:12.5px;color:#c9d4e3;white-space:nowrap}
+.mx-gr{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #1f1f22;font-size:13.5px}.mx-gr .muted{font-size:12px;text-align:right}
+.mx-links{display:flex;gap:6px;margin-top:8px}.mx-links .btn{flex:1;text-align:center;text-decoration:none;font-size:12.5px;padding:8px 6px;white-space:nowrap}.mx-links .btn.pri{flex:1.4;background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.mx-cam img{aspect-ratio:2/1 !important}
 </style>
 </head>
 <body>
@@ -1057,7 +1062,7 @@ function updateTop(){
   if(v !== "forecast"){ $("#locName").textContent = VIEW_TITLE[v]||"Snowline"; $("#locSub").textContent = ""; return; }
   if(!L) return;
   const bandName = {base:"Base", mid:"Mid", summit:"Summit"}[S.band];
-  $("#locName").textContent = L.name; $("#ltName").textContent = L.name;
+  $("#locName").textContent = dispName(L.name); $("#ltName").textContent = dispName(L.name); $("#ltName").title = L.name;
   $("#locSub").textContent = `${bandName} · ${fmtEl(bandElev())}`;
   // Base · Mid · Summit as one quiet row: each shows its elevation, the sport's default is picked, a tap switches
   const elv = [["base","Base",L.base],["mid","Mid",(L.base+L.top)/2],["summit","Summit",L.top]];
@@ -1434,6 +1439,8 @@ function updateSeasonSummary(){
 }
 
 /* ---------- Favorites ---------- */
+const SHORT_NAMES = {"Mt. Bachelor, OR":"Mt. Bachelor","Mt. Bachelor Nordic Center, OR":"Bachelor Nordic","Meissner Nordic (Bend), OR":"Meissner Nordic"};
+function dispName(n){ return SHORT_NAMES[n] || String(n||"").replace(/,\s*[A-Z]{2}$/,""); }
 const DEFAULT_FAVS = ["Mt. Bachelor, OR","Mt. Bachelor Nordic Center, OR","Meissner Nordic (Bend), OR","Hoodoo, OR"];
 async function renderFavs(force){
   const el = $("#view-favs");
@@ -2640,6 +2647,7 @@ function openFeedback(){
 }
 
 /* ---------- Live at Meissner: the club's own station, ODOT's Wanoga Butte station, the parking-lot cam ---------- */
+function mxGroomLine(){ const m = new Date().getMonth(); return (m===11 || m<=2)? "Groomed 7 days a week, Dec–Mar, snow permitting" : "Daily grooming runs Dec–Mar; early and late season as snow allows"; }
 function renderMeissner(){
   const el = $("#mxCard"); if(!el || !S.loc) return; const M = extrasFor(S.loc).mx; if(!M) return;
   const ago2 = s => { const ms = Date.parse(s); return isFinite(ms)? ago(ms) : s; };
@@ -2656,8 +2664,9 @@ function renderMeissner(){
   const cam = M.cam? `<a class="mx-cam" href="${M.cam.page}" target="_blank" rel="noopener"><img loading="lazy" src="${M.cam.img}?t=${Math.floor(Date.now()/36e5)}" alt="Meissner Sno-Park webcam" onerror="this.closest('a').remove()"><span>Parking lot cam · every 2 hours</span></a>` : "";
   el.innerHTML = `<div class="card-h"><h2>Live at Meissner</h2><a class="muted" href="https://meissnernordic.org/weather/" target="_blank" rel="noopener">Meissner Nordic ↗</a></div>
     <div class="mx-grid">${st}</div>${cam}
-    <div class="row mx-links">${(M.links||[]).map(([l,u])=>`<a class="btn" href="${u}" target="_blank" rel="noopener">${l} ↗</a>`).join("")}</div>
-    <div class="muted" style="font-size:11px;margin-top:8px">Readings from Meissner Nordic's Sno-Park station and ODOT's Wanoga Butte station (via the National Weather Service). Grooming is posted by Meissner Nordic.</div>`;
+    <div class="mx-gr"><b>Grooming</b><span class="muted">${mxGroomLine()}</span></div>
+    <div class="mx-links">${(M.links||[]).map(([l,u],i)=>`<a class="btn ${i? "" : "pri"}" href="${u}" target="_blank" rel="noopener">${l} ↗</a>`).join("")}</div>
+    <div class="muted" style="font-size:11px;margin-top:8px">Stations: Meissner Nordic, and ODOT via the National Weather Service. Grooming is posted live by Meissner Nordic.</div>`;
 }
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
@@ -2689,7 +2698,7 @@ const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meis
 function renderGroom(){
   const card = $("#groomCard"); if(!card || !S.loc) return; const G = extrasFor(S.loc).groom;
   if(!G || S.mode==="bc"){ card.hidden = true; return; }
-  if(G.links){ if(!G.links.length){ card.hidden = true; return; }
+  if(G.links){ if(!G.links.length || S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = true; return; }
     card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><div class="row" style="gap:8px;flex-wrap:wrap">${G.links.map(([t,u])=>`<a class="btn" style="text-decoration:none" href="${u}" target="_blank" rel="noopener">${t} ↗</a>`).join("")}</div>
       <div class="muted" style="font-size:11px;margin-top:6px">Live grooming for this area is published on its own report; Snowline links to it rather than copying it.</div>`; return; }
   if(G.error){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><a href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor's grooming report ↗</a>`; return; }
@@ -2701,10 +2710,19 @@ function renderGroom(){
     : `<p class="muted" style="margin:4px 0">No ${nordic? "trails" : "runs"} marked groomed right now${D.open? ` · ${D.open} open` : ""}.</p>`;
   card.innerHTML = `<div class="card-h"><h2>${nordic? "Grooming · Nordic" : "Grooming & resort report"}</h2><a class="muted" href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor ↗</a></div>
     ${head}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
+    ${!nordic? liftsHTML(G.lifts) : ""}
     ${D.trails?.length? `<details class="nb" style="margin-top:8px"><summary>See groomed ${nordic? "trails" : "runs"}</summary><div class="list">${D.trails.map(x=>`<div class="li" style="min-height:38px"><span class="nm"><b>${esc(x.name)}</b><small>${esc((x.groom||"").replace(/ And /g," & "))}${x.updated? " · "+ago(x.updated) : ""}</small></span></div>`).join("")}</div></details>` : ""}
     ${R? `<div class="grp">Resort snow report</div><div class="fr"><div><b class="num">${R.overnight ?? "—"}″</b><small>Overnight</small></div><div><b class="num">${R.h24 ?? "—"}″</b><small>24 hours</small></div><div><b class="num">${R.base ?? "—"}″</b><small>Base</small></div></div>
       ${R.text? `<p class="muted clamp3" style="margin:8px 0 0;font-size:13px">${esc(R.text)}</p>` : ""}` : ""}
     <div class="muted" style="font-size:11px;margin-top:6px">From Mt. Bachelor's own mountain report.</div>`;
+}
+function liftsHTML(L){
+  if(!L || !L.length) return "";
+  const open = L.filter(l=>l.status==="open"), dot = s => s==="open"? "#34d399" : /hold|delay/i.test(s)? "#fbbf24" : "#52525b";
+  const waits = open.filter(l=>l.wait && /\d/.test(l.wait));
+  return `<div class="grp">Lifts</div>
+    <div class="lf-top"><b class="num">${open.length}</b><span>of ${L.length} lifts open${waits.length? ` · longest wait ${esc(waits.map(l=>l.wait).sort((a,b)=>parseInt(b)-parseInt(a))[0])}` : ""}</span></div>
+    <details class="nb" style="margin-top:6px"><summary>All lifts</summary><div class="list">${L.map(l=>`<div class="li lf"><i style="background:${dot(l.status)}"></i><span class="nm"><b>${esc(l.name)}</b><small>${esc(l.area||"")}${l.hours? " · "+esc(l.hours) : ""}</small></span><span class="lf-s">${l.status==="open"? (l.wait? esc(l.wait) : "Open") : esc(l.status.charAt(0).toUpperCase()+l.status.slice(1))}</span></div>`).join("")}</div></details>`;
 }
 async function loadAvyObs(loc){
   const X = extrasFor(loc); if(X.avyobs && Date.now()-X.avyobsAt < 15*60e3) return;
