@@ -486,6 +486,12 @@ details.sec > summary .ttl{white-space:nowrap;flex:0 0 auto}details.sec > summar
 details.more-today{margin-top:10px}details.more-today > summary{list-style:none;cursor:pointer;color:var(--ice);font-weight:600;font-size:14px;padding:4px 0}
 details.more-today > summary::-webkit-details-marker{display:none}details.more-today > summary::after{content:" ›";display:inline-block;transition:transform .2s}details.more-today[open] > summary::after{transform:rotate(90deg)}
 details.more-today .kv{margin-top:8px}
+
+.t-rg{font-size:10px;font-weight:500;fill:var(--mute)}
+.trust{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:#0f1d30;border:1px solid #22406a;border-radius:12px;padding:9px 12px;margin:10px 0 2px;color:inherit;font:inherit;cursor:pointer}
+.trust > span:first-child{font-size:18px}.trust b{display:block;font-size:14px}.trust small{color:var(--mute);font-size:12px}
+.ac-hero{display:flex;gap:14px;align-items:center;margin:2px 0 6px}.ac-big{font-size:40px;font-weight:800;color:#6ee7a0;line-height:1;min-width:64px;text-align:center}.ac-big small{font-size:18px;color:var(--mute);font-weight:600}
+.ac-lr{display:grid;grid-template-columns:92px auto 1fr;gap:10px;align-items:baseline;padding:7px 0;border-top:1px solid var(--line);font-size:14px}.ac-lr .muted{font-size:12px;text-align:right}
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -823,16 +829,20 @@ function computeAt(e){
   const time = D.time, n = time.length;
   const nowIdx = Math.max(0, time.findIndex(t=>t>=nk));
   const ids = Object.keys(D.models).filter(id=>S.enabled[id]);
+  // Tuning from the nearest snow gauge: which models have been right here at each lead time, how wet or dry each runs, and how fluffy the snow really is
+  const cal = S.learnOn ? learned() : null, fix = cal?.slrFix || 1;
+  const leadOf = i => { const dd = (i - nowIdx)/24; return dd <= 1.5 ? 1 : dd <= 4 ? 3 : 5; };
   const per = {}; // id -> hourly {snow, Te, slr, sl}
   for(const id of Object.keys(D.models)){
     const m = D.models[id]; const idx = new Map(m.time.map((t,i)=>[t,i]));
-    per[id] = time.map(t=>{ const i = idx.get(t); if(i==null) return null; return snowAt(m.P[i], m.T[i], m.FL?.[i], ref, e); });
+    per[id] = time.map((t,k)=>{ const i = idx.get(t); if(i==null) return null; const cf = cal?.corr?.[leadOf(k)]?.[id] ?? 1;
+      const v = snowAt(isNum(m.P[i])? m.P[i]*cf : m.P[i], m.T[i], m.FL?.[i], ref, e); if(v && fix!==1){ v.snow *= fix; v.slr *= fix; } return v; });
   }
   // consensus hourly
-  const wOf = id => MODELS.find(m=>m.id===id).w * learnedW(id);
+  const wOf = (id, k) => MODELS.find(m=>m.id===id).w * learnedW(id, leadOf(k));
   const cons = time.map((t,i)=>{
     let ws=0, s=0, te=0, sl=0, r=0, P=0, W=0, G=0, ww=0, fr=0, cc=0, cw=0, sw=0, swW=0, rw=0, rwW=0, rh=0, rhW=0, wu=0, wv=0;
-    for(const id of ids){ const v = per[id][i]; if(!v) continue; const w=wOf(id); ws+=w; s+=v.snow*w; te+=v.Te*w; sl+=v.sl*w; r+=v.slr*w; fr+=v.frac*w;
+    for(const id of ids){ const v = per[id][i]; if(!v) continue; const w=wOf(id, i); ws+=w; s+=v.snow*w; te+=v.Te*w; sl+=v.sl*w; r+=v.slr*w; fr+=v.frac*w;
       const raw = rawAt(id, t); if(raw){ P+=raw.P*w; if(isNum(raw.W)){W+=raw.W*w;G+=(isNum(raw.G)?raw.G:raw.W)*w;ww+=w;} if(isNum(raw.CC)){cc+=raw.CC*w;cw+=w;} if(isNum(raw.SW)){sw+=raw.SW*w;swW+=w;} const rr=ridgeWind(raw,e); if(isNum(rr)){rw+=rr*w;rwW+=w;} if(isNum(raw.RH)){rh+=raw.RH*w;rhW+=w;} if(isNum(raw.WD)){ const mag=isNum(raw.W)?Math.max(raw.W,1):1; wu+=Math.sin(raw.WD*Math.PI/180)*mag*w; wv+=Math.cos(raw.WD*Math.PI/180)*mag*w; } }
     }
     if(!ws) return null;
@@ -861,7 +871,7 @@ function computeAt(e){
   for(const E of D.ens){
     for(const mem of E.members){
       const tot = days.map(()=>0), cnt = days.map(()=>0), totD = days.map(()=>0), totN = days.map(()=>0);
-      E.time.forEach((t,i)=>{ if(t < nk) return; const [d, part] = periodOf(t); const k = dayIdx.get(d); if(k==null) return; const v = snowAt(mem.P[i], mem.T[i], null, ref, e); if(v){ tot[k]+=v.snow; cnt[k]++; if(part==="day") totD[k]+=v.snow; else totN[k]+=v.snow; } });
+      E.time.forEach((t,i)=>{ if(t < nk) return; const [d, part] = periodOf(t); const k = dayIdx.get(d); if(k==null) return; const v = snowAt(mem.P[i], mem.T[i], null, ref, e); if(v && fix!==1) v.snow *= fix; if(v){ tot[k]+=v.snow; cnt[k]++; if(part==="day") totD[k]+=v.snow; else totN[k]+=v.snow; } });
       ensDays.push({tot, cnt, totD, totN});
     }
   }
@@ -943,7 +953,8 @@ function snowBarsSVG(vals, dates, o={}){
   [[0,5,"Next 1–5 Days"],[5,10,"Next 6–10 Days"],[10,15,"Next 11–15 Days"]].forEach(([a,b,lab])=>{
     if(a >= n) return; const bb = Math.min(b,n); const seg = vals.slice(a,bb), tot = seg.reduce((x,y)=>x+(y||0),0);
     const x1 = a*cw+4, x2 = bb*cw-4, xm = (x1+x2)/2, t = seg.filter(v=>v==null).length*2 > seg.length ? "—" : fmtSnow(tot,0);
-    g += `<text x="${xm}" y="10" class="t-l">${lab}</text><path d="M${x1} 15v6M${x2} 15v6M${x1} 18H${xm-16}M${xm+16} 18H${x2}" class="t-br"/><text x="${xm}" y="22" class="t-tot">${t}</text>`;
+    const rg = o.ranges?.[a/5], rt = t!=="—" && rg && snowNum(rg[1])-snowNum(rg[0]) >= 1 ? ` <tspan class="t-rg">${Math.round(snowNum(rg[0]))}–${Math.round(snowNum(rg[1]))}</tspan>` : "", half = rt? 34 : 16;
+    g += `<text x="${xm}" y="10" class="t-l">${lab}</text><path d="M${x1} 15v6M${x2} 15v6M${x1} 18H${xm-half}M${xm+half} 18H${x2}" class="t-br"/><text x="${xm}" y="22" class="t-tot">${t}${rt}</text>`;
   });
   vv.forEach((v,i)=>{
     const x = i*cw + 5, bw = cw - 10; const val = v||0; const h = Math.max(2, val/mx*H);
@@ -957,6 +968,11 @@ function snowBarsSVG(vals, dates, o={}){
   let hh = top + H + 36;
   if(o.q){ o.q.forEach((sc,i)=>{ if(!isNum(sc)) return; const qh = 6 + sc*2.6; g += `<rect x="${i*cw+7}" y="${hh+34-qh}" width="${cw-14}" height="${qh}" rx="2" fill="${scoreColor(sc)}" opacity=".9"/>`; }); hh += 38; }
   return `<svg class="bars" width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}">${g}</svg>`;
+}
+
+/* Likely range for each 5-day block: the middle 80% of the ensemble runs */
+function bucketRanges(C){
+  return [0,5,10].map(a=>{ const sums = C.ensDays.filter(m=>m.cnt.slice(a,a+5).every(c=>c>0)).map(m=>m.tot.slice(a,a+5).reduce((x,y)=>x+y,0)); if(sums.length < 10) return null; sums.sort((x,y)=>x-y); return [sums[Math.floor(sums.length*.1)], sums[Math.floor(sums.length*.9)]]; });
 }
 function snowSummaryHTML(last24, vals, dates, o={}){
   const nowLbl = (()=>{ const d = new Date(); return DOW[d.getDay()]+" "+d.getDate()+" "+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}).replace(" ","").toLowerCase(); })();
@@ -980,7 +996,7 @@ function tidyGroups(){
   document.querySelectorAll("details.gsec").forEach(g=>{
     const cards = [...g.querySelectorAll(".grp-b > section.card")].filter(c=> !c.hidden && c.innerHTML.trim());
     g.hidden = !cards.length;
-    const names = [...new Set(cards.map(c=> (c.querySelector("h2")?.textContent || "").replace(/\s*·.*$/,"").trim()).filter(Boolean))];
+    const names = [...new Set(cards.map(c=> (c.dataset.sv || c.querySelector("h2")?.textContent || "").replace(/\s*·.*$/,"").trim()).filter(Boolean))];
     const sv = g.querySelector(".sv"); if(sv) sv.textContent = names.slice(0,3).join(" · ") + (names.length>3? ` +${names.length-3}` : "");
   });
 }
@@ -1025,7 +1041,8 @@ function render(){
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend"><span class="spin"></span>ensembles</span>` : `<button class="badge b-${conf.lvl} tipbadge" data-tip="conf" aria-label="What confidence means">${conf.label} ⓘ</button>`}</div>
-    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, ranges: bucketRanges(C), measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    ${trustLineHTML()}
     <div class="qleg"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
   </section>
   <section class="card" id="nowCard"></section>
@@ -2120,7 +2137,7 @@ function loadExtras(loc){
   const q = `lat=${loc.lat.toFixed(4)}&lon=${loc.lon.toFixed(4)}`;
   const done = () => { if(S.loc===loc && S.data) scheduleRender(loc); };
   api(`/obs?${q}`).then(r=>{ X.obs=r; done(); }).catch(()=>{});
-  api(`/verify?${q}`).then(r=>{ X.verify=r; done(); }).catch(()=>{});
+  api(`/verify?${q}`).then(r=>{ X.verify=r; done(); setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
   api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
   api(`/nws?${q}`).then(r=>{ X.nws=r; if(S.loc===loc){ renderNwsAlerts(); renderAFD(); } }).catch(()=>{});
@@ -2129,7 +2146,7 @@ function loadExtras(loc){
 }
 function nearObs(){ const X = S.loc && S.extras[S.loc.name]; const st = X?.obs?.stations?.[0]; return st && st.km <= SNOTEL_MAX_KM ? st : null; }
 function learned(){ const X = S.loc && S.extras[S.loc.name]; const v = X?.verify; return v && v.status==="ok" ? v : null; }
-function learnedW(id){ const v = learned(); return S.learnOn && v ? (v.weights[id] || 1) : 1; }
+function learnedW(id, L=1){ const v = learned(); return S.learnOn && v ? (v.wLead?.[L]?.[id] ?? v.weights?.[id] ?? 1) : 1; }
 
 function renderReport(){
   const el = $("#reportCard"); if(!el) return;
@@ -2294,6 +2311,30 @@ function finishWelcome(){
   if(go) load(go); else { updateTop(); if(modeChanged && S.data) render(); }
   toast(add.length? `★ ${add.length} spot${add.length>1?"s":""} saved to Favorites` : "You're all set");
 }
+
+/* ---------- Keeping score: save this morning's Snowline forecast at the gauge so it can be graded after the storm ---------- */
+function saveScore(loc){
+  try{
+    const v = S.extras[loc.name]?.verify, st = v?.station; if(!st?.id || !st.elevFt || S.loc!==loc || !S.data) return;
+    if(Object.keys(S.data.models).filter(id=>id!=="hrrr").length < 5) return;   // only complete forecasts
+    const D = S.data, C = computeAt(st.elevFt/FT), issued = C.time[C.nowIdx]?.slice(0,10); if(!issued) return;
+    const key = `score-${st.id}`; if(store.get(key) === issued) return;
+    const tot = {}; C.time.forEach((t,i)=>{ const c = C.cons[i]; if(!c || i < C.nowIdx) return; const d = t.slice(0,10); if(d <= issued) return; const o = tot[d] ||= [0,0,0]; o[0] += c.snow; o[1] += (c.P||0)/25.4; o[2]++; });
+    const fc = Object.entries(tot).filter(([d,o])=>o[2]>=22).sort().slice(0,5).map(([d,o])=>[d, Math.round(o[0]*10)/10, Math.round(o[1]*100)/100]);
+    if(!fc.length) return;
+    fetch(API+"/score", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({station: st.id, issued, fc})}).then(r=>{ if(r.ok) store.set(key, issued); }).catch(()=>{});
+  }catch(e){}
+}
+const MNAME = id => MODELS.find(m=>m.id===id)?.name || id;
+function trustLineHTML(){
+  const v = S.loc && S.extras[S.loc.name]?.verify; if(!v || !S.learnOn) return "";
+  const R = v.record;
+  if(R && R.storms >= 1) return `<button class="trust" data-open="g-acc"><span>🎯</span><span><b>Snowline here: within 2″ on ${R.within} of ${R.storms} storm${R.storms>1?"s":""}</b><small>Graded against ${esc(v.station.name)} · tap for the scorecard</small></span></button>`;
+  if(v.status !== "ok") return "";
+  const b = v.bestByLead || {}, b1 = b[1], b5 = b[5];
+  return `<button class="trust" data-open="g-acc"><span>🎯</span><span><b>Tuned to ${esc(v.station.name)}</b><small>${b1? `${MNAME(b1)} has been closest 1 day out` : ""}${b5 && b5!==b1? `, ${MNAME(b5)} 5 days out` : ""}${v.basis==="last-season"? " (last winter)" : ""}</small></span></button>`;
+}
+document.addEventListener("click", e=>{ const b = e.target.closest("[data-open]"); if(!b) return; const g = document.querySelector(`details[data-sec="${b.dataset.open}"]`); if(!g) return; g.open = true; setTimeout(()=>g.scrollIntoView({behavior:"smooth", block:"start"}), 50); });
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
@@ -2308,6 +2349,10 @@ const TIPS = {
   snowlevel: () => ["Snow level", `<p><b>The elevation where falling precipitation turns from rain to snow.</b> Above it you get snow; below it, rain or a mix.</p>
     <p>Snowline takes the freezing level from the models and sets the snow level about 1,000 ft below it, since snowflakes take a while to melt on the way down.</p>
     <p class="muted">If the snow level is close to your elevation, small changes decide rain or snow, so expect wetter, heavier snow and less certain totals.</p>`],
+  accuracy: () => ["How accuracy is measured", `<p><b>The gauge:</b> the nearest SNOTEL station, an automated government snow gauge in the mountains, measures new snow depth and the water in it every day.</p>
+    <p><b>Snowline's record:</b> each morning Snowline saves its own forecast for that gauge's elevation. After a storm it's compared with what fell. "Within 2″" counts a storm as close when the miss is 2″ or less, or 25% on big storms.</p>
+    <p><b>Model by model:</b> every model's forecasts made 1, 3 and 5 days ahead are compared with the gauge over the last 90 days (last winter when it's been dry). The models that have been closest get more weight in Snowline's blend for that lead time, and models that run wet or dry are corrected, within limits.</p>
+    <p class="muted">Measured depth runs a little low because new snow settles, so the water amount counts most when picking the closest model.</p>`],
   chance: () => ["Chance of snow", `<p>Each weather center runs its model many times with slightly different starting conditions (the "ensemble"). <b>The chance is the share of those runs</b> that give at least that much snow over the window you picked.</p>
     <p class="muted">70% for 6″ means 7 out of 10 runs show 6″ or more. It's a better guide to the odds than any single forecast number.</p>`],
 };
@@ -2891,21 +2936,29 @@ function renderAlerts(){
 /* ---------- Forecast vs. actual ---------- */
 function renderTrack(){
   const el = $("#trackCard"); if(!el) return; const v = S.extras[S.loc?.name]?.verify;
-  const st = (v?.storms||[]).filter(x=>!x.ongoing); if(!st.length){ el.remove(); return; }
+  if(!v || (v.status!=="ok" && !(v.storms||[]).length)){ el.innerHTML = ""; return; }
+  const st = (v.storms||[]).filter(x=>!x.ongoing), R = v.record, sn = v.station.name;
   const range = (a,b) => a===b? md(a) : `${md(a)}–${md(b)}`;
-  const verdict = (f,o) => { if(o < 1) return {t:"—", c:"var(--mute)"}; const r=f/o; return r>1.35? {t:"Forecast too high", c:"#ffb35c"} : r<0.7? {t:"Forecast too low", c:"#ffb35c"} : {t:"Close", c:"#6ee7a0"}; };
-  const L0 = st[0], vd = verdict(L0.fcstSnow, L0.obsSnow);
-  const maxV = Math.max(L0.fcstHi, L0.obsSnow, 1);
-  const bar = (val, col, lab) => `<div class="tk-row"><span class="tk-l">${lab}</span><div class="tk-bar"><i style="width:${Math.max(3,val/maxV*100)}%;background:${col}"></i></div><b class="num">${fmtSnow(val,0)}</b></div>`;
-  const ratios = st.filter(x=>x.obsSnow>=1).map(x=>x.fcstSnow/x.obsSnow);
-  const avg = ratios.length>=2 ? Math.round(ratios.reduce((a,b)=>a+b,0)/ratios.length*100) : null;
-  el.innerHTML = `<div class="card-h"><h2>Forecast vs. actual</h2><span class="muted">${v.station.name} SNOTEL</span></div>
-    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px;margin-bottom:6px"><b>Last storm · ${range(L0.start,L0.end)}</b><span style="color:${vd.c};font-weight:700">${vd.t}</span></div>
-    ${bar(L0.fcstSnow, "#5aa2ff", "Forecast")}${bar(L0.obsSnow, "#e6edf7", "Measured")}
-    <div class="muted" style="margin:2px 0 10px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)} · water ${L0.fcstWater.toFixed(2)}" forecast vs ${L0.obsWater.toFixed(2)}" measured${L0.closest? `<br>Closest model: <b style="color:var(--text)">${MODELS.find(m=>m.id===L0.closest.id)?.name || L0.closest.id}</b> (${fmtSnow(L0.closest.s,0)})` : ""}</div>
-    ${st.length>1? `<div class="list">${st.slice(1).map(x=>{ const w=verdict(x.fcstSnow,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(x.fcstSnow,0)} fcst · ${fmtSnow(x.obsSnow,0)} got${x.closest? ` · best ${MODELS.find(m=>m.id===x.closest.id)?.name || ""}` : ""} · <b style="color:${w.c}">${w.t==="Close"? "✓" : w.t.includes("high")? "↑" : "↓"}</b></span></div>`; }).join("")}</div>`:""}
-    ${avg!=null? `<div class="muted" style="margin-top:8px">Over the last ${ratios.length} storms, forecasts averaged <b>${avg}%</b> of what fell.</div>`:""}
-    <div class="muted" style="margin-top:6px;font-size:12px">Average of the models' forecasts made the day before each snow day, at the station's elevation. Measured snow is the depth gain at the station, which runs a little low as new snow settles.</div>`;
+  const verdict = (f,o) => { if(o < 1) return {t:"—", c:"var(--mute)"}; const d = f-o; return Math.abs(d) <= Math.max(2, 0.25*o)? {t:"Close", c:"#6ee7a0"} : d>0? {t:"Too high", c:"#ffb35c"} : {t:"Too low", c:"#ffb35c"}; };
+  // 1. Snowline's own record
+  const rec = R && R.storms? `<div class="ac-hero"><div class="ac-big num">${R.within}<small>/${R.storms}</small></div><div><b>storms within 2″</b> (or 25% on big ones)<br><span class="muted">Average miss ${fmtSnow(R.avgErr)}${R.bias? ` · ran ${R.bias>1.08? Math.round((R.bias-1)*100)+"% high" : R.bias<0.92? Math.round((1-R.bias)*100)+"% low" : "about even"}` : ""}</span></div></div>`
+    : `<div class="ac-hero"><div class="ac-big">🎯</div><div><b>Snowline keeps score here</b><br><span class="muted">Every morning it saves its forecast for ${esc(sn)}, then grades it against what the gauge measures. The first grades come after the next storm.</span></div></div>`;
+  // 2. who has been right, by how far ahead
+  const B = v.bestByLead || {}, SL = v.scoresByLead || {};
+  const leadRow = (L, lab) => { const id = B[L]; if(!id) return ""; const s = SL[L]?.[id]; return `<div class="ac-lr"><span>${lab}</span><b>${MNAME(id)}</b><span class="muted">${s? `avg miss ${imp()? (s.mae/25.4).toFixed(2)+"″" : (s.mae/10).toFixed(1)+" cm"} water` : ""}</span></div>`; };
+  const leads = v.status==="ok"? `<div class="grp">Closest models here${v.basis==="last-season"? " · last winter" : " · last 90 days"}</div>${leadRow(1,"Tomorrow")}${leadRow(3,"3 days out")}${leadRow(5,"5+ days out")}` : "";
+  // 3. last storm
+  let last = "";
+  if(st.length){ const L0 = st[0], s1 = L0.snowline?.s, vd = verdict(isNum(s1)? s1 : L0.fcstSnow, L0.obsSnow), maxV = Math.max(L0.fcstHi, L0.obsSnow, s1||0, 1);
+    const bar = (val, col, lab) => `<div class="tk-row"><span class="tk-l">${lab}</span><div class="tk-bar"><i style="width:${Math.max(3,val/maxV*100)}%;background:${col}"></i></div><b class="num">${fmtSnow(val,0)}</b></div>`;
+    last = `<div class="grp">Last storm · ${range(L0.start,L0.end)}<span style="float:right;color:${vd.c};text-transform:none;letter-spacing:0">${vd.t}</span></div>
+      ${isNum(s1)? bar(s1, "#38bdf8", "Snowline") : ""}${bar(L0.fcstSnow, "#5a6b85", "Models avg")}${bar(L0.obsSnow, "#e6edf7", "Measured")}
+      <div class="muted" style="margin:2px 0 4px;font-size:13px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)}${L0.closest? ` · closest: <b style="color:var(--text)">${MNAME(L0.closest.id)}</b> (${fmtSnow(L0.closest.s,0)})` : ""}</div>
+      ${st.length>1? `<div class="list" style="margin-top:6px">${st.slice(1,5).map(x=>{ const f = isNum(x.snowline?.s)? x.snowline.s : x.fcstSnow, w=verdict(f,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(f,0)} ${isNum(x.snowline?.s)? "Snowline" : "fcst"} · ${fmtSnow(x.obsSnow,0)} fell</span><b style="color:${w.c};margin-left:10px;font-size:12px;white-space:nowrap">${w.t}</b></div>`; }).join("")}</div>` : ""}`; }
+  el.dataset.sv = R && R.storms? `${R.within} of ${R.storms} storms within 2″` : v.status==="ok"? `Tuned to ${sn}` : "Last storms";
+  el.innerHTML = `<div class="card-h"><h2>Forecast accuracy${tipI("accuracy")}</h2></div><div class="muted" style="margin:-4px 0 10px;font-size:13px">Graded at the ${esc(sn)} snow gauge, ${fmtEl(v.station.elevFt/FT)}</div>
+    ${rec}${leads}${last}
+    <div class="muted" style="margin-top:10px;font-size:12px">Snowline uses this: models that have been right here get more say, separately for tomorrow and the days after, and models that run wet or dry here are corrected${v.slrFix && v.slrFix!==1? `. Snow-to-water ratio tuned to this gauge (${v.slrFix>1? "+" : ""}${Math.round((v.slrFix-1)*100)}%)` : ""}.</div>`;
 }
 
 /* ---------- Measured snow map layer ---------- */
