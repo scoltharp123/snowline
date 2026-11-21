@@ -98,6 +98,26 @@ export async function buildBrief(sub, force) {
   if (!lines.length || (mode === "snow" && !matters && !force)) return null;
   return { title: "☀️ Snowline morning brief", body: lines.join("\n"), url: "/#favs", tag: "snowline-daily" };
 }
+// ---- Storm watch: a big storm 2–5 days out at a favorite, sent once per storm ----
+export async function buildWatch(sub) {
+  if (sub.prefs?.watch === false) return null;
+  const min = sub.prefs?.watchIn ?? 8, seen = new Set(sub.watched || []), out = [];
+  for (const sp of (sub.spots || []).slice(0, 6)) {
+    let j; try { const elev = Math.round((sp.top || sp.base || 5000) / 3.28084);
+      j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${sp.lat}&longitude=${sp.lon}&elevation=${elev}&daily=snowfall_sum&forecast_days=7&timezone=auto`); } catch (e) { continue; }
+    const d = j.daily; if (!d?.time) continue; const v = d.snowfall_sum.map(x => (x || 0) / 2.54);
+    // storms = runs of days with 1"+ ; watch the biggest one that starts 2–5 days from now
+    const storms = []; let cur = null; v.forEach((x, k) => { if (x >= 1) { if (!cur) cur = { s: k, e: k, tot: 0 }; cur.e = k; cur.tot += x; } else if (cur) { storms.push(cur); cur = null; } }); if (cur) storms.push(cur);
+    const st = storms.filter(x => x.s >= 2 && x.s <= 5 && x.tot >= min).sort((a, b) => b.tot - a.tot)[0]; if (!st) continue;
+    const key = `${sp.name}|${d.time[st.s]}`; if (seen.has(key)) continue;
+    const short = sp.name.replace(/,\s*[A-Z]{2}$/, "").replace(/\s*\(.*\)$/, "");
+    const when = st.e > st.s ? `${DOW[new Date(d.time[st.s] + "T12:00:00Z").getUTCDay()]}–${DOW[new Date(d.time[st.e] + "T12:00:00Z").getUTCDay()]}` : DOW[new Date(d.time[st.s] + "T12:00:00Z").getUTCDay()];
+    out.push({ key, v: st.tot, spot: sp.name, title: `🚨 Storm watch: ${Math.round(st.tot)}" for ${short} ${when}`, line: `${short}: about ${Math.round(st.tot)}" ${when}. Tap to share it with friends.` });
+  }
+  if (!out.length) return null;
+  out.sort((a, b) => b.v - a.v);
+  return { title: out[0].title, body: out.slice(0, 2).map(x => x.line).join("\n"), url: `/?s=${encodeURIComponent(out[0].spot)}#share`, tag: "snowline-watch", keys: out.map(x => x.key) };
+}
 export function combine(alert, brief) {
   if (alert && brief) return { ...alert, body: alert.body + "\n" + brief.body };
   return alert || brief || null;

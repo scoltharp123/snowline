@@ -12,6 +12,8 @@ export default async (req) => {
     const rec = { sub: b.sub, spots: b.spots.slice(0, 6).map(x => ({ name: String(x.name).slice(0, 80), lat: +x.lat, lon: +x.lon, base: +x.base, top: +x.top })), prefs: { overnight: +b.prefs?.overnight || 4, forecast: +b.prefs?.forecast || 8, brief: ["off","snow","daily"].includes(b.prefs?.brief) ? b.prefs.brief : "snow", units: b.prefs?.units === "met" ? "met" : "imp" },
       rules: (Array.isArray(b.rules) ? b.rules : []).slice(0, 12).map(r => ({ spot: String(r.spot).slice(0, 100), type: r.type === "overnight" ? "overnight" : "forecast", win: ["h24","d3","d5","d10"].includes(r.win) ? r.win : "d3", inches: Math.max(0.5, Math.min(60, +r.inches || 6)), spotObj: r.spotObj ? { name: String(r.spotObj.name).slice(0, 80), lat: +r.spotObj.lat, lon: +r.spotObj.lon, base: +r.spotObj.base, top: +r.spotObj.top } : null })),
       created: Date.now() };
+    try { const old = await s.get(subKey(b.sub.endpoint), { type: "json" }); if (old?.watched) rec.watched = old.watched; } catch (e) {}   // don't re-announce storms already sent
+    rec.prefs.watch = b.prefs?.watch !== false;
     await s.setJSON(subKey(b.sub.endpoint), rec);
     return json({ ok: true });
   }

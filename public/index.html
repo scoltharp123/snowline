@@ -567,6 +567,7 @@ h1,.lt b,#ltName{letter-spacing:-.5px}
 .mm-ticks{display:flex;justify-content:space-between;font-size:10.5px;color:var(--mute)}.mm-ticks i{font-style:normal}
 .mm-play{background:var(--ice2) !important;border:0 !important;color:#04121f !important}
 .sh-msg{width:100%;margin-top:10px;background:#141416;border:1px solid #26262a;border-radius:12px;color:var(--text);padding:10px 12px;font:15px/1.4 Inter,sans-serif;resize:none}
+.tog{flex:0 0 auto;width:50px;height:30px;border-radius:16px;border:0;background:#2c2c30;position:relative;padding:0;transition:background .2s}.tog i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}.tog.on{background:#34c759}.tog.on i{transform:translateX(20px)}
 /* ================= Clean pass: fewer boxes, more air, one clear hierarchy ================= */
 main{padding-top:4px}
 .card{background:#111113;border:0;border-radius:20px;padding:16px;margin:0 0 14px}
@@ -781,6 +782,8 @@ function snowAt(P, Tref, FLmodel, ref, e){
 }
 
 /* ================= Data ================= */
+// a storm-watch notification opens the forecast with the share card ready
+if(location.hash==="#share"){ S.pendingShare = true; history.replaceState(null, "", location.pathname + location.search + "#forecast"); }
 const libsReady = new Promise(r=>{ if(window.Chart && window.L) r(); else document.addEventListener("DOMContentLoaded", ()=>r(), {once:true}); });
 // Open-Meteo answers 429 when busy (per phone/network); retry busy, server and network errors with growing waits.
 const OM_CACHE = "om-answers-v1";
@@ -876,6 +879,7 @@ async function load(loc){
   S.data = { ref, models, ens: [], ensNames: [], time:first.time, offset:first.offset, tz:first.tz, fetched:new Date(), ensPending:true };
   MEM.set(loc.name, {t:Date.now(), data:S.data});
   loadExtras(loc); await libsReady; if(S.loc!==loc) return; render(); saveSnap(loc);
+  if(S.pendingShare){ S.pendingShare = false; setTimeout(()=>openShareSheet(), 600); }
   const data = S.data;
   const retry = i => { data.retrying = (data.retrying||0)+1; setTimeout(()=>fetchDet(MODELS[i], loc, ref).then(x=>{ data.retrying--; if(x){ data.models[MODELS[i].id] = x; if(x.time.length > data.time.length) data.time = x.time; data.fetched = new Date(); } if(S.loc===loc) scheduleRender(loc); }), 5000 + i*700); };
   det.forEach((d,i)=>{ if(d===TIMEOUT) detPs[i].then(x=>{ if(x){ data.models[MODELS[i].id] = x; if(x.time.length > data.time.length) data.time = x.time; scheduleRender(loc); } else retry(i); }); else if(!d) retry(i); });
@@ -3011,7 +3015,7 @@ function evalAlerts(F){
 }
 function pushSpots(){ const L = S.favs.length? S.favs : (S.loc? [S.loc] : []); return L.slice(0,6).map(x=>({name:x.name, lat:x.lat, lon:x.lon, base:x.base, top:x.top})); }
 function pushRules(){ const all=[...S.favs, ...PRESETS]; return alertRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
-async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units}})}); }catch(e){} }
+async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true)}})}); }catch(e){} }
 function renderAlerts(){
   const el = $("#view-alerts"); const spots = finderSpots(); const on = store.get("pushOn", false);
   if(!alertRules().length && !store.get("alertsSeeded")){ store.set("alerts", [{spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); store.set("alertsSeeded", 1); }
@@ -3020,6 +3024,8 @@ function renderAlerts(){
     : !supported ? `<div class="muted">This browser can't show lock-screen notifications; alerts still show at the top of the Forecast tab.</div>`
     : `<div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:10px"><div><b>Lock-screen notifications</b><div class="muted">Checked around 6am each morning</div></div><button class="btn ${on?"":"primary"}" id="pToggle" style="flex:0 0 auto">${on? "Turn off" : "Turn on"}</button></div>${on? `<div style="margin-top:14px"><b>Morning brief</b><div class="muted">Around 6am, one line per favorite: overnight snow, more today, Bachelor grooming, the temperature up top</div>
       <div class="seg sm" id="briefSeg" style="margin-top:8px">${[["off","Off"],["snow","Snow days"],["daily","Every day"]].map(([k,l])=>`<button data-b="${k}" class="${store.get("brief","snow")===k?"on":""}">${l}</button>`).join("")}</div></div>
+      <div class="row" style="justify-content:space-between;align-items:center;gap:12px;margin-top:14px"><div><b>Storm watch</b><div class="muted">One heads-up when 8″+ is coming to a favorite 2–5 days out, ready to share</div></div>
+      <button class="tog ${store.get("watch",true)?"on":""}" id="watchTog" role="switch" aria-checked="${store.get("watch",true)}" aria-label="Storm watch"><i></i></button></div>
       <button class="link" id="pTest">Send a test notification</button>`:""}`;
   el.innerHTML = `<div class="vh"><h1>Alerts</h1></div>
     <div class="card"><h2>Your alerts</h2><div class="muted" style="margin:4px 0 8px">Matches show at the top of the Forecast tab${on? " and on your lock screen" : ""}.</div>
@@ -3043,9 +3049,10 @@ function renderAlerts(){
     if(on){ try{ const sub = await pushSub(); if(sub){ await post({action:"unsubscribe", endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); } }catch(e){} store.set("pushOn", false); toast("Lock-screen alerts off"); renderAlerts(); return; }
     try{ const perm = await Notification.requestPermission(); if(perm!=="granted"){ toast("Notifications are blocked in Settings"); return; }
       const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
-      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
+      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
     }catch(e){ toast("Couldn't turn on notifications"); } };
   document.querySelectorAll("#briefSeg button").forEach(b=>b.onclick=()=>{ store.set("brief", b.dataset.b); document.querySelectorAll("#briefSeg button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(b.dataset.b==="off"? "Morning brief off" : b.dataset.b==="daily"? "Morning brief every day" : "Morning brief on snow days"); });
+  const wt = $("#watchTog"); if(wt) wt.onclick = () => { const on = !store.get("watch", true); store.set("watch", on); wt.classList.toggle("on", on); wt.setAttribute("aria-checked", on); pushSync(); toast(on? "Storm watch on" : "Storm watch off"); };
   const tb = $("#pTest"); if(tb) tb.onclick = async () => { try{ const sub = await pushSub(); const r = await post({action:"test", endpoint:sub?.endpoint}); toast(r.ok? "Test sent" : "Test failed"); }catch(e){ toast("Test failed"); } };
 }
 
