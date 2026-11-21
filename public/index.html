@@ -623,6 +623,14 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .verdict{display:block;padding:12px 14px}.v-main{display:flex;align-items:center;gap:10px}
 .v-sub{display:flex;align-items:center;gap:6px;margin:9px 0 0 20px;padding-top:9px;border-top:1px solid #1f1f22;font-size:13px;color:#c9d4e3;white-space:nowrap;overflow:hidden}
 .v-sub b{color:#fff}.v-sub .sc{font-size:11.5px;padding:1px 6px}.v-sub .tipb{margin-left:auto}
+
+/* cam callouts on maps: small thumbnails (Leaflet's own CSS sets marker images to width:auto, so be specific) */
+.leaflet-container .cco{width:96px;max-width:96px;padding:2px;border-radius:9px}
+.leaflet-container .cco.multi{width:104px;max-width:104px}
+.leaflet-container .cco img{width:100% !important;max-width:100% !important;height:auto;aspect-ratio:16/10;object-fit:cover;border-radius:6px}
+.leaflet-container .cco-grid img{aspect-ratio:4/3;border-radius:4px}
+.leaflet-container .cco > span{font-size:10px;padding:3px 2px 1px}
+.leaflet-container .cco-live{font-size:8.5px;padding:2px 4px;left:3px;bottom:3px}
 </style>
 </head>
 <body>
