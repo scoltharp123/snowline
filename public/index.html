@@ -611,6 +611,18 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .ctrl .seg button{min-height:30px;padding:5px 8px;font-size:13px}
 .qleg{margin-top:10px;font-size:11px}
 .more-h{margin:26px 4px 10px}
+
+/* top of the forecast: one tidy stack */
+#ltStatus:empty{display:none}
+.elv-r{font-size:12.5px;font-weight:600;color:var(--ice);text-decoration:none;margin-left:auto}
+#ltSub{flex-wrap:nowrap}.elv{min-width:0}.elv button{padding:4px 8px}
+.ctrl #modeSeg{background:#141416}.ctrl #modeSeg button{min-height:32px;font-size:13.5px}
+.al-strip{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}
+.al-strip button{display:flex;align-items:center;gap:9px;width:100%;background:#17132a;border:0;border-left:3px solid #8b5cf6;border-radius:12px;padding:9px 12px;color:#e9e3ff;font-size:14px;text-align:left}
+.al-strip span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.al-strip i{font-style:normal;color:#a78bfa;font-size:18px}
+.verdict{display:block;padding:12px 14px}.v-main{display:flex;align-items:center;gap:10px}
+.v-sub{display:flex;align-items:center;gap:6px;margin:9px 0 0 20px;padding-top:9px;border-top:1px solid #1f1f22;font-size:13px;color:#c9d4e3;white-space:nowrap;overflow:hidden}
+.v-sub b{color:#fff}.v-sub .sc{font-size:11.5px;padding:1px 6px}.v-sub .tipb{margin-left:auto}
 </style>
 </head>
 <body>
@@ -1021,7 +1033,7 @@ function updateTop(){
   $("#locSub").textContent = `${bandName} · ${fmtEl(bandElev())}`;
   // Base · Mid · Summit as one quiet row: each shows its elevation, the sport's default is picked, a tap switches
   const elv = [["base","Base",L.base],["mid","Mid",(L.base+L.top)/2],["summit","Summit",L.top]];
-  $("#ltSub").innerHTML = `<span class="elv" role="tablist" aria-label="Forecast elevation">${elv.map(([k,l,ft])=>`<button data-band="${k}" class="${S.band===k?"on":""}" role="tab" aria-selected="${S.band===k}"><b>${l}</b> ${fmtEl(ft/FT)}</button>`).join("")}</span><span class="elv-r">${regionOf2(L.name)==="Other"? (L.lat.toFixed(2)+", "+L.lon.toFixed(2)) : regionOf2(L.name)}</span>`;
+  $("#ltSub").innerHTML = `<span class="elv" role="tablist" aria-label="Forecast elevation">${elv.map(([k,l,ft])=>`<button data-band="${k}" class="${S.band===k?"on":""}" role="tab" aria-selected="${S.band===k}"><b>${l}</b> ${fmtEl(ft/FT)}</button>`).join("")}</span>${RESORT_SITE[L.name]? `<a class="elv-r" href="${RESORT_SITE[L.name]}" target="_blank" rel="noopener">Site ↗</a>` : ""}`;
   const fav = S.favs.some(f=>f.name===L.name);
   $("#favBtn").classList.toggle("on", fav); $("#favBtn svg").setAttribute("fill", fav? "currentColor" : "none");
 }
@@ -1137,8 +1149,10 @@ function render(){
       const wet = rain >= 2 && sc < 6.5, gale = gust >= 72 && sc < 6.5;
       const [lvl, head] = wet? ["skip", `Skip it ${who.toLowerCase()}`] : gale? ["meh", `Windy ${who.toLowerCase()}`] : sc>=8? ["go", `Go! ${who} is epic`] : sc>=6.5? ["go", `Worth it ${who.toLowerCase()}`] : sc>=5? ["ok", `Good day ${who.toLowerCase()}`] : sc>=3.5? ["meh", `Fair ${who.toLowerCase()}`] : ["skip", `Skip it ${who.toLowerCase()}`];
       const why = wet? `rain at ${fmtEl(e)}` : gale? `gusts to ${fmtWind(gust)} ${windU()}, ${lab}` : `${lab}, best ${when}`;
-      verdict = `<div class="verdict v-${lvl}"><i></i><span><b>${head}:</b> ${why}</span>${scoreChip(sc)}</div>`; }
+      verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}:</b> ${why}</span>${scoreChip(sc)}</div></div>`; }
   }
+  if(verdict && bestK>=0 && days7[bestK]!==vDay){ const b = sums[bestK];
+    verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg>Best this week: <b>${dayLabel(days7[bestK])}</b> ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()} ${scoreChip(b.best.avg)}${tipI("best")}</div></div>`); bestK = -1; }
   if(bestK>=0 && callouts.length<2 && S.mode!=="bc" && days7[bestK]!==vDay){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout quiet best"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="bt"><b>Best day: ${dayLabel(days7[bestK])}</b> · ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div>`); }
   S.bestDay = bestK>=0 ? days7[bestK] : null;
 
@@ -1910,7 +1924,9 @@ async function checkAlerts(){
   if(!activeRules().length){ $("#alertBanner").innerHTML=""; return; }
   try{ const F = await loadFinder(); const hits = evalAlerts(F);
     document.querySelector('#tabs a[data-v="alerts"]').classList.toggle("has", hits.length>0);
-    $("#alertBanner").innerHTML = hits.length? `<div class="callout gold" style="margin-top:0">🔔 <b>Snow alert${hits.length>1?"s":""}:</b> ${hits.slice(0,4).map(h=>`${h.x.spot.name} ${fmtSnow(h.v)} in ${h.w}`).join(" · ")} <a href="#alerts">Manage</a></div>` : "";
+    $("#alertBanner").innerHTML = hits.length? `<div class="al-strip">${hits.slice(0,3).map(h=>{ const here = S.loc && h.x.spot.name===S.loc.name;
+        return `<button data-alspot="${encodeURIComponent(h.x.spot.name)}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round"><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 003.4 0"/></svg><span><b>${here? "Here" : esc(h.x.spot.name.replace(/, [A-Z]{2}$/,""))}</b> ${fmtSnow(h.v,0)} in ${h.w}</span>${here? "" : "<i>›</i>"}</button>`; }).join("")}</div>` : "";
+    $("#alertBanner").querySelectorAll("[data-alspot]").forEach(b=>b.onclick=()=>{ const n = decodeURIComponent(b.dataset.alspot); if(S.loc?.name===n){ location.hash="alerts"; return; } const sp = [...S.favs,...PRESETS].find(x=>x.name===n); if(sp){ scrollTo(0,0); load(sp); } });
   }catch(e){}
 }
 /* ================= Avalanche ================= */
@@ -3412,7 +3428,7 @@ function statusPill(rep){
   if(R.status==="Closed") return `<span class="st-pill st-closed"><i></i>Closed</span>`;
   return "";
 }
-function renderStatus(){ const el = $("#ltStatus"); if(!el || !S.loc) return; el.innerHTML = statusPill(S.extras[S.loc.name]?.report) + resortSiteHTML(S.loc.name); }
+function renderStatus(){ const el = $("#ltStatus"); if(!el || !S.loc) return; el.innerHTML = statusPill(S.extras[S.loc.name]?.report); }
 
 /* ---------- alert bell on each spot ---------- */
 function spotRules(name){ return alertRules().filter(r=>r.spot===name); }
