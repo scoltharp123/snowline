@@ -427,7 +427,7 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .tl-row input[type=range]{flex:1;min-width:0;accent-color:var(--ice);height:30px}
 .sbar{margin-top:6px}.sbar-g{height:9px;border-radius:5px}
 .sbar-t{position:relative;height:15px;font-size:10px;color:var(--mute)}.sbar-t span{position:absolute;top:2px;transform:translateX(-50%)}.sbar-t span:first-child{transform:none}.sbar-t span:last-child{transform:translateX(-100%)}
-.snowfield{image-rendering:auto;pointer-events:none}
+.snowfield{image-rendering:auto;pointer-events:none;filter:blur(3px)}
 .map-base{display:flex;background:rgba(15,23,42,.85);border-radius:10px;padding:3px;gap:2px;backdrop-filter:blur(6px)}
 .map-base button{border:0;background:none;color:#cbd5e1;font:600 12px Inter,system-ui;padding:6px 9px;border-radius:8px;min-height:30px}.map-base button.on{background:#334155;color:#fff}
 .map-fsb{width:40px;height:40px;border-radius:50%;border:0;background:rgba(15,23,42,.85);color:#fff;font-size:18px;backdrop-filter:blur(6px)}
@@ -1902,13 +1902,15 @@ function applyLayers(){
 
 /* ---------- Big map: Topo / Satellite basemap and full screen ---------- */
 function bigMapChrome(){
-  const layers = { topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15, attribution:"© OpenStreetMap, SRTM | © OpenTopoMap"}),
+  const layers = { dark: L.layerGroup([L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, attribution:"Esri, USGS"}), L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, opacity:.55}), L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, pane:"labelsTop"})]),
+    topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15, attribution:"© OpenStreetMap, SRTM | © OpenTopoMap"}),
     sat: L.layerGroup([L.tileLayer(SAT_TILES,{maxZoom:15, attribution:SAT_ATTR}), L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, opacity:.9})]) };
-  let cur = store.get("bigBase","topo"); if(!layers[cur]) cur="topo"; layers[cur].addTo(bigMap);
+  if(!bigMap.getPane("labelsTop")){ bigMap.createPane("labelsTop"); bigMap.getPane("labelsTop").style.zIndex = 450; bigMap.getPane("labelsTop").style.pointerEvents = "none"; }
+  let cur = store.get("bigBase2","dark"); if(!layers[cur]) cur="dark"; layers[cur].addTo(bigMap);
   const Base = L.Control.extend({ onAdd(){ const d=L.DomUtil.create("div","map-base"); L.DomEvent.disableClickPropagation(d);
-    d.innerHTML=[["topo","Topo"],["sat","Satellite"]].map(([k,l])=>`<button type="button" data-b="${k}">${l}</button>`).join("");
+    d.innerHTML=[["dark","Dark"],["topo","Topo"],["sat","Satellite"]].map(([k,l])=>`<button type="button" data-b="${k}">${l}</button>`).join("");
     const paint=()=>d.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.b===cur));   // toggle classes only: replacing the buttons would let the tap fall through to the map
-    d.querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(b.dataset.b===cur) return; bigMap.removeLayer(layers[cur]); cur=b.dataset.b; store.set("bigBase",cur); layers[cur].addTo(bigMap); (layers[cur].eachLayer? layers[cur].eachLayer(x=>x.bringToBack()) : layers[cur].bringToBack()); paint(); });
+    d.querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(b.dataset.b===cur) return; bigMap.removeLayer(layers[cur]); cur=b.dataset.b; store.set("bigBase2",cur); layers[cur].addTo(bigMap); (layers[cur].eachLayer? layers[cur].eachLayer(x=>x.bringToBack()) : layers[cur].bringToBack()); paint(); });
     paint(); return d; } });
   new Base({position:"topright"}).addTo(bigMap);
   const Fs = L.Control.extend({ onAdd(){ const b=L.DomUtil.create("button","map-fsb"); b.type="button"; b.setAttribute("aria-label","Full screen map"); b.textContent="⤢"; L.DomEvent.disableClickPropagation(b);
@@ -3381,7 +3383,7 @@ async function drawMiniMap(){
 }
 /* Continuous snow colors: light blue → blue → violet → magenta, fading in from clear */
 const SNOW_RAMP = [[0.3,[125,211,252,0]],[1,[56,189,248,.55]],[3,[59,130,246,.7]],[6,[99,102,241,.75]],[12,[139,92,246,.8]],[24,[217,70,239,.82]],[40,[244,171,252,.85]]];
-function snowRGBA(v){ if(!(v>0.3)) return [0,0,0,0]; const R=SNOW_RAMP; if(v>=R.at(-1)[0]) return R.at(-1)[1];
+function snowRGBAc(v){ if(!(v>0.3)) return [0,0,0,0]; const R=SNOW_RAMP; if(v>=R.at(-1)[0]) return R.at(-1)[1];
   for(let i=1;i<R.length;i++) if(v<=R[i][0]){ const [a,ca]=R[i-1], [b,cb]=R[i], f=(v-a)/(b-a); return ca.map((x,j)=>x+(cb[j]-x)*f); } return R.at(-1)[1]; }
 function snowFieldURL(vals, N){
   const W = 160, cv = document.createElement("canvas"); cv.width = cv.height = W; const ctx = cv.getContext("2d"), img = ctx.createImageData(W, W);
@@ -3392,11 +3394,11 @@ function snowFieldURL(vals, N){
     const v = g(a,b)*(1-da)*(1-db) + g(a+1,b)*da*(1-db) + g(a,b+1)*(1-da)*db + g(a+1,b+1)*da*db;
     // feather the edges so the field fades into the map instead of ending in a hard square
     const ex = Math.min(x, W-1-x)/(W*.18), ey = Math.min(y, W-1-y)/(W*.18), edge = Math.min(1, ex) * Math.min(1, ey), fe = edge*edge*(3-2*edge);
-    const c = snowRGBA(v), o = (y*W+x)*4; img.data[o]=c[0]; img.data[o+1]=c[1]; img.data[o+2]=c[2]; img.data[o+3]=c[3]*255*fe;
+    const c = snowRGBAc(v), o = (y*W+x)*4; img.data[o]=c[0]; img.data[o+1]=c[1]; img.data[o+2]=c[2]; img.data[o+3]=c[3]*255*fe;
   }
   ctx.putImageData(img, 0, 0); return cv.toDataURL();
 }
-function snowLegendHTML(){ const st = [1,3,6,12,24]; return `<div class="mm-leg"><span class="mm-bar" style="background:linear-gradient(90deg,${st.map(v=>`rgba(${snowRGBA(v).slice(0,3).map(Math.round).join(",")},1)`).join(",")})"></span><span class="mm-ticks">${st.map(v=>`<i>${imp()? v+"″" : Math.round(v*2.54)}</i>`).join("")}</span></div>`; }
+function snowLegendHTML(){ const st = [1,3,6,12,24]; return `<div class="mm-leg"><span class="mm-bar" style="background:linear-gradient(90deg,${st.map(v=>`rgba(${snowRGBAc(v).slice(0,3).map(Math.round).join(",")},1)`).join(",")})"></span><span class="mm-ticks">${st.map(v=>`<i>${imp()? v+"″" : Math.round(v*2.54)}</i>`).join("")}</span></div>`; }
 
 /* ---------- nearby stations (Snow Report) ---------- */
 function stationChartSVG(s){
