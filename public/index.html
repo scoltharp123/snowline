@@ -644,6 +644,13 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 /* daily snow: amount sits after the bar, never on top of it */
 .dl-b{gap:7px}.dl-b i{position:static;height:14px;max-width:62%;flex:0 0 auto;border-radius:4px}.dl-b em{padding-left:0;text-shadow:none;white-space:nowrap}
 .v-sub > *{flex:0 0 auto}.v-sub .vs-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}.v-sub .tipb{margin-left:2px}
+.mx-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.mx-st{padding:2px 0 10px}.mx-st + .mx-st{border-left:1px solid #1f1f22;padding-left:16px}
+.mx-h{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:13.5px}.mx-h .muted{font-size:11.5px}.mx-h a{font-size:12px}
+.mx-big{font-family:"Space Grotesk",Inter,sans-serif;font-size:38px;font-weight:700;line-height:1.1;margin:4px 0 2px}
+.mx-kv{display:flex;flex-direction:column;font-size:12.5px;color:#c9d4e3;gap:1px}.mx-sp{display:block;margin-top:6px}.mx-u{font-size:11px;margin-top:4px}
+.mx-cam{display:block;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;background:#0b0b0d}.mx-cam img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
+.mx-cam span{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11.5px;padding:3px 8px;border-radius:6px}
+.mx-links{gap:8px;flex-wrap:wrap;margin-top:10px}.mx-links .btn{text-decoration:none;font-size:13px;padding:7px 11px}
 </style>
 </head>
 <body>
@@ -1196,6 +1203,7 @@ function render(){
     <div class="qleg"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
+  ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
   <section class="card" id="nowCard"></section>
   ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
   <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
@@ -1228,7 +1236,7 @@ function render(){
   const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -2324,6 +2332,7 @@ function loadExtras(loc){
   const q = `lat=${loc.lat.toFixed(4)}&lon=${loc.lon.toFixed(4)}`;
   const done = () => { if(S.loc===loc && S.data) scheduleRender(loc); };
   api(`/obs?${q}`).then(r=>{ X.obs=r; done(); }).catch(()=>{});
+  if(loc.name==="Meissner Nordic (Bend), OR") api("/meissner").then(r=>{ X.mx=r; if(S.loc===loc) renderMeissner(); }).catch(()=>{ X.mx={stations:[]}; if(S.loc===loc) renderMeissner(); });
   api(`/season?${q}`).then(r=>{ X.season=r; if(S.loc===loc) renderSeasonCard(); }).catch(()=>{});
   api(`/verify?${q}`).then(r=>{ X.verify=r; done(); setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
@@ -2628,6 +2637,27 @@ function openFeedback(){
       fc:{last24: S.ctx.last24 ?? null, today: daily[0], next24, tempF: c? c.Te*9/5+32 : null}})}); closeSheet("tipSheet"); toast("Thanks! Report sent"); }
     catch(e){ $("#fbSend").disabled = false; toast("Couldn't send. Try again"); } };
   openSheet("tipSheet");
+}
+
+/* ---------- Live at Meissner: the club's own station, ODOT's Wanoga Butte station, the parking-lot cam ---------- */
+function renderMeissner(){
+  const el = $("#mxCard"); if(!el || !S.loc) return; const M = extrasFor(S.loc).mx; if(!M) return;
+  const ago2 = s => { const ms = Date.parse(s); return isFinite(ms)? ago(ms) : s; };
+  const tF = v => v==null? "—" : imp()? `${Math.round(v)}°` : `${Math.round((v-32)*5/9)}°`, wnd = v => v==null? "—" : imp()? `${Math.round(v)}` : `${Math.round(v*1.609)}`;
+  const spark = sr => { if(!sr || sr.length < 4) return ""; const v = sr.map(r=>r[1]), lo = Math.min(...v), hi = Math.max(...v), W = 110, H = 28;
+    const pts = v.map((x,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H - (hi===lo? H/2 : (x-lo)/(hi-lo)*H)).toFixed(1)}`).join(" ");
+    return `<svg viewBox="0 -2 ${W} ${H+4}" width="${W}" height="${H+4}" class="mx-sp"><polyline points="${pts}" fill="none" stroke="#7dd3fc" stroke-width="1.6"/></svg><small class="muted">24 h: ${tF(lo)} to ${tF(hi)}</small>`; };
+  const st = (M.stations||[]).map(s => s.error? `<div class="mx-st"><div class="mx-h"><b>${esc(s.name)}</b><a href="${s.link}" target="_blank" rel="noopener">Open ↗</a></div><div class="muted">Not reporting right now.</div></div>`
+    : `<div class="mx-st"><div class="mx-h"><b>${esc(s.name)}</b><span class="muted">${s.elevFt? fmtEl(s.elevFt/FT) : ""}</span></div>
+      <div class="mx-big num">${tF(s.tempF)}</div>
+      <div class="mx-kv"><span>Wind ${s.windDir||""} ${wnd(s.windMph)}${s.gustMph!=null? `–${wnd(s.gustMph)}` : ""} ${windU()}</span><span>Humidity ${s.rh!=null? s.rh+"%" : "—"}</span></div>
+      ${spark(s.series)}
+      <div class="muted mx-u">${s.time? "Updated "+ago2(s.time) : s.updated? "Updated "+esc(s.updated) : ""}</div></div>`).join("");
+  const cam = M.cam? `<a class="mx-cam" href="${M.cam.page}" target="_blank" rel="noopener"><img loading="lazy" src="${M.cam.img}?t=${Math.floor(Date.now()/36e5)}" alt="Meissner Sno-Park webcam" onerror="this.closest('a').remove()"><span>Parking lot cam · every 2 hours</span></a>` : "";
+  el.innerHTML = `<div class="card-h"><h2>Live at Meissner</h2><a class="muted" href="https://meissnernordic.org/weather/" target="_blank" rel="noopener">Meissner Nordic ↗</a></div>
+    <div class="mx-grid">${st}</div>${cam}
+    <div class="row mx-links">${(M.links||[]).map(([l,u])=>`<a class="btn" href="${u}" target="_blank" rel="noopener">${l} ↗</a>`).join("")}</div>
+    <div class="muted" style="font-size:11px;margin-top:8px">Readings from Meissner Nordic's Sno-Park station and ODOT's Wanoga Butte station (via the National Weather Service). Grooming is posted by Meissner Nordic.</div>`;
 }
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
@@ -3585,6 +3615,7 @@ const ROAD_CAM_FILTER = { "Mt. Bachelor, OR": /^Century Dr/i, "Mt. Bachelor Nord
 const RESORT_CAMS = {
   "Mt. Bachelor, OR": BACH_CAMS,
   "Mt. Bachelor Nordic Center, OR": [BACH_CAMS.find(c=>c.id==="mtb-16")],
+  "Meissner Nordic (Bend), OR": [{id:"meissner-lot", name:"Meissner Sno-Park", img:"https://teacup-trailcams.fly.dev/meissner/photos/latest", page:"https://meissnernordic.org/webcam/", src:"Meissner Nordic · every 2 h", lat:43.9843, lon:-121.5269}],
   "Timberline, OR": [TIMB("snowstake","Snow stake",45.3318,-121.7102), TIMB("lodge","Timberline Lodge",45.3311,-121.7112), TIMB("FloodEast","Magic Mile",45.3400,-121.7101), TIMB("FloodSouth","Jeff Flood",45.3205,-121.7082), TIMB("palmerbottom","Palmer / Silcox",45.3436,-121.7091), TIMB("pucci","Pucci",45.3331,-121.7176), TIMB("brunotop","Bruno's",45.3006,-121.7468), TIMB("summit","Summit Pass",45.3020,-121.7431), TIMB("SummitBus","Summit Pass shuttle",45.3025,-121.7441)],
 };
 function camKey(c){ return c.id!=null? (String(c.id).includes("-")? c.id : "odot-"+c.id) : c.img; }
