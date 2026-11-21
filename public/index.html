@@ -1373,7 +1373,7 @@ function renderDisc(C, e, winTot, lo, hi, modelTots, SIM){
 
 const chartBase = () => ({
   responsive:true, maintainAspectRatio:false, animation:false,
-  plugins:{ legend:{position:"bottom",labels:{color:"#8b9cba",boxWidth:8,boxHeight:8,usePointStyle:true,padding:12,font:{size:11}}}, tooltip:{mode:"index",intersect:false} },
+  plugins:{ legend:{position:"bottom",labels:{color:"#8b9cba",boxWidth:8,boxHeight:8,usePointStyle:true,padding:12,font:{size:11}}}, tooltip:{mode:"index",intersect:false, callbacks:{ label: it => { const v = it.parsed?.x!=null && it.chart.options.indexAxis==="y"? it.parsed.x : it.parsed?.y; return ` ${it.dataset.label}: ${isNum(v)? (Math.abs(v)>=10? Math.round(v) : Math.round(v*10)/10).toLocaleString() : "—"}`; } }} },
   scales:{ x:{ticks:{color:"#8b9cba",font:{size:10},maxRotation:0,autoSkipPadding:6},grid:{display:false}}, y:{ticks:{color:"#8b9cba",font:{size:10},maxTicksLimit:5},grid:{color:"#1a2540"},border:{display:false},beginAtZero:true} }
 });
 
@@ -1448,7 +1448,7 @@ function renderElevChart(C0){
   o.indexAxis = "y";
   o.scales = { y:{type:"linear", min:imp()?loFt:loFt/FT, max:imp()?hiFt:hiFt/FT, ticks:{color:"#8fa1bf",callback:v=>v.toLocaleString()+(imp()?" ft":" m")}, grid:{color:"#1a2540"}},
                x:{beginAtZero:true, ticks:{color:"#8fa1bf"}, grid:{color:"#1a2540"}, title:{display:true,text:`${N}-day snow (${imp()?"in":"cm"})`,color:"#8fa1bf"}} };
-  o.plugins.tooltip = {mode:"nearest", intersect:false, axis:"y"};
+  o.plugins.tooltip = {mode:"nearest", intersect:false, axis:"y", callbacks:{ title: it => `${Math.round(it[0].parsed.y).toLocaleString()} ${imp()? "ft" : "m"}`, label: it => ` ${it.dataset.label}: ${fmtSnow(imp()? it.parsed.x : it.parsed.x/2.54, 0)}` }};
   const pts = arr => arr.map((v,i)=>({x:v, y: imp()? levels[i] : levels[i]/FT}));
   S.charts.elev = new Chart($("#cElev"), {type:"line", data:{datasets:[
     {label:"Model max", data:pts(mx), borderColor:"transparent", backgroundColor:"rgba(125,211,252,.15)", pointRadius:0, fill:"+1"},
@@ -1460,12 +1460,17 @@ function renderElevChart(C0){
 function renderSL(C){
   const L=S.loc; const start=C.nowIdx, end=Math.min(C.time.length,start+24*7);
   const slice = C.cons.slice(start,end);
-  const labels = C.time.slice(start,end).map(t=>t.slice(11,13)==="00"? dow(t.slice(0,10)) : t.slice(11,13)==="12"?"noon":"");
+  const times = C.time.slice(start,end);
+  const labels = times.map(t=>t.slice(11,13)==="12"? dow(t.slice(0,10)) : "");   // one day name, centered on each day
   const conv = m => imp()? m*FT : m;
   const o = chartBase();
-  o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.grid.display=false;
-  o.scales.y = {position:"left", ticks:{color:"#8fa1bf",callback:v=>Math.round(v).toLocaleString()}, grid:{color:"#1a2540"}, title:{display:true,text:imp()?"snow level (ft)":"snow level (m)",color:"#8fa1bf"}};
-  o.scales.y2 = {position:"right", beginAtZero:true, ticks:{color:"#8fa1bf"}, grid:{display:false}, title:{display:true,text:imp()?"precip in/hr":"precip mm/hr",color:"#8fa1bf"}};
+  o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.ticks.font={size:11, weight:"600"}; o.scales.x.ticks.color="#c9d4e3";
+  o.scales.x.grid = {display:true, drawTicks:false, color: ctx => times[ctx.index]?.slice(11,13)==="00"? "#22304f" : "transparent"};   // a line at each midnight
+  o.plugins.legend.labels.filter = it => it.text !== "Precip";
+  o.plugins.tooltip.callbacks = { title: it => { const t = times[it[0].dataIndex]; return t? `${dow(t.slice(0,10))} ${hl(+t.slice(11,13))}` : ""; },
+    label: it => it.dataset.label==="Precip"? ` Precip ${it.parsed.y.toFixed(2)}${imp()? '"' : " mm"}/hr` : ` ${it.dataset.label} ${Math.round(it.parsed.y).toLocaleString()} ${imp()? "ft" : "m"}` };
+  o.scales.y = {position:"left", ticks:{color:"#8fa1bf",maxTicksLimit:6,callback:v=>Math.round(v).toLocaleString()}, grid:{color:"#1a2540"}, title:{display:true,text:imp()?"snow level (ft)":"snow level (m)",color:"#8fa1bf"}};
+  o.scales.y2 = {position:"right", beginAtZero:true, ticks:{color:"#8fa1bf",maxTicksLimit:4,callback:v=>imp()? (v>=0.1? v.toFixed(2) : +v.toFixed(3)+"") : +v.toFixed(1)+""}, grid:{display:false}, title:{display:true,text:imp()?"precip in/hr":"precip mm/hr",color:"#8fa1bf"}};
   const flat = v => slice.map(()=>v);
   S.charts.sl = new Chart($("#cSL"), {data:{labels, datasets:[
     {type:"line", label:"Snow level", data:slice.map(c=>c?conv(c.sl):null), borderColor:"#a78bfa", borderWidth:2, pointRadius:0, yAxisID:"y", tension:.3},
