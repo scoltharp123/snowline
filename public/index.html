@@ -569,7 +569,7 @@ h1,.lt b,#ltName{letter-spacing:-.5px}
 .sh-msg{width:100%;margin-top:10px;background:#141416;border:1px solid #26262a;border-radius:12px;color:var(--text);padding:10px 12px;font:15px/1.4 Inter,sans-serif;resize:none}
 .tog{flex:0 0 auto;width:50px;height:30px;border-radius:16px;border:0;background:#2c2c30;position:relative;padding:0;transition:background .2s}.tog i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}.tog.on{background:#34c759}.tog.on i{transform:translateX(20px)}
 .se-hero{display:flex;align-items:center;gap:14px;margin:0 0 12px}.se-big{font-size:46px;font-weight:800;line-height:1}
-.se-fr{margin-bottom:10px}.se-ch{display:block;margin-top:4px}
+.se-fr{margin-bottom:10px}.se-ch{display:block;margin-top:4px}.se-m{position:relative;height:16px;font-size:10.5px;color:var(--mute)}.se-m span{position:absolute;top:2px;transform:translateX(-50%)}.se-m span:first-child{transform:none}
 /* ================= Clean pass: fewer boxes, more air, one clear hierarchy ================= */
 main{padding-top:4px}
 .card{background:#111113;border:0;border-radius:20px;padding:16px;margin:0 0 14px}
@@ -2466,7 +2466,7 @@ document.addEventListener("click", e=>{ const b = e.target.closest("[data-open]"
 function renderSeason(){
   const el = $("#seasonCard"); if(!el || !S.loc) return; const Z = extrasFor(S.loc).season;
   if(!Z || Z.status!=="ok"){ el.innerHTML = ""; return; }
-  const N = Z.now, P = N.pct, sr = Z.series.filter(r=>r[1]!=null || r[3]!=null);
+  const N = Z.now, P = N.med >= 2? N.pct : null, sr = Z.series.filter(r=>r[1]!=null || r[3]!=null);
   const word = P==null? "" : P>=130? "Way above normal" : P>=110? "Above normal" : P>=90? "About normal" : P>=70? "Below normal" : "Well below normal";
   const col = P==null? "#e6edf7" : P>=110? "#7dd3fc" : P>=90? "#86efac" : P>=70? "#fde68a" : "#fca5a5";
   el.dataset.sv = P!=null? `${P}% of normal snowpack` : `${fmtSnow(N.depth||0,0)} on the ground`;
@@ -2475,13 +2475,13 @@ function renderSeason(){
   const X = i => i/(Math.max(1,n-1))*W, Y = v => H - v/mx*H;
   const line = k => sr.map((r,i)=> r[k]==null? null : `${X(i).toFixed(1)},${Y(r[k]).toFixed(1)}`).filter(Boolean).join(" ");
   const area = sr.some(r=>r[1]!=null)? `M0,${H} L${sr.map((r,i)=>`${X(i).toFixed(1)},${Y(r[1]??0).toFixed(1)}`).join(" L")} L${W},${H}Z` : "";
-  const months = sr.map((r,i)=>[r[0],i]).filter(([d])=>d.slice(8)==="01").map(([d,i])=>`<text x="${X(i)}" y="${H+14}" font-size="10" fill="var(--mute)" text-anchor="middle">${new Date(d+"T12:00:00Z").toLocaleString([], {month:"short", timeZone:"UTC"})}</text>`).join("");
+  const months = sr.map((r,i)=>[r[0],i]).filter(([d])=>d.slice(8)==="01").map(([d,i])=>`<span style="left:${(X(i)/W*100).toFixed(1)}%">${new Date(d+"T12:00:00Z").toLocaleString([], {month:"short", timeZone:"UTC"})}</span>`).join("");
   const unit = imp()? "″" : " cm", sw = v => v==null? "—" : imp()? v.toFixed(1)+"″" : Math.round(v*2.54)+" cm";
   el.innerHTML = `<div class="card-h"><h2>Season so far${tipI("season")}</h2></div>
-    <div class="se-hero">${P!=null? `<div class="se-big num" style="color:${col}">${P}%</div><div><b>${word}</b><br><span class="muted">snowpack for ${new Date(N.date+"T12:00:00Z").toLocaleDateString([], {month:"short", day:"numeric", timeZone:"UTC"})}</span></div>` : `<div><b>Early season</b><br><span class="muted">Not enough snow yet to compare with normal.</span></div>`}</div>
+    <div class="se-hero">${P!=null? `<div class="se-big num" style="color:${col}">${P}%</div><div><b>${word}</b><br><span class="muted">snowpack for ${new Date(N.date+"T12:00:00Z").toLocaleDateString([], {month:"short", day:"numeric", timeZone:"UTC"})}</span></div>` : `<div><b>Early season</b><br><span class="muted">Too little snow so far, here or in a normal year, for a fair % of normal. It shows once the snowpack builds.</span></div>`}</div>
     <div class="fr se-fr"><div><b class="num">${N.depth!=null? fmtSnow(N.depth,0) : "—"}</b><small>On the ground</small></div><div><b class="num">${fmtSnow(Z.fallen,0)}</b><small>Measured since Oct 1</small></div><div><b class="num">${sw(N.swe)}</b><small>Snow water${N.med!=null? ` · normal ${sw(N.med)}` : ""}</small></div></div>
-    <svg viewBox="0 -4 ${W} ${H+20}" width="100%" class="se-ch"><defs><linearGradient id="seG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8" stop-opacity=".45"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs>
-      ${area? `<path d="${area}" fill="url(#seG)"/>` : ""}<polyline points="${line(3)}" fill="none" stroke="#8b93a7" stroke-width="1.5" stroke-dasharray="4 4"/><polyline points="${line(1)}" fill="none" stroke="#7dd3fc" stroke-width="2.2"/>${months}</svg>
+    <svg viewBox="0 -4 ${W} ${H+4}" width="100%" height="120" preserveAspectRatio="none" class="se-ch"><defs><linearGradient id="seG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8" stop-opacity=".45"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs>
+      ${area? `<path d="${area}" fill="url(#seG)"/>` : ""}<polyline points="${line(3)}" fill="none" stroke="#8b93a7" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/><polyline points="${line(1)}" fill="none" stroke="#7dd3fc" stroke-width="2.2" vector-effect="non-scaling-stroke"/></svg><div class="se-m">${months}</div>
     <div class="qleg" style="margin-top:4px"><span><i style="background:#7dd3fc"></i>This season</span><span><i style="background:#8b93a7"></i>Normal</span></div>
     <div class="muted" style="font-size:11.5px;margin-top:6px">${esc(Z.station.name)} snow gauge, ${fmtEl(Z.station.elevFt/FT)}. Normal is the 1991–2020 median.</div>`;
 }
