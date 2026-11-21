@@ -473,6 +473,19 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .callout.ih{display:flex;gap:12px;align-items:flex-start;padding:12px 40px 12px 13px}.callout.ih img{border-radius:10px;flex:0 0 auto}.callout.ih > div{flex:1;min-width:0;line-height:1.4}
 .ih-ic{flex:0 0 40px;height:40px;border-radius:10px;background:#0b1220;display:grid;place-items:center;font-size:20px}
 .callout.tip .ih-go{position:static;width:auto;height:auto;padding:0;margin-top:6px;font-weight:600;font-size:14px;color:var(--ice)}
+
+/* sectioned page: essentials on top, groups below */
+.more-h{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:22px 4px 10px}
+details.gsec > .grp-b{border-top:1px solid var(--line)}
+details.gsec .grp-b > .card{background:transparent;border:0;border-radius:0;margin:0;border-bottom:1px solid var(--line)}
+details.gsec .grp-b > .card:last-child{border-bottom:0}
+details.sec > summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);margin:-4px 4px 0 2px;transition:transform .2s;flex:0 0 auto}
+details.sec[open] > summary::after{transform:rotate(225deg);margin-top:4px}
+details.sec > summary .ttl{white-space:nowrap;flex:0 0 auto}details.sec > summary .sv{min-width:0;flex:1 1 auto}
+.dl-day.late{display:none}.dl-all{display:block;margin:10px auto 0;font-weight:600}
+details.more-today{margin-top:10px}details.more-today > summary{list-style:none;cursor:pointer;color:var(--ice);font-weight:600;font-size:14px;padding:4px 0}
+details.more-today > summary::-webkit-details-marker{display:none}details.more-today > summary::after{content:" ›";display:inline-block;transition:transform .2s}details.more-today[open] > summary::after{transform:rotate(90deg)}
+details.more-today .kv{margin-top:8px}
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -961,6 +974,17 @@ const SECTIONS = [
 ];
 S.open = new Set(store.get("open", []));
 
+const grp = (id, title, inner) => `<details class="sec gsec" data-sec="${id}" ${S.open.has(id)?"open":""}><summary><span class="ttl">${title}</span><span class="sv" id="sv-${id}"></span></summary><div class="grp-b">${inner}</div></details>`;
+/* Keep each group honest: hide it when nothing inside has content, and list what's inside on the closed row */
+function tidyGroups(){
+  document.querySelectorAll("details.gsec").forEach(g=>{
+    const cards = [...g.querySelectorAll(".grp-b > section.card")].filter(c=> !c.hidden && c.innerHTML.trim());
+    g.hidden = !cards.length;
+    const names = [...new Set(cards.map(c=> (c.querySelector("h2")?.textContent || "").replace(/\s*·.*$/,"").trim()).filter(Boolean))];
+    const sv = g.querySelector(".sv"); if(sv) sv.textContent = names.slice(0,3).join(" · ") + (names.length>3? ` +${names.length-3}` : "");
+  });
+}
+let tidyQ = 0; new MutationObserver(()=>{ if(!tidyQ) tidyQ = requestAnimationFrame(()=>{ tidyQ = 0; tidyGroups(); }); }).observe(document.getElementById("app"), {childList:true, subtree:true, attributes:true, attributeFilter:["hidden"]});
 function render(){
   if(!window.Chart || !window.L){ libsReady.then(()=>{ if(S.data) render(); }); return; }
   if(!S.data) return;
@@ -1005,25 +1029,22 @@ function render(){
     <div class="qleg"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
   </section>
   <section class="card" id="nowCard"></section>
-  <section class="card" id="groomCard" hidden></section>
-  <section class="card" id="workCard"></section>
-  <section class="card" id="reportCard"></section>
-  <section class="card" id="camCard"></section>
-  ${S.loc && RESORT_CAMS[S.loc.name]?.some(c=>c.id==="mtb-14")? `<section class="card" id="stakeCard"></section>`:""}
-  <section class="card" id="tmCard"></section>
-  ${!isAlp()? `<section class="card" id="openCard"></section>`:""}
-  <section class="card" id="repCard"></section>
+  ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
   <section class="card"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
-  <section class="card" id="stormCard"></section>
   <section class="card"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div></section>
-  <section class="card" id="elevCard"></section>
-  <section class="card" id="miniMapCard"></section>
-  <section class="card" id="trackCard"></section>
-  <section class="card" id="roadCard"></section>
-  ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}
   <section class="card"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read more</button></section>
-  <section class="card" id="afdCard" hidden></section>
+  <div class="more-h">More for this spot</div>
+  ${grp("g-mtn", "On the mountain", `${isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
+    <section class="card" id="reportCard"></section><section class="card" id="camCard"></section>
+    ${S.loc && RESORT_CAMS[S.loc.name]?.some(c=>c.id==="mtb-14")? `<section class="card" id="stakeCard"></section>`:""}
+    <section class="card" id="tmCard"></section>
+    ${!isAlp()? `<section class="card" id="openCard"></section>`:""}
+    <section class="card" id="repCard"></section>`)}
+  ${grp("g-storm", "Storm & elevation", `<section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
+  ${grp("g-plan", "Plan your day", `<section class="card" id="workCard"></section><section class="card" id="roadCard"></section>
+    ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
+  ${grp("g-acc", "Forecast accuracy", `<section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
   <div class="muted" style="text-align:center;margin:18px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
@@ -1086,15 +1107,18 @@ function renderRightNow(C, SIM, e){
     </div>
     <div class="surf-row"><span class="ic">${now.icon}</span><div style="flex:1;min-width:0"><b>${now.label}</b><div class="muted">${descOf(now)}</div></div><div style="text-align:right"><div class="num" style="font-size:26px;color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</div><div class="muted">${MODE_NAME[S.mode]}</div></div></div>
     <div class="kv">
-      ${(()=>{ const an = aspectNote(C, todayStr()) || aspectNote(C, dateAdd(todayStr(),1)); return an? `<div class="full"><div class="l">${byMode("Slopes","Sun vs. shade")} ${aspectNote(C, todayStr())? "today":"tomorrow"}</div><div class="v">☀️ ${an.line}</div></div>` : ""; })()}
-      ${(()=>{ const cn = coldNote(c, now); return cn? `<div class="full"><div class="l">Dress for it</div><div class="v">🧤 ${cn}</div></div>` : ""; })()}
-      ${!isAlp()? (()=>{ const k = fromKit(c, now); return k && (k.glide||k.kick)? `<div class="full"><div class="l">From your wax box</div><div class="v">🧰 ${[k.glide?.name, k.kick?.name].filter(Boolean).join(" + ")}</div></div>` : ""; })() : ""}
-      ${!isAlp()? (()=>{ const sg = waxSuggest(c, now); return sg?.text? `<div class="full"><div class="l">Your wax log</div><div class="v">🧠 ${sg.text}</div></div>` : ""; })() : ""}
       ${ts? `<div class="full"><div class="l">Best window ${tsDay}${tipI("quality")}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
       ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
       <div><div class="l">New snow</div><div class="v">${fmtSnow(now.newSnow)}${now.newSnow>0.5? ` · ${now.age<24?"last 24h":Math.round(now.age/24)+"d ago"}`:""}</div></div>
       ${S.mode==="alpine"? `<div><div class="l">Lifts · ridgetop ${fmtWind(c.RW)} ${windU()}${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : `<div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${fmtEl(c.sl)}</div></div>`}
-    </div>`;
+
+    </div>
+    ${(()=>{ const more = [
+      `${(()=>{ const an = aspectNote(C, todayStr()) || aspectNote(C, dateAdd(todayStr(),1)); return an? `<div class="full"><div class="l">${byMode("Slopes","Sun vs. shade")} ${aspectNote(C, todayStr())? "today":"tomorrow"}</div><div class="v">☀️ ${an.line}</div></div>` : ""; })()}`,
+      `${(()=>{ const cn = coldNote(c, now); return cn? `<div class="full"><div class="l">Dress for it</div><div class="v">🧤 ${cn}</div></div>` : ""; })()}`,
+      `${!isAlp()? (()=>{ const k = fromKit(c, now); return k && (k.glide||k.kick)? `<div class="full"><div class="l">From your wax box</div><div class="v">🧰 ${[k.glide?.name, k.kick?.name].filter(Boolean).join(" + ")}</div></div>` : ""; })() : ""}`,
+      `${!isAlp()? (()=>{ const sg = waxSuggest(c, now); return sg?.text? `<div class="full"><div class="l">Your wax log</div><div class="v">🧠 ${sg.text}</div></div>` : ""; })() : ""}`].join("").trim(); return more? `<details class="more-today"><summary>More for today</summary><div class="kv">${more}</div></details>` : ""; })()}
+`;
 }
 
 /* ---------- Hourly strip ---------- */
@@ -1140,10 +1164,13 @@ function renderDailyList(C, SIM){
         <span class="dl-sc">${part==="day" && x? scoreChip(x.best.avg) : ""}</span><span class="dl-slr">${slrP}</span>
         <span class="dl-b"><i style="width:${pctW}%;background:${ty==="none"?"#3d8bfd":PT[ty]}"></i><em>${txt}</em></span></div>`;
     };
-    return `<div class="dl-day ${S.selDay===d?"sel":""}" data-d="${d}"><div class="dl-l"><b>${d===todayStr()?"Today":d===dateAdd(todayStr(),1)?"Tmrw":dow(d)}</b><span>${+d.slice(8,10)}</span>${S.bestDay===d?'<span class="star">★</span>':""}</div><div class="dl-p">${per("day")}${per("night")}</div></div>
+    return `<div class="dl-day ${S.selDay===d?"sel":""} ${k>=7 && !S.allDays? "late":""}" data-d="${d}"><div class="dl-l"><b>${d===todayStr()?"Today":d===dateAdd(todayStr(),1)?"Tmrw":dow(d)}</b><span>${+d.slice(8,10)}</span>${S.bestDay===d?'<span class="star">★</span>':""}</div><div class="dl-p">${per("day")}${per("night")}</div></div>
       <div class="dl-x" id="dx-${d}">${S.selDay===d? "" : ""}</div>`;
   }).join("");
-  $("#dailyList").innerHTML = `<div class="dl-h"><span></span><span>Temp</span><span></span><span>Ski</span><span>SLR</span><span>12-hr snowfall</span></div>` + rows;
+  const nDays = C.days.filter((d,k)=>C.consDays[k].n).length;
+  $("#dailyList").innerHTML = `<div class="dl-h"><span></span><span>Temp</span><span></span><span>Ski</span><span>SLR</span><span>12-hr snowfall</span></div>` + rows
+    + (nDays > 7? `<button class="link dl-all" id="dlAll">${S.allDays? "Show 7 days" : `Show all ${nDays} days`}</button>` : "");
+  const da = $("#dlAll"); if(da) da.onclick = () => { S.allDays = !S.allDays; renderDailyList(C, SIM); if(!S.allDays) $("#dailyList").scrollIntoView({block:"nearest"}); };
   document.querySelectorAll("#dailyList .dl-day").forEach(r=>r.onclick=()=>{ const d=r.dataset.d; const was = S.selDay===d; S.selDay = was? null : d;
     document.querySelectorAll("#dailyList .dl-x").forEach(x=>x.innerHTML=""); document.querySelectorAll("#dailyList .dl-day").forEach(x=>x.classList.toggle("sel", x.dataset.d===S.selDay));
     if(!was) renderDayDetail(C, SIM, $("#dx-"+d)); });
