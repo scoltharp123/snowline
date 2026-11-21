@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Snowline">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta property="og:title" content="Snowline: snow forecasts by elevation">
@@ -455,6 +456,21 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 .callout .tipb{float:right;font-size:15px;margin:2px 0 0 8px}
 .tipbadge{border:0;cursor:pointer;font:inherit}
 .tipbox{font-size:15px;line-height:1.55;padding-bottom:12px}.tipbox p{margin:0 0 12px}
+
+/* welcome + install guide */
+.wl-hero{text-align:center;margin:4px 0 14px}.wl-hero img{border-radius:16px;box-shadow:0 6px 24px rgba(56,189,248,.25)}.wl-hero h2{margin:10px 0 6px;font-size:24px}.wl-hero.sm h2{margin-top:2px}.wl-hero p{margin:0;color:#c9d4e3;line-height:1.5}
+.wl-q{font-weight:700;margin:6px 0 8px}
+.wl-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.wl-modes button,.wl-spots button{background:var(--card2);border:1.5px solid var(--line);border-radius:14px;color:inherit;font:inherit;cursor:pointer;transition:border-color .15s,background .15s}
+.wl-modes button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 6px}.wl-modes span{font-size:24px}.wl-modes small,.wl-spots small{color:var(--mute);font-size:12px}
+.wl-modes button.on,.wl-spots button.on{border-color:var(--ice2);background:#10253d}
+.wl-spots{display:grid;gap:8px}.wl-spots button{display:flex;align-items:center;gap:12px;padding:11px 12px;text-align:left}.wl-spots b{display:block}.wl-star{font-size:22px;color:var(--mute);width:24px;text-align:center}.wl-spots .on .wl-star{color:#fbbf24}
+.wl-dots{display:flex;justify-content:center;gap:6px;margin:16px 0 12px}.wl-dots i{width:7px;height:7px;border-radius:9px;background:var(--line)}.wl-dots i.on{background:var(--ice2);width:20px}
+.ig{list-style:none;margin:0;padding:0;display:grid;gap:10px}.ig li{display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:11px 12px}
+.ig-n{flex:0 0 22px;height:22px;border-radius:50%;background:var(--ice2);color:#04121f;font-weight:700;font-size:13px;display:grid;place-items:center}
+.ig-ic{flex:0 0 36px;height:36px;border-radius:10px;background:#0b1220;display:grid;place-items:center;color:var(--ice)}.ig-t{font-size:14px;line-height:1.45}
+.ig-arrow{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--mute);font-size:12px;margin-top:10px}.ig-arrow svg{color:var(--ice)}
+.ig-big{min-height:52px;font-size:17px}.ig-done{background:#10253d;border:1px solid #24446e;border-radius:14px;padding:14px;line-height:1.5}
+.callout.ih{display:flex;gap:12px;align-items:flex-start}.callout.ih img{border-radius:10px;flex:0 0 auto}.ih-go{padding:0;margin-top:4px;font-weight:600}
 /* cam map callouts, lightbox, trail maps */
 .cmap-wrap{position:relative;height:300px;border-radius:12px;overflow:hidden;margin-top:8px}.cmap-wrap #camMini{position:absolute;inset:0}
 .cmap-wrap.full{position:fixed;inset:0;height:auto;border-radius:0;margin:0;z-index:1200}
@@ -545,6 +561,8 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
 
 <div class="sheet" id="miniSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2 id="miniTitle"></h2><button class="link" data-close>Close</button></div><div id="miniBox"></div></div></div>
 <div class="sheet" id="repSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2>Check in</h2><button class="link" data-close>Cancel</button></div><div id="repBox"></div></div></div>
+<div class="sheet" id="welcomeSheet"><div class="sheet-b"><div class="grab"></div><div id="welcomeBox"></div></div></div>
+<div class="sheet" id="installSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2>Add to Home Screen</h2><button class="link" data-close>Done</button></div><div id="installBox"></div></div></div>
 <div class="sheet" id="tipSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2 id="tipTitle"></h2><button class="link" data-close>Done</button></div><div id="tipBox" class="tipbox"></div></div></div>
 <div class="sheet" id="shareSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2>Share</h2><button class="link" data-close>Done</button></div><div id="shareBox"></div></div></div>
 <div id="offPill">Offline · showing saved forecast</div>
@@ -552,6 +570,7 @@ details.nb{margin-top:8px}details.nb summary{min-height:44px;display:flex;align-
   <div class="grab"></div>
   <div class="sheet-h"><h2>Settings</h2><button class="link" data-close>Done</button></div>
   <div class="field">Units<div class="seg" id="unitSeg"><button data-u="imp">Inches · °F · ft</button><button data-u="met">cm · °C · m</button></div></div>
+  <div class="row" style="gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn" id="setInstall" style="flex:1">📲 Add to Home Screen</button><button class="btn" id="setWelcome" style="flex:1">👋 Welcome tour</button></div>
   <h3 style="margin:18px 0 6px">Sync across devices</h3><div id="syncBox"></div>
   <h3 style="margin:18px 0 6px">How Snowline works</h3>
   <div class="about">
@@ -1921,8 +1940,13 @@ function saveSnap(loc){ if(S.data && Object.keys(S.data.models).filter(id=>id!==
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
 const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 function miniBars(vals){ const w=4, gap=2, H=18; const mx=Math.max(4,...vals); return `<svg width="${vals.length*(w+gap)}" height="${H}" viewBox="0 0 ${vals.length*(w+gap)} ${H}">${vals.map((v,i)=>{ const h=Math.max(1.5, v/mx*H); return `<rect x="${i*(w+gap)}" y="${H-h}" width="${w}" height="${h}" rx="1" fill="${v<0.05?'#3a3a3e':barColor(v)}"/>`; }).join("")}</svg>`; }
-function a2hsHTML(){ const ios=/iPhone|iPad|iPod/.test(navigator.userAgent); if(!ios || navigator.standalone || store.get("a2hs")) return "";
-  return `<div class="callout tip" id="a2hs"><b>Get the app:</b> tap <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> Share, then <b>Add to Home Screen</b>.<button aria-label="Dismiss" onclick="store.set('a2hs',1);this.parentElement.remove()">✕</button></div>`; }
+function a2hsHTML(){
+  if(APP.standalone){   // opened from the Home Screen: once, point to snow alerts if they're off
+    if(store.get("pushOn") || store.get("hiAlerts")) return "";
+    return `<div class="callout tip ih" id="a2hs"><b>📲 You're set up like an app.</b> Want a heads-up when snow is coming, plus a morning brief on snow days? <button class="link ih-go" onclick="store.set('hiAlerts',1);location.hash='alerts'">Turn on snow alerts</button><button aria-label="Dismiss" onclick="store.set('hiAlerts',1);this.parentElement.remove()">✕</button></div>`; }
+  if(!APP.mobile || (store.get("visits",0) < 2 && !S.favs.length) || Date.now() < store.get("a2hsSnooze",0)) return "";
+  return `<div class="callout tip ih" id="a2hs"><img src="/icon-192.png" alt="" width="40" height="40"><div><b>Add Snowline to your Home Screen</b><br><span class="muted">Opens like an app, one tap to your spots.</span><br><button class="link ih-go" onclick="openInstall()">Show me how</button></div><button aria-label="Not now" onclick="store.set('a2hsSnooze',Date.now()+21*864e5);this.parentElement.remove()">✕</button></div>`;
+}
 async function refreshView(){ S.freshAsk = Date.now() + 30e3; const v=S.view||"forecast"; if(v==="forecast" && S.loc){ const all=store.get("snap",{})||{}; delete all[S.loc.name]; store.set("snap",all); await load(S.loc); } else if(v==="favs") await renderFavs(true); else if(v==="finder") await renderFinder(true); else if(v==="maps") await drawGrid(); }
 // scroll: compact title + auto-hide controls
 (function(){ let lastY=0; addEventListener("scroll",()=>{ const y=scrollY; $("#top").classList.toggle("scrolled", y>44);
@@ -2160,6 +2184,87 @@ function qualityExplainHTML(){
     <p class="muted">Epic 8+ · Great 6.5+ · Good 5+ · Fair 3.5+ · Poor below. It's a forecast of the surface, not a grooming report or a safety rating.${S.mode==="bc"? " <b>It says nothing about avalanche danger.</b>" : ""} Switch Alpine / Skate / Classic to see each sport's score.</p>`;
 }
 
+
+/* ================= First visit: welcome, favorites, Home Screen ================= */
+const APP = (()=>{ const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
+  return { ios, android, mobile: ios || android,
+    inApp: /FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|LinkedInApp|Pinterest|musical_ly|TikTok/.test(ua),
+    iosOther: ios && /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/.test(ua),
+    standalone: !!(navigator.standalone || matchMedia("(display-mode: standalone)").matches) }; })();
+let BIP = null;   // Android/desktop Chrome's own install prompt, kept for our button
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); BIP = e; if($("#installSheet")?.classList.contains("on")) renderInstall(); });
+addEventListener("appinstalled", () => { BIP = null; store.set("installed", 1); closeSheet("installSheet"); $("#a2hs")?.remove(); toast("Snowline is on your Home Screen"); });
+store.set("visits", store.get("visits",0) + 1);
+
+const IC = {
+  share: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>`,
+  plus: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></svg>`,
+  dots: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`,
+  vdots: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>`,
+  home: `<img src="/icon-192.png" width="22" height="22" alt="" style="border-radius:6px">` };
+const stepHTML = steps => `<ol class="ig">${steps.map(([ic, html], i)=>`<li><span class="ig-n">${i+1}</span><span class="ig-ic">${ic}</span><span class="ig-t">${html}</span></li>`).join("")}</ol>`;
+
+function installGuideHTML(){
+  if(APP.standalone) return `<div class="ig-done">✅ Snowline is already on your Home Screen. You're opening it like an app right now.</div>`;
+  const why = `<p class="muted" style="margin:0 0 14px">It opens full screen like a regular app, starts faster, works with weak signal, and${APP.ios? " is needed on iPhone for" : " can send"} snow alerts on your lock screen. Free, nothing to download from the App Store.</p>`;
+  if(APP.inApp) return why + `<div class="callout rain" style="margin-bottom:12px">You're in another app's built-in browser, which can't add to the Home Screen. Open Snowline in ${APP.ios? "Safari" : "Chrome"} first:</div>`
+    + stepHTML([[IC.dots, `Tap the <b>•••</b> menu (usually top right).`], ["↗️", `Choose <b>Open in ${APP.ios? "Safari" : "browser"}</b>.`], [IC.home, `Then tap <b>Settings ⚙︎ › Add to Home Screen</b> in Snowline for the last steps.`]])
+    + `<button class="btn wide" style="margin-top:12px" onclick="copyAppLink()">Copy the link instead</button>`;
+  if(APP.ios) return why + stepHTML(APP.iosOther ? [
+      [IC.share, `Tap the <b>Share</b> button in the address bar.`],
+      [IC.plus, `Scroll down and tap <b>Add to Home Screen</b>. (Don't see it? Open snowline-forecast.netlify.app in Safari instead.)`],
+      [IC.home, `Tap <b>Add</b>. Snowline is now on your Home Screen.`] ] : [
+      [IC.share, `Tap the <b>Share</b> button. It's at the bottom of Safari, or inside the <b>•••</b> button next to the address bar on newer iPhones.`],
+      [IC.plus, `Scroll down the list and tap <b>Add to Home Screen</b>.`],
+      [IC.home, `Leave <b>Open as Web App</b> on if you see it, then tap <b>Add</b>. Snowline appears on your Home Screen.`] ])
+    + `<div class="ig-arrow">${IC.share}<span>The Share button looks like this</span></div>`;
+  if(APP.android) return why + (BIP ? `<button class="btn primary wide ig-big" onclick="doInstall()">📲 Install Snowline</button><p class="muted" style="text-align:center;margin:8px 0 0">One tap, then <b>Install</b>.</p>`
+    : stepHTML([[IC.vdots, `Tap the <b>⋮</b> menu at the top right of Chrome.`], [IC.plus, `Tap <b>Add to Home screen</b> or <b>Install app</b>.`], [IC.home, `Tap <b>Install</b>. Snowline shows up with your other apps.`]]));
+  return why + (BIP ? `<button class="btn primary wide ig-big" onclick="doInstall()">💻 Install Snowline on this computer</button>`
+    : `<p>On your phone, open <b>snowline-forecast.netlify.app</b> and come back here for the steps. On a computer: in Chrome or Edge, click the install icon at the right end of the address bar; in Safari on a Mac, choose <b>File › Add to Dock</b>.</p>`);
+}
+function openInstall(){ renderInstall(); openSheet("installSheet"); }
+function renderInstall(){ $("#installBox").innerHTML = installGuideHTML(); }
+async function doInstall(){ if(!BIP) return renderInstall(); BIP.prompt(); const r = await BIP.userChoice.catch(()=>null); BIP = null; if(r?.outcome==="accepted") store.set("installed",1); renderInstall(); }
+function copyAppLink(){ navigator.clipboard?.writeText(location.origin).then(()=>toast("Link copied. Paste it into Safari or Chrome."), ()=>toast(location.origin)); }
+
+const WELCOME_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Hoodoo, OR", "Willamette Pass, OR", "Tumalo Mountain, OR"];
+const W = { step:0, picks:new Set(), mode:null };
+function openWelcome(){ W.step = 0; W.picks = new Set(S.favs.map(f=>f.name)); W.mode = S.mode==="bc"? "alpine" : S.mode; renderWelcome(); openSheet("welcomeSheet"); }
+function renderWelcome(){
+  const box = $("#welcomeBox"), last = APP.standalone ? 1 : 2;
+  const dots = `<div class="wl-dots">${[0,1,2].slice(0,last+1).map(i=>`<i class="${i===W.step?"on":""}"></i>`).join("")}</div>`;
+  if(W.step===0) box.innerHTML = `<div class="wl-hero"><img src="/icon-192.png" alt="" width="64" height="64"><h2>Welcome to Snowline</h2>
+      <p>Free snow forecasts from nine weather models, by elevation, with ski conditions for each hour. No account, no ads.</p></div>
+      <div class="wl-q">What do you ski most?</div>
+      <div class="wl-modes">${[["alpine","⛷️","Alpine","Resort skiing"],["skate","🎿","Skate","Nordic skate"],["classic","🎿","Classic","Nordic classic"]].map(([k,e,n,s])=>`<button data-wm="${k}" class="${W.mode===k?"on":""}"><span>${e}</span><b>${n}</b><small>${s}</small></button>`).join("")}</div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">You can switch anytime at the top. Backcountry touring is under <b>Tour</b>.</p>
+      ${dots}<button class="btn primary wide" id="wlNext">Next</button>`;
+  if(W.step===1) box.innerHTML = `<div class="wl-hero sm"><h2>Star your spots</h2><p>They'll be one tap away in <b>Favorites</b>, side by side.</p></div>
+      <div class="wl-spots">${WELCOME_SPOTS.map(n=>{ const p = PRESETS.find(x=>x.name===n); if(!p) return ""; const on = W.picks.has(n);
+        return `<button data-wp="${encodeURIComponent(n)}" class="${on?"on":""}"><span class="wl-star">${on?"★":"☆"}</span><span><b>${esc(n.replace(/, OR$/,""))}</b><small>${p.bc? "Backcountry tour" : /Nordic|Trails|Birkie/i.test(n)? "Nordic" : "Resort"} · ${fmtEl(p.base/FT).replace(/ ?(ft|m)$/,"")}–${fmtEl(p.top/FT)}</small></span></button>`; }).join("")}</div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Somewhere else? Tap the spot name at the top and search any town, peak or resort, then tap ★.</p>
+      ${dots}<div class="row" style="gap:8px"><button class="btn" id="wlBack" style="flex:0 0 auto">Back</button><button class="btn primary" id="wlNext" style="flex:1">${W.picks.size? `Next · ${W.picks.size} starred` : "Skip for now"}</button></div>`;
+  if(W.step===2) box.innerHTML = `<div class="wl-hero sm"><h2>Put it on your Home Screen</h2></div>${installGuideHTML()}
+      ${dots}<div class="row" style="gap:8px;margin-top:6px"><button class="btn" id="wlBack" style="flex:0 0 auto">Back</button><button class="btn primary" id="wlNext" style="flex:1">I'm all set</button></div>
+      <button class="link" id="wlLater" style="display:block;margin:10px auto 0">Maybe later</button>`;
+  box.querySelectorAll("[data-wm]").forEach(b=>b.onclick=()=>{ W.mode=b.dataset.wm; renderWelcome(); });
+  box.querySelectorAll("[data-wp]").forEach(b=>b.onclick=()=>{ const n=decodeURIComponent(b.dataset.wp); W.picks.has(n)? W.picks.delete(n) : W.picks.add(n); renderWelcome(); });
+  const back = $("#wlBack"); if(back) back.onclick = ()=>{ W.step--; renderWelcome(); };
+  const later = $("#wlLater"); if(later) later.onclick = ()=>{ store.set("a2hsSnooze", Date.now()+7*864e5); finishWelcome(); };
+  $("#wlNext").onclick = ()=>{ if(W.step < last){ W.step++; renderWelcome(); } else finishWelcome(); };
+}
+function finishWelcome(){
+  store.set("welcomed", 1); closeSheet("welcomeSheet");
+  const add = [...W.picks].filter(n=>!S.favs.some(f=>f.name===n)).map(n=>PRESETS.find(p=>p.name===n)).filter(Boolean);
+  S.favs = S.favs.filter(f=>W.picks.has(f.name) || !WELCOME_SPOTS.includes(f.name)).concat(add.map(p=>({...p})));
+  store.set("favs", S.favs); try{ pushSync(); }catch(e){}
+  const modeChanged = W.mode && W.mode!==S.mode; if(modeChanged) setMode(W.mode);
+  const first = S.favs[0]; const go = first && (!S.loc || !S.favs.some(f=>f.name===S.loc.name)) ? first : null;
+  if(go) load(go); else { updateTop(); if(modeChanged && S.data) render(); }
+  toast(add.length? `★ ${add.length} spot${add.length>1?"s":""} saved to Favorites` : "You're all set");
+}
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
@@ -3501,6 +3606,9 @@ const startLoc = linked || last || PRESETS[0];
 S.loc = startLoc; updateTop(); showView(); load(startLoc); checkAlerts();
 
 setTimeout(()=>{ checkSharedList(); syncPull(); }, 600);
+if(!store.get("welcomed") && !linked && !last && !S.favs.length) setTimeout(openWelcome, 700); else if(!store.get("welcomed")) store.set("welcomed", 1);
+$("#setInstall").onclick = () => { closeSheet("setSheet"); openInstall(); };
+$("#setWelcome").onclick = () => { closeSheet("setSheet"); openWelcome(); };
 </script>
 </body>
 </html>
