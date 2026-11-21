@@ -645,7 +645,7 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .dl-b{gap:7px}.dl-b i{position:static;height:14px;max-width:62%;flex:0 0 auto;border-radius:4px}.dl-b em{padding-left:0;text-shadow:none;white-space:nowrap}
 .v-sub > *{flex:0 0 auto}.v-sub .vs-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}.v-sub .tipb{margin-left:2px}
 .mx-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.mx-st{padding:2px 0 10px}.mx-st + .mx-st{border-left:1px solid #1f1f22;padding-left:16px}
-.mx-h{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:13.5px}.mx-h .muted{font-size:11.5px}.mx-h a{font-size:12px}
+.mx-h{display:flex;flex-direction:column;gap:0;font-size:13.5px}.mx-h .muted{font-size:11.5px}.mx-h a{font-size:12px}
 .mx-big{font-family:"Space Grotesk",Inter,sans-serif;font-size:38px;font-weight:700;line-height:1.1;margin:4px 0 2px}
 .mx-kv{display:flex;flex-direction:column;font-size:12.5px;color:#c9d4e3;gap:1px}.mx-sp{display:block;margin-top:6px}.mx-u{font-size:11px;margin-top:4px}
 .mx-cam{display:block;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;background:#0b0b0d}.mx-cam img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
@@ -1439,7 +1439,7 @@ function updateSeasonSummary(){
 }
 
 /* ---------- Favorites ---------- */
-const SHORT_NAMES = {"Mt. Bachelor, OR":"Mt. Bachelor","Mt. Bachelor Nordic Center, OR":"Bachelor Nordic","Meissner Nordic (Bend), OR":"Meissner Nordic"};
+const SHORT_NAMES = {"Mt. Bachelor, OR":"Mt. Bachelor","Mt. Bachelor Nordic Center, OR":"Bachelor Nordic","Meissner Nordic (Bend), OR":"Meissner"};
 function dispName(n){ return SHORT_NAMES[n] || String(n||"").replace(/,\s*[A-Z]{2}$/,""); }
 const DEFAULT_FAVS = ["Mt. Bachelor, OR","Mt. Bachelor Nordic Center, OR","Meissner Nordic (Bend), OR","Hoodoo, OR"];
 async function renderFavs(force){
@@ -2647,20 +2647,20 @@ function openFeedback(){
 }
 
 /* ---------- Live at Meissner: the club's own station, ODOT's Wanoga Butte station, the parking-lot cam ---------- */
-function mxGroomLine(){ const m = new Date().getMonth(); return (m===11 || m<=2)? "Groomed 7 days a week, Dec–Mar, snow permitting" : "Daily grooming runs Dec–Mar; early and late season as snow allows"; }
+function mxGroomLine(){ const m = new Date().getMonth(); return (m===11 || m<=2)? "7 days a week through March" : "Daily Dec–Mar, snow permitting"; }
 function renderMeissner(){
   const el = $("#mxCard"); if(!el || !S.loc) return; const M = extrasFor(S.loc).mx; if(!M) return;
-  const ago2 = s => { const ms = Date.parse(s); return isFinite(ms)? ago(ms) : s; };
+  const ago2 = s => { const m = String(s).match(/(\d+)\/(\d+)\/(\d{4})\s+(\d+):(\d+)\s*([ap])m/i); let ms = m? new Date(+m[3], m[1]-1, +m[2], (+m[4]%12)+(m[6].toLowerCase()==="p"?12:0), +m[5]).getTime() : Date.parse(s); return isFinite(ms)? ago(ms) : s; };
   const tF = v => v==null? "—" : imp()? `${Math.round(v)}°` : `${Math.round((v-32)*5/9)}°`, wnd = v => v==null? "—" : imp()? `${Math.round(v)}` : `${Math.round(v*1.609)}`;
   const spark = sr => { if(!sr || sr.length < 4) return ""; const v = sr.map(r=>r[1]), lo = Math.min(...v), hi = Math.max(...v), W = 110, H = 28;
     const pts = v.map((x,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H - (hi===lo? H/2 : (x-lo)/(hi-lo)*H)).toFixed(1)}`).join(" ");
     return `<svg viewBox="0 -2 ${W} ${H+4}" width="${W}" height="${H+4}" class="mx-sp"><polyline points="${pts}" fill="none" stroke="#7dd3fc" stroke-width="1.6"/></svg><small class="muted">24 h: ${tF(lo)} to ${tF(hi)}</small>`; };
   const st = (M.stations||[]).map(s => s.error? `<div class="mx-st"><div class="mx-h"><b>${esc(s.name)}</b><a href="${s.link}" target="_blank" rel="noopener">Open ↗</a></div><div class="muted">Not reporting right now.</div></div>`
-    : `<div class="mx-st"><div class="mx-h"><b>${esc(s.name)}</b><span class="muted">${s.elevFt? fmtEl(s.elevFt/FT) : ""}</span></div>
+    : `<div class="mx-st"><div class="mx-h"><b>${esc(s.name.replace("Meissner ",""))}</b><span class="muted">${s.elevFt? fmtEl(s.elevFt/FT) : ""}</span></div>
       <div class="mx-big num">${tF(s.tempF)}</div>
       <div class="mx-kv"><span>Wind ${s.windDir||""} ${wnd(s.windMph)}${s.gustMph!=null? `–${wnd(s.gustMph)}` : ""} ${windU()}</span><span>Humidity ${s.rh!=null? s.rh+"%" : "—"}</span></div>
       ${spark(s.series)}
-      <div class="muted mx-u">${s.time? "Updated "+ago2(s.time) : s.updated? "Updated "+esc(s.updated) : ""}</div></div>`).join("");
+      <div class="muted mx-u">${s.time? "Updated "+ago2(s.time) : s.updated? "Updated "+esc(ago2(s.updated)) : ""}</div></div>`).join("");
   const cam = M.cam? `<a class="mx-cam" href="${M.cam.page}" target="_blank" rel="noopener"><img loading="lazy" src="${M.cam.img}?t=${Math.floor(Date.now()/36e5)}" alt="Meissner Sno-Park webcam" onerror="this.closest('a').remove()"><span>Parking lot cam · every 2 hours</span></a>` : "";
   el.innerHTML = `<div class="card-h"><h2>Live at Meissner</h2><a class="muted" href="https://meissnernordic.org/weather/" target="_blank" rel="noopener">Meissner Nordic ↗</a></div>
     <div class="mx-grid">${st}</div>${cam}
