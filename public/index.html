@@ -3319,9 +3319,9 @@ async function drawMiniMap(){
   miniMap = L.map("miniMap", {zoomControl:false, attributionControl:false, dragging:!L.Browser.mobile, scrollWheelZoom:false, tap:false, zoomSnap:.25}).setView([L0.lat, L0.lon], 9.25);
   // dark terrain underneath, snow in the middle, place names on top
   L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}",{maxZoom:13}).addTo(miniMap);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",{maxZoom:13, opacity:.55}).addTo(miniMap);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxZoom:13, opacity:.6}).addTo(miniMap);
   miniMap.createPane("labels"); miniMap.getPane("labels").style.zIndex = 450; miniMap.getPane("labels").style.pointerEvents = "none";
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",{maxZoom:13, pane:"labels"}).addTo(miniMap);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxZoom:13, pane:"labels"}).addTo(miniMap);
   L.marker([L0.lat,L0.lon],{icon:L.divIcon({className:"mm-pin", html:"<i></i>", iconSize:[18,18]}), pane:"labels"}).addTo(miniMap);
   const N=9, step=0.075, pts=[]; for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([L0.lat+(a-(N-1)/2)*step, L0.lon+(b-(N-1)/2)*step*1.35]);
   let j; try{ j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&forecast_days=8`); }catch(e){ $("#mmLbl").textContent="Snow map unavailable"; return; }
@@ -3351,7 +3351,9 @@ function snowFieldURL(vals, N){
     // grid row 0 is the south edge; canvas row 0 is the north edge
     const fa = (W-1-y)/(W-1)*(N-1), fb = x/(W-1)*(N-1), a = Math.floor(fa), b = Math.floor(fb), da = fa-a, db = fb-b;
     const v = g(a,b)*(1-da)*(1-db) + g(a+1,b)*da*(1-db) + g(a,b+1)*(1-da)*db + g(a+1,b+1)*da*db;
-    const c = snowRGBA(v), o = (y*W+x)*4; img.data[o]=c[0]; img.data[o+1]=c[1]; img.data[o+2]=c[2]; img.data[o+3]=c[3]*255;
+    // feather the edges so the field fades into the map instead of ending in a hard square
+    const ex = Math.min(x, W-1-x)/(W*.18), ey = Math.min(y, W-1-y)/(W*.18), edge = Math.min(1, ex) * Math.min(1, ey), fe = edge*edge*(3-2*edge);
+    const c = snowRGBA(v), o = (y*W+x)*4; img.data[o]=c[0]; img.data[o+1]=c[1]; img.data[o+2]=c[2]; img.data[o+3]=c[3]*255*fe;
   }
   ctx.putImageData(img, 0, 0); return cv.toDataURL();
 }
