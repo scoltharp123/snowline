@@ -46,6 +46,7 @@ const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const r = (v) => Math.round(v);
 const WIN = { h24: ["next1", "next 24 hours"], d3: ["next3", "next 3 days"], d5: ["next5", "next 5 days"], d10: ["next10", "next 10 days"] };
 export async function buildAlert(sub) {
+  if (sub.prefs?.powder === false && !(Array.isArray(sub.rules) && sub.rules.length)) return null;   // "Powder alert" switched off and no custom alerts
   const rules = Array.isArray(sub.rules) && sub.rules.length ? sub.rules
     : [{ spot: "*favs", type: "overnight", inches: sub.prefs?.overnight ?? 4 }, { spot: "*favs", type: "forecast", win: "d3", inches: sub.prefs?.forecast ?? 8 }];
   const cache = new Map(); const hits = [];

@@ -570,6 +570,11 @@ h1,.lt b,#ltName{letter-spacing:-.5px}
 .tog{flex:0 0 auto;width:50px;height:30px;border-radius:16px;border:0;background:#2c2c30;position:relative;padding:0;transition:background .2s}.tog i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}.tog.on{background:#34c759}.tog.on i{transform:translateX(20px)}
 .se-hero{display:flex;align-items:center;gap:14px;margin:0 0 12px}.se-big{font-size:46px;font-weight:800;line-height:1}
 .se-fr{margin-bottom:10px}.se-ch{display:block;margin-top:4px}.se-m{position:relative;height:16px;font-size:10.5px;color:var(--mute)}.se-m span{position:absolute;top:2px;transform:translateX(-50%)}.se-m span:first-child{transform:none}
+.sheet-b.tall{max-height:88vh;overflow-y:auto}.dl-lr{display:block;margin:6px auto 0;font-size:13.5px;color:var(--mute)}
+#hourStrip{cursor:pointer}
+#ltSub{cursor:pointer}#ltSub u{text-decoration:none;color:#c9d4e3;border-bottom:1px dashed #3a4660}
+.al-card{padding-top:6px}.al-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid #1f1f22}.al-row:last-of-type{border-bottom:0}.al-row b{font-size:15px}.al-row .muted{margin-top:2px;line-height:1.35}
+.al-note{padding:12px 0;color:var(--mute);font-size:13.5px;border-bottom:1px solid #1f1f22}
 /* ================= Clean pass: fewer boxes, more air, one clear hierarchy ================= */
 main{padding-top:4px}
 .card{background:#111113;border:0;border-radius:20px;padding:16px;margin:0 0 14px}
@@ -613,12 +618,11 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
   <div id="view-forecast"><div class="lt"><button id="ltBtn" aria-label="Change location"><span id="ltName">Snowline</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="lt-sub" id="ltSub"></div><div id="ltStatus"></div></div>
 <div class="ctrl" id="ctrl">
   <div class="seg" id="modeSeg"><button data-m="alpine">Alpine</button><button data-m="skate">Skate</button><button data-m="classic">Classic</button><button data-m="bc">Tour</button></div>
-  <div class="seg" id="bandSeg" style="flex:.8"><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
+  <div class="seg" id="bandSeg" hidden><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
 </div>
 <nav class="jtabs" id="jtabs" aria-label="Jump to"><button data-j="snowCard" class="on">Snow</button><button data-j="nowCard">Now</button><button data-j="hourCard">Hourly</button><button data-j="dailyCard">Daily</button><button data-j="fxCard">Forecast</button><button data-j="camCard" data-g="g-mtn">Cams</button><button data-j="moreH">More</button></nav>
   <div id="alertBanner"></div><div id="app"><div class="skel"></div><div class="skel" style="height:120px"></div><div class="skel" style="height:240px"></div></div></div>
   <div id="view-favs" style="display:none"></div>
-  <div id="view-finder" style="display:none"></div>
   <div id="view-maps" style="display:none"><div class="card">
     <div class="card-h"><h2>Snow forecast map</h2><div class="seg sm" id="mapWin"><button data-w="3">3d</button><button data-w="5">5d</button><button data-w="10">10d</button></div></div>
     <div class="seg sm scroll" id="mapLayers" style="margin-bottom:10px">
@@ -630,7 +634,7 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
         <div id="tlLegend"></div></div></div>
     <div class="row" style="justify-content:space-between;margin-top:10px"><span class="muted" id="mapStatus"></span><button class="btn" id="gridGo">Model this view</button></div>
     <div class="muted" id="radarTime"></div><div class="muted" id="fcrTime"></div><div class="muted" id="satTime"></div><div class="legend" id="bcLegend"></div>
-  </div></div>
+  </div><div id="view-finder"></div></div>
   <div id="view-outlook" style="display:none"></div>
   <div id="view-alerts" style="display:none"></div>
 </main>
@@ -639,7 +643,6 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
   <a href="#forecast" data-v="forecast"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Forecast</a>
   <a href="#favs" data-v="favs"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>Favorites</a>
   <a href="#maps" data-v="maps"><svg viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>Maps</a>
-  <a href="#finder" data-v="finder"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Explore</a>
   <a href="#alerts" data-v="alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2zM10 21h4"/></svg>Alerts</a>
 </nav>
 
@@ -657,6 +660,8 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 <div class="sheet" id="repSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2>Check in</h2><button class="link" data-close>Cancel</button></div><div id="repBox"></div></div></div>
 <div class="sheet" id="welcomeSheet"><div class="sheet-b"><div class="grab"></div><div id="welcomeBox"></div></div></div>
 <div class="sheet" id="installSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2>Add to Home Screen</h2><button class="link" data-close>Done</button></div><div id="installBox"></div></div></div>
+<div class="sheet" id="dhSheet"><div class="sheet-b tall"><div class="grab"></div><div class="sheet-h"><h2>Hourly detail</h2><button class="link" data-close>Done</button></div><div class="sec-b" id="sb-hourly"></div></div></div>
+<div class="sheet" id="lrSheet"><div class="sheet-b tall"><div class="grab"></div><div class="sheet-h"><h2>Long range</h2><button class="link" data-close>Done</button></div><div class="sec-b" id="sb-outlook"></div></div></div>
 <div class="sheet" id="tipSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2 id="tipTitle"></h2><button class="link" data-close>Done</button></div><div id="tipBox" class="tipbox"></div></div></div>
 <div class="sheet" id="shareSheet"><div class="sheet-b"><div class="grab"></div><div class="sheet-h"><h2>Share</h2><button class="link" data-close>Done</button></div><div id="shareBox"></div></div></div>
 <div id="offPill">Offline · showing saved forecast</div>
@@ -844,7 +849,18 @@ function syncModeFor(loc){
   if(isTour && S.mode!=="bc"){ S.prevMode = S.mode; S.autoBC = true; setMode("bc"); }
   else if(!isTour && S.mode==="bc" && S.autoBC){ S.autoBC = false; setMode(S.prevMode || "alpine"); }
 }
-function setMode(m){ S.mode = m; store.set("mode", m); document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===m)); if(m==="bc") bcAcknowledge(); }
+/* Elevation follows the sport: Nordic forecasts the trails (base), Alpine mid-mountain, Tour the summit. Tapping the forecast-point line overrides it per sport. */
+function bandFor(m){ return store.get("band_"+m, null) || ({skate:"base", classic:"base", alpine:"mid", bc:"summit"}[m] || "mid"); }
+function applyBand(){ S.band = bandFor(S.mode); store.set("band", S.band); }
+function openBandPicker(){
+  const L = S.loc; if(!L) return; const opts = [["base","Base",L.base],["mid","Mid-mountain",(L.base+L.top)/2],["summit","Summit",L.top]], def = ({skate:"base", classic:"base", alpine:"mid", bc:"summit"})[S.mode];
+  $("#tipTitle").textContent = "Forecast elevation";
+  $("#tipBox").innerHTML = `<p class="muted" style="margin:0 0 10px">Snow and temperature change a lot with height. Snowline picks ${({base:"the base",mid:"mid-mountain",summit:"the summit"})[def]} for ${MODE_NAME[S.mode]}; choose another if you like.</p>
+    <div class="list">${opts.map(([k,l,ft])=>`<button class="li" data-bp="${k}" style="width:100%;text-align:left"><span class="nm"><b>${l}${k===def? " · default" : ""}</b><small>${fmtEl(ft/FT)}</small></span>${S.band===k? '<span style="color:var(--ice);font-weight:700">✓</span>' : ""}</button>`).join("")}</div>`;
+  $("#tipBox").querySelectorAll("[data-bp]").forEach(b=>b.onclick=()=>{ const k = b.dataset.bp; if(k===def) store.del? store.del("band_"+S.mode) : store.set("band_"+S.mode, null); else store.set("band_"+S.mode, k); applyBand(); closeSheet("tipSheet"); render(); });
+  openSheet("tipSheet");
+}
+function setMode(m){ S.mode = m; store.set("mode", m); applyBand(); document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===m)); if(m==="bc") bcAcknowledge(); }
 async function load(loc){
   syncModeFor(PRESETS.find(p=>p.name===loc.name) || loc);
   S.loc = loc; store.set("last", loc); S.selDay = null; S.avyMini = null; S.avyLabel = ""; S.season = null; S.outlook = null;
@@ -990,7 +1006,7 @@ function updateTop(){
   const bandName = {base:"Base", mid:"Mid", summit:"Summit"}[S.band];
   $("#locName").textContent = L.name; $("#ltName").textContent = L.name;
   $("#locSub").textContent = `${bandName} · ${fmtEl(bandElev())}`;
-  $("#ltSub").textContent = `Forecast point ${fmtEl(bandElev())} · ${bandName} · ${regionOf2(L.name)==="Other"? (L.lat.toFixed(2)+", "+L.lon.toFixed(2)) : regionOf2(L.name)}`;
+  $("#ltSub").innerHTML = `Forecast point <u>${fmtEl(bandElev())} · ${bandName}</u> ▾ · ${regionOf2(L.name)==="Other"? (L.lat.toFixed(2)+", "+L.lon.toFixed(2)) : regionOf2(L.name)}`;
   const fav = S.favs.some(f=>f.name===L.name);
   $("#favBtn").classList.toggle("on", fav); $("#favBtn svg").setAttribute("fill", fav? "currentColor" : "none");
 }
@@ -1058,12 +1074,8 @@ function snowSummaryHTML(last24, vals, dates, o={}){
     <div class="ss-r">${snowBarsSVG(vals, dates, o)}</div></div>`;
 }
 
-const SECTIONS = [
-  {id:"hourly",  title:"Detailed hourly forecast"},
+const SECTIONS = [   // the rest live in groups or sheets: hourly (sheet), models (Models & accuracy), elev (Storm & elevation), outlook (sheet)
   {id:"wax",     title:"Wax", nordic:true},
-  {id:"models",  title:"Models & odds"},
-  {id:"elev",    title:"Elevation & snow level"},
-  {id:"outlook", title:"Long range"},
   {id:"avy",     title:"Avalanche danger"},
 ];
 S.open = new Set(store.get("open", []));
@@ -1125,7 +1137,7 @@ function render(){
   <section class="card" id="nowCard"></section>
   ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
   <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
-  <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div></section>
+  <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div><button class="link dl-lr" id="lrOpen">Long range · weeks 1–5 and the season ›</button></section>
   <section class="card" id="fxCard"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read the full forecast</button></section>
   <div class="more-h" id="moreH">More for this spot</div>
@@ -1136,25 +1148,29 @@ function render(){
     ${!isAlp()? `<section class="card" id="openCard"></section>`:""}
     <section class="card" id="repCard"></section>`)}
   ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
-  ${grp("g-storm", "Storm & elevation", `<section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
+  ${grp("g-storm", "Storm & elevation", `<section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
   ${grp("g-plan", "Plan your day", `<section class="card" id="workCard"></section><section class="card" id="roadCard"></section>
     ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
-  ${grp("g-acc", "Forecast accuracy", `<section class="card" id="trackCard"></section>`)}
+  ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
   <div class="muted" style="text-align:center;margin:18px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
   $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read the full forecast" : "Show less"; };
   $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
-  $("#toDetailed").onclick = () => { const d = document.querySelector('details[data-sec="hourly"]'); d.open = true; d.scrollIntoView({behavior:"smooth", block:"start"}); };
-  document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); } else S.open.delete(id); store.set("open",[...S.open]); }));
+  const openHourly = () => { openSheet("dhSheet"); renderSection("hourly"); };
+  $("#toDetailed").onclick = openHourly; $("#hourStrip").onclick = e => { if(!e.target.closest("button")) openHourly(); };
+  $("#lrOpen").onclick = () => { openSheet("lrSheet"); renderSection("outlook"); };
+  const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
+  document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeason(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
   renderReport(); renderStorm(C, SIM, e);
-  S.open.forEach(id=>{ if($("#sb-"+id)) renderSection(id); });
+  S.open.forEach(id=>{ if($("#sb-"+id)) renderSection(id); const g = document.querySelector(`details.gsec[data-sec="${id}"]`); if(g) g.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3))); });
+  if($("#dhSheet").classList.contains("on")) renderSection("hourly");
   renderAvy(); updateSeasonSummary();
   if((location.hash||'')==='#maps') initBigMap();
 }
@@ -1290,7 +1306,6 @@ function renderDayDetail(C, SIM, el){
   el.innerHTML = `<div class="daydetail"><div class="kv">
     <div><div class="l">Total · confidence</div><div class="v">${fmtSnow(cd.day+cd.night)} <span class="badge b-${conf.lvl}">${conf.label}</span></div></div>
     <div><div class="l">Odds of 6"+</div><div class="v">${memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length)+"%" : "—"}</div></div>
-    <div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${fmtEl(sl)}</div></div>
     <div><div class="l">Quality</div><div class="v">${ratio? `${Math.round(ratio)}:1 · ${ratio>=15?"blower":ratio>=11?"average":"dense"}` : "—"}</div></div>
     <div><div class="l">Max gust</div><div class="v">${fmtWind(cd.gmax)} ${windU()}</div></div>
     ${S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
@@ -1781,16 +1796,15 @@ function renderSeason(C){
 }
 
 /* ================= Views / tabs ================= */
-const VIEWS = ["forecast","favs","finder","maps","alerts"];
+const VIEWS = ["forecast","favs","maps","alerts"];
 function showView(){
   if(!window.L){ libsReady.then(showView); return; }
-  let v = (location.hash||"").slice(1); if(!VIEWS.includes(v)) v = "forecast";
+  let v = (location.hash||"").slice(1); if(v==="finder"){ history.replaceState(null,"","#maps"); v = "maps"; } if(!VIEWS.includes(v)) v = "forecast";
   VIEWS.forEach(x=>{ const el=$("#view-"+x); if(el) el.style.display = x===v? "" : "none"; });
   document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===v));
   S.view = v; updateTop(); window.scrollTo(0,0);
   const ve = $("#view-"+v); if(ve){ ve.classList.remove("enter"); void ve.offsetWidth; ve.classList.add("enter"); }
-  if(v==="finder") renderFinder();
-  if(v==="maps") initBigMap();
+  if(v==="maps"){ initBigMap(); renderFinder(); }
   if(v==="favs") renderFavs();
   if(v==="alerts") renderAlerts();
 }
@@ -1838,13 +1852,13 @@ async function loadFinder(force){
 }
 async function renderFinder(force){
   const el = $("#view-finder");
-  if(!S.finder || force) el.innerHTML = `<div class="vh"><h1>Explore</h1></div><div class="card"><h2>Powder Finder</h2><div class="loading"><div class="spin"></div>Checking ${finderSpots().length} spots…</div></div>`;
+  if(!S.finder || force) el.innerHTML = `<div class="card"><h2>Powder Finder</h2><div class="loading"><div class="spin"></div>Checking ${finderSpots().length} spots…</div></div>`;
   let F; try{ F = await loadFinder(force); }catch(e){ el.innerHTML = `<div class="card"><h2>Powder Finder</h2><div class="err" style="margin-top:8px">Couldn't load the Powder Finder. Pull to refresh in a minute.</div></div>`; return; }
   const reg = S.finderRegion || "All", sortK = S.finderSort || "d5";
   const regions = ["All","Oregon","Washington & BC","Nordic","Backcountry"];
   const W = {h24:"24h", d3:"3d", d5:"5d", d10:"10d"};
   const rows = F.rows.filter(r=>reg==="All"||r.regions.includes(reg)).sort((a,b)=>b[sortK]-a[sortK]);
-  el.innerHTML = `<div class="vh"><h1>Explore</h1></div><div class="card">
+  el.innerHTML = `<div class="card">
     <div class="card-h"><h2>Powder Finder</h2><button class="link" id="fRefresh" style="padding:0">Refresh</button></div><div class="muted" style="margin:-4px 0 10px">Every resort and Nordic area, ranked by forecast snow</div>
     <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg sm" id="sortSeg">${Object.entries(W).map(([k,l])=>`<button data-s="${k}" class="${k===sortK?'on':''}">${l}</button>`).join("")}</div><span class="muted">summit snow</span></div>
     <div class="seg sm scroll" id="regSeg">${regions.map(r=>`<button data-r="${r}" class="${r===reg?'on':''}">${r}</button>`).join("")}</div>
@@ -1858,8 +1872,10 @@ async function renderFinder(force){
 
 /* ================= Alerts ================= */
 function alertRules(){ return store.get("alerts", []); }
+// "Powder alert" switch turns the any-favorite rules on or off; rules for a specific spot stay as they are
+function activeRules(){ const off = store.get("powderOn", true) === false; return alertRules().filter(r=> !(off && r.spot==="*favs")); }
 async function checkAlerts(){
-  if(!alertRules().length){ $("#alertBanner").innerHTML=""; return; }
+  if(!activeRules().length){ $("#alertBanner").innerHTML=""; return; }
   try{ const F = await loadFinder(); const hits = evalAlerts(F);
     document.querySelector('#tabs a[data-v="alerts"]').classList.toggle("has", hits.length>0);
     $("#alertBanner").innerHTML = hits.length? `<div class="callout gold" style="margin-top:0">🔔 <b>Snow alert${hits.length>1?"s":""}:</b> ${hits.slice(0,4).map(h=>`${h.x.spot.name} ${fmtSnow(h.v)} in ${h.w}`).join(" · ")} <a href="#alerts">Manage</a></div>` : "";
@@ -2190,7 +2206,6 @@ function renderStorm(C, SIM, e){
     <div class="storm-h"><div><div class="muted">Next storm</div><b>${tLabel(C,st.a)} → ${tLabel(C,st.b)}</b></div><div style="text-align:right"><div class="num" style="font-size:30px;color:var(--ice)">${fmtSnow(st.tot)}</div><div class="muted">storm total</div></div></div>
     <div class="kv" style="margin:10px 0">
       <div><div class="l">Peak rate</div><div class="v">${fmtSnow(st.peak.v,1)}/hr · ${tLabel(C,st.peak.i)}</div></div>
-      <div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${isFinite(slMin)? `${fmtEl(slMin)}–${fmtEl(slMax)}` : "—"}</div></div>
       <div><div class="l">Quality</div><div class="v">${Math.round(ratio)}:1 · ${ratio>=15?"blower":ratio>=11?"average":"dense"}</div></div>
       <div><div class="l">Wind</div><div class="v">gusts to ${fmtWind(maxG)} ${windU()}</div></div>
     </div>
@@ -2240,7 +2255,7 @@ function loadExtras(loc){
   const q = `lat=${loc.lat.toFixed(4)}&lon=${loc.lon.toFixed(4)}`;
   const done = () => { if(S.loc===loc && S.data) scheduleRender(loc); };
   api(`/obs?${q}`).then(r=>{ X.obs=r; done(); }).catch(()=>{});
-  api(`/season?${q}`).then(r=>{ X.season=r; if(S.loc===loc) renderSeason(); }).catch(()=>{});
+  api(`/season?${q}`).then(r=>{ X.season=r; if(S.loc===loc) renderSeasonCard(); }).catch(()=>{});
   api(`/verify?${q}`).then(r=>{ X.verify=r; done(); setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
   api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
@@ -2471,7 +2486,7 @@ document.addEventListener("click", e=>{ const b = e.target.closest("[data-open]"
 })();
 
 /* ---------- Season so far: snowpack vs normal at the nearest gauge ---------- */
-function renderSeason(){
+function renderSeasonCard(){
   const el = $("#seasonCard"); if(!el || !S.loc) return; const Z = extrasFor(S.loc).season;
   if(!Z || Z.status!=="ok"){ el.innerHTML = ""; return; }
   const N = Z.now, P = N.med >= 2? N.pct : null, sr = Z.series.filter(r=>r[1]!=null || r[3]!=null);
@@ -3057,39 +3072,43 @@ const ALERT_WIN = {h24:"24 hr", d3:"3 days", d5:"5 days", d10:"10 days"};
 function ruleLabel(r){ const sp = r.spot==="*favs"? "Any favorite" : r.spot==="*all"? "Any spot" : r.spot.replace(/,\s*[A-Z]{2}$/,""); return r.type==="overnight" ? `${sp}: ≥ ${fmtSnow(r.inches,0)} overnight` : `${sp}: ≥ ${fmtSnow(r.inches,0)} in ${ALERT_WIN[r.win||"d3"]}`; }
 function evalAlerts(F){
   const hits = [];
-  for(const r of alertRules()){
+  for(const r of activeRules()){
     const pool = r.spot === "*favs" ? F.rows.filter(x=>S.favs.some(f=>f.name===x.spot.name)) : r.spot === "*all" ? F.rows : F.rows.filter(x=>x.spot.name===r.spot);
     for(const x of pool){ const v = r.type==="overnight" ? x.last24 : x[r.win||"d3"]; if(isNum(v) && v >= r.inches) hits.push({r, x, v, w: r.type==="overnight"? "the last 24 hr" : ALERT_WIN[r.win||"d3"]}); }
   }
   return hits;
 }
 function pushSpots(){ const L = S.favs.length? S.favs : (S.loc? [S.loc] : []); return L.slice(0,6).map(x=>({name:x.name, lat:x.lat, lon:x.lon, base:x.base, top:x.top})); }
-function pushRules(){ const all=[...S.favs, ...PRESETS]; return alertRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
-async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false)}})}); }catch(e){} }
+function pushRules(){ const all=[...S.favs, ...PRESETS]; return activeRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
+async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true)}})}); }catch(e){} }
 function renderAlerts(){
   const el = $("#view-alerts"); const spots = finderSpots(); const on = store.get("pushOn", false);
   if(!alertRules().length && !store.get("alertsSeeded")){ store.set("alerts", [{spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); store.set("alertsSeeded", 1); }
   const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-  const pushRow = isIOS && !standalone ? `<div class="muted">To get these on your lock screen, add Snowline to your home screen (Share → <b>Add to Home Screen</b>), open it from there, and come back here.</div>`
-    : !supported ? `<div class="muted">This browser can't show lock-screen notifications; alerts still show at the top of the Forecast tab.</div>`
-    : `<div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:10px"><div><b>Lock-screen notifications</b><div class="muted">Checked around 6am each morning</div></div><button class="btn ${on?"":"primary"}" id="pToggle" style="flex:0 0 auto">${on? "Turn off" : "Turn on"}</button></div>${on? `<div style="margin-top:14px"><b>Morning brief</b><div class="muted">Around 6am, one line per favorite: overnight snow, more today, Bachelor grooming, the temperature up top</div>
-      <div class="seg sm" id="briefSeg" style="margin-top:8px">${[["off","Off"],["snow","Snow days"],["daily","Every day"]].map(([k,l])=>`<button data-b="${k}" class="${store.get("brief","snow")===k?"on":""}">${l}</button>`).join("")}</div></div>
-      <div class="row" style="justify-content:space-between;align-items:center;gap:12px;margin-top:14px"><div><b>Storm watch</b><div class="muted">One heads-up when 8″+ is coming to a favorite 2–5 days out, ready to share</div></div>
-      <button class="tog ${store.get("watch",true)?"on":""}" id="watchTog" role="switch" aria-checked="${store.get("watch",true)}" aria-label="Storm watch"><i></i></button></div>
-      <button class="link" id="pTest">Send a test notification</button>`:""}`;
+  const sw = (id, title, sub, onv) => `<div class="al-row"><div><b>${title}</b><div class="muted">${sub}</div></div><button class="tog ${onv?"on":""}" id="${id}" role="switch" aria-checked="${onv}" aria-label="${title}"><i></i></button></div>`;
+  const briefOn = store.get("brief","snow") !== "off";
+  const master = isIOS && !standalone ? `<div class="al-note">To get these on your lock screen, add Snowline to your Home Screen (Share → <b>Add to Home Screen</b>), open it from there, and come back here.</div>`
+    : !supported ? `<div class="al-note">This browser can't show lock-screen notifications. Alerts still show at the top of the Forecast tab.</div>`
+    : `<div class="al-row"><div><b>Lock-screen notifications</b><div class="muted">${on? "On · checked around 6am each morning" : "Off · alerts only show inside the app"}</div></div><button class="btn ${on?"":"primary"}" id="pToggle" style="flex:0 0 auto">${on? "Turn off" : "Turn on"}</button></div>`;
   el.innerHTML = `<div class="vh"><h1>Alerts</h1></div>
-    <div class="card"><h2>Your alerts</h2><div class="muted" style="margin:4px 0 8px">Matches show at the top of the Forecast tab${on? " and on your lock screen" : ""}.</div>
-      <div class="list" id="aList"></div><div id="aHits"></div></div>
-    <div class="card"><h2>Add an alert</h2>
+    <div class="card al-card">${master}
+      ${sw("watchTog", "Storm watch", "A heads-up when 8″+ is coming to a favorite 2–5 days out, ready to share", store.get("watch", true))}
+      ${sw("powderTog", "Powder alert", `${fmtSnow(4,0)}+ overnight or ${fmtSnow(8,0)}+ in the next 3 days at any favorite`, store.get("powderOn", true))}
+      ${sw("briefTog", "Morning brief", "Around 6am: overnight snow, more today, grooming and the temperature up top", briefOn)}
+      ${briefOn? `<div class="seg sm" id="briefSeg" style="margin:2px 0 6px">${[["snow","Snow days"],["daily","Every day"]].map(([k,l])=>`<button data-b="${k}" class="${store.get("brief","snow")===k?"on":""}">${l}</button>`).join("")}</div>` : ""}
+      ${on? `<button class="link" id="pTest" style="padding-left:0;margin-top:6px">Send a test notification</button>` : ""}
+      <div id="aHits"></div></div>
+    <details class="sec" id="customAl"><summary><span class="ttl">Custom alerts</span><span class="sv">${alertRules().filter(r=>r.spot!=="*favs").length || "Add your own"}</span></summary><div class="sec-b">
+      <div class="list" id="aList"></div>
+      <div class="grp">Add an alert</div>
       <div class="field">Spot<select id="aSpot"><option value="*favs">Any favorite</option><option value="*all">Any spot</option>${spots.map(s=>`<option>${s.name}</option>`).join("")}</select></div>
-      <div class="form2"><div class="field">When<select id="aType"><option value="overnight">Overnight snow</option><option value="forecast" selected>Forecast</option></select></div><div class="field">At least (${imp()?"in":"cm"})<input id="aIn" type="number" inputmode="numeric" value="${imp()?6:15}"></div></div>
+      <div class="form2"><div class="field">When<select id="aType"><option value="overnight">Overnight snow</option><option value="forecast" selected>Forecast</option></select></div><div class="field">At least (${imp()?"in":"cm"})<input id="aIn" type="number" inputmode="decimal" value="${imp()?6:15}"></div></div>
       <div class="field" id="aWinF">Within<select id="aWin">${Object.entries(ALERT_WIN).map(([k,l])=>`<option value="${k}" ${k==="d3"?"selected":""}>${l}</option>`).join("")}</select></div>
-      <button class="btn primary wide" id="aAdd">Add alert</button></div>
-    <div class="card" id="pushCard">${pushRow}</div>`;
+      <button class="btn primary wide" id="aAdd">Add alert</button></div></details>`;
   const list = () => { const rs = alertRules();
     $("#aList").innerHTML = rs.length? rs.map((r,i)=>`<div class="li"><span class="nm"><b>${r.type==="overnight"? "🌙" : "🌨"} ${ruleLabel(r)}</b></span><button class="link" data-del="${i}" style="color:#ff6b6b">Remove</button></div>`).join("") : `<div class="muted" style="padding:8px 0">No alerts yet.</div>`;
     $("#aList").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ const r=alertRules(); r.splice(+b.dataset.del,1); store.set("alerts",r); list(); checkAlerts(); pushSync(); });
-    if(rs.length) loadFinder().then(F=>{ const h=evalAlerts(F); $("#aHits").innerHTML = `<div class="grp">Matching now</div>` + (h.length? h.slice(0,6).map(x=>`<div class="li"><span class="nm"><b>✅ ${x.x.spot.name}</b><small>${fmtSnow(x.v)} in ${x.w}</small></span></div>`).join("") : `<div class="muted" style="padding:8px 0">Nothing meets your alerts yet.</div>`); }).catch(()=>{});
+    if(activeRules().length) loadFinder().then(F=>{ const h=evalAlerts(F); $("#aHits").innerHTML = `<div class="grp">Matching now</div>` + (h.length? h.slice(0,6).map(x=>`<div class="li"><span class="nm"><b>✅ ${x.x.spot.name}</b><small>${fmtSnow(x.v)} in ${x.w}</small></span></div>`).join("") : `<div class="muted" style="padding:8px 0">Nothing meets your alerts yet.</div>`); }).catch(()=>{});
     else $("#aHits").innerHTML = ""; };
   list();
   $("#aType").onchange = () => { $("#aWinF").style.display = $("#aType").value==="overnight"? "none" : ""; };
@@ -3099,10 +3118,13 @@ function renderAlerts(){
     if(on){ try{ const sub = await pushSub(); if(sub){ await post({action:"unsubscribe", endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); } }catch(e){} store.set("pushOn", false); toast("Lock-screen alerts off"); renderAlerts(); return; }
     try{ const perm = await Notification.requestPermission(); if(perm!=="granted"){ toast("Notifications are blocked in Settings"); return; }
       const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
-      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
+      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
     }catch(e){ toast("Couldn't turn on notifications"); } };
   document.querySelectorAll("#briefSeg button").forEach(b=>b.onclick=()=>{ store.set("brief", b.dataset.b); document.querySelectorAll("#briefSeg button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(b.dataset.b==="off"? "Morning brief off" : b.dataset.b==="daily"? "Morning brief every day" : "Morning brief on snow days"); });
-  const wt = $("#watchTog"); if(wt) wt.onclick = () => { const on = !store.get("watch", true); store.set("watch", on); wt.classList.toggle("on", on); wt.setAttribute("aria-checked", on); pushSync(); toast(on? "Storm watch on" : "Storm watch off"); };
+  const flip = (id, get, set, msg) => { const b = $("#"+id); if(b) b.onclick = () => { const v = !get(); set(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); pushSync(); toast(msg(v)); }; };
+  flip("watchTog", ()=>store.get("watch", true), v=>store.set("watch", v), v=>v? "Storm watch on" : "Storm watch off");
+  flip("powderTog", ()=>store.get("powderOn", true), v=>{ store.set("powderOn", v); if(v && !alertRules().some(r=>r.spot==="*favs")) store.set("alerts", [...alertRules(), {spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); checkAlerts(); }, v=>v? "Powder alert on" : "Powder alert off");
+  const bt = $("#briefTog"); if(bt) bt.onclick = () => { store.set("brief", store.get("brief","snow")==="off"? "snow" : "off"); pushSync(); renderAlerts(); toast(store.get("brief")==="off"? "Morning brief off" : "Morning brief on snow days"); };
   const tb = $("#pTest"); if(tb) tb.onclick = async () => { try{ const sub = await pushSub(); const r = await post({action:"test", endpoint:sub?.endpoint}); toast(r.ok? "Test sent" : "Test failed"); }catch(e){ toast("Test failed"); } };
 }
 
@@ -4068,7 +4090,8 @@ $("#pGo").onclick = () => { const [lat,lon] = $("#pLL").value.split(",").map(Num
 
 /* ================= Controls ================= */
 function seg(id, attr, key, cb){ const el=$(id); el.querySelectorAll("button").forEach(b=>{ b.classList.toggle("on", String(S[key])===b.dataset[attr]); b.onclick=()=>{ S[key] = key==="win"? +b.dataset[attr] : b.dataset[attr]; store.set(key,S[key]); el.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); cb(); }; }); }
-seg("#modeSeg","m","mode",()=>{ S.autoBC = false; if(S.mode==="bc") bcAcknowledge(); render(); }); seg("#bandSeg","b","band",render); seg("#unitSeg","u","units",()=>{ render(); if(location.hash==="#finder") renderFinder(); });
+seg("#modeSeg","m","mode",()=>{ S.autoBC = false; applyBand(); if(S.mode==="bc") bcAcknowledge(); render(); });
+applyBand(); $("#ltSub").onclick = openBandPicker; seg("#bandSeg","b","band",render); seg("#unitSeg","u","units",()=>{ render(); if(location.hash==="#maps") renderFinder(); });
 seg("#mapWin","w","win",()=>{ render(); tlStop(); S.tl.h = Math.min(S.grid?.maxH||240, S.win*24); if(S.tl.mode!=="fc") setTlMode("fc"); else paintField(); });
 document.querySelectorAll("#mapLayers button").forEach(b=>b.onclick=()=>{ b.classList.toggle("on"); applyLayers(); });
 
