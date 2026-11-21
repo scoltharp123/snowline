@@ -3583,15 +3583,17 @@ function matchAreas(P){
   const out = [], byPlace = [], nordicMode = S.mode==="skate" || S.mode==="classic";
   for(const a of AREAS.rows){
     if(P.kind && !a.kind.includes(P.kind)) continue;
-    let sc = 0, inName = 0;
-    for(const w of P.req){ const n = tokScore(w, a.nt), o = tokScore(w, a.ot); if(!n && !o){ sc = -1; break; } if(n>=o){ sc += n*2; inName++; } else sc += o; }
+    let sc = 0, inName = 0, fuzzy = false;
+    for(const w of P.req){ const n = tokScore(w, a.nt), o = tokScore(w, a.ot); if(!n && !o){ sc = -1; break; } if(Math.max(n,o)===2) fuzzy = true; if(n>=o){ sc += n*2; inName++; } else sc += o; }
     if(sc < 0) continue;
     if(normQ(a.name).startsWith(P.req.join(" "))) sc += 3;
     if(nordicMode? a.kind.includes("n") : a.kind.includes("a")) sc += 1;
     const d = km(BEND[0], BEND[1], a.lat, a.lon); if(d < 250) sc += 2; else if(a.cc==="US"||a.cc==="CA") sc += 1;
-    (inName? out : byPlace).push({a, sc, d});
+    (inName? out : byPlace).push({a, sc, d, fuzzy});
   }
-  return (out.length? out : byPlace).sort((x,y)=> y.sc-x.sc || x.d-y.d).slice(0, 10).map(x=>x.a);
+  let list = out.length? out : byPlace; if(list.some(x=>!x.fuzzy)) list = list.filter(x=>!x.fuzzy);   // spelling guesses only when nothing matches as typed
+  matchAreas.byPlace = !out.length && byPlace.length > 0;
+  return list.sort((x,y)=> y.sc-x.sc || x.d-y.d).slice(0, 10).map(x=>x.a);
 }
 const areaKind = a => a.kind==="an"? "Resort + Nordic" : a.kind==="n"? "Nordic" : "Resort";
 const areaWhere = a => [a.loc && a.loc!==a.name? a.loc : "", (a.cc==="US"||a.cc==="CA")? a.reg : [a.reg, a.cc].filter(Boolean).join(", ")].filter(Boolean).join(", ");
@@ -3633,9 +3635,12 @@ $("#q").oninput = e => { clearTimeout(qT); const q = e.target.value.trim(), seq 
     if(!P.place) return;
     const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(P.place)}&count=6&language=en&format=json`); await loadAreas();
     if(seq!==qSeq) return;
-    const g = (j.results||[]).sort((a,b)=>(b.population||0)-(a.population||0) || (b.admin1==="Oregon")-(a.admin1==="Oregon"));
-    const town = g.find(x=>/^PPL/.test(x.feature_code||"PPL")) || g[0];
-    if(town && (P.kind || areas.length < 4)){ nearName = `${town.name}${town.admin1? ", "+town.admin1 : ""}`;
+    // Of the places with this name, pick the one with the most ski areas around it (Sun Valley, Idaho over Sun Valley, Nevada)
+    const around = x => AREAS.rows.reduce((n,a)=> n + (Math.abs(a.lat-x.latitude)<1.2 && Math.abs(a.lon-x.longitude)<1.6 && km(x.latitude,x.longitude,a.lat,a.lon)<130 && (!P.kind || a.kind.includes(P.kind))? 1 : 0), 0);
+    const g = (j.results||[]).map(x=>({x, n: around(x)})).sort((a,b)=> b.n-a.n || (b.x.population||0)-(a.x.population||0)).map(o=>o.x);
+    const town = g[0];
+    if(town && (P.kind || !areas.length || matchAreas.byPlace)){ nearName = `${town.name}${town.admin1? ", "+town.admin1 : ""}`;
+      if(matchAreas.byPlace) areas = [];   // "bozeman xc": one list, nearest first
       nearby = AREAS.rows.filter(a=> (!P.kind || a.kind.includes(P.kind)) && !areas.includes(a) && !near(a, mine)).map(a=>({a, d: km(town.latitude, town.longitude, a.lat, a.lon)})).filter(x=>x.d<130).sort((x,y)=>x.d-y.d).slice(0, 8); }
     places = g.filter(x=> !mine.some(p=>near({lat:x.latitude, lon:x.longitude}, [p]))).slice(0, nearby.length? 3 : 6);
     draw();
