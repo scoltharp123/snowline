@@ -668,6 +668,11 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .ag-rng{position:absolute;top:12px;height:6px;background:rgba(125,211,252,.18);border-radius:4px}.ag-dot{position:absolute;top:10px;width:10px;height:10px;margin-left:-5px;border-radius:50%;border:2px solid #111113}
 .ag-me{position:absolute;top:-12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;font-size:12px}.ag-me b{background:#f5f5f7;color:#000;border-radius:6px;padding:1px 6px;font-weight:700}.ag-me::after{content:"";width:2px;height:22px;background:#f5f5f7;margin-top:1px;border-radius:1px}
 .ag-ends{display:flex;justify-content:space-between;font-size:11.5px;color:#8e8e93;margin:0 0 2px}
+.conf-b{display:block;width:calc(100% - 28px);margin:12px 14px 2px;padding:12px 0 2px;border:0;border-top:1px solid #1f1f22;background:none;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.cf-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:13.5px}.cf-l{font-weight:700}.cf-l.c-hi{color:#6ee7a0}.cf-l.c-md{color:#fcd34d}.cf-l.c-lo{color:#fca5a5}.cf-r{color:#c9d4e3}.cf-r b{color:#fff}
+.cf-bar{position:relative;height:8px;margin:10px 0 8px;background:#202024;border-radius:6px}.cf-rng{position:absolute;top:0;bottom:0;background:rgba(96,165,250,.45);border-radius:6px}.cf-me{position:absolute;top:-4px;width:4px;height:16px;margin-left:-2px;background:#fff;border-radius:2px;box-shadow:0 0 0 2px #111113}
+.cf-n{font-size:12px;color:#8e8e93}.cf-n span{opacity:.8}
+.v-sc{cursor:pointer;display:inline-flex}
 </style>
 </head>
 <body>
@@ -1220,7 +1225,7 @@ function render(){
       const wet = rain >= 2 && sc < 6.5, gale = gust >= 72 && sc < 6.5;
       const [lvl, head] = wet? ["skip", `Skip it ${who.toLowerCase()}`] : gale? ["meh", `Windy ${who.toLowerCase()}`] : sc>=8? ["go", `Go! ${who} is epic`] : sc>=6.5? ["go", `Worth it ${who.toLowerCase()}`] : sc>=5? ["ok", `Good day ${who.toLowerCase()}`] : sc>=3.5? ["meh", `Fair ${who.toLowerCase()}`] : ["skip", `Skip it ${who.toLowerCase()}`];
       const why = wet? `rain at ${fmtEl(e)}` : gale? `gusts to ${fmtWind(gust)} ${windU()}, ${lab}` : `${lab}, best ${when}`;
-      verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}:</b> ${why}</span>${scoreChip(sc)}</div></div>`; }
+      verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}:</b> ${why}</span><span class="v-sc" data-tip="quality" role="button" aria-label="What the ski score means">${scoreChip(sc)}</span></div></div>`; }
   }
   if(verdict && bestK>=0 && days7[bestK]!==vDay){ const b = sums[bestK];
     verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="vs-t">Best this week: <b>${(l=>/\d/.test(l)? new Date(days7[bestK]+"T12:00").toLocaleDateString([], {weekday:"short"}) : l)(dayLabel(days7[bestK]))}</b> ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div></div>`); bestK = -1; }
@@ -1242,10 +1247,9 @@ function render(){
   ${verdict? verdict.replace(/<\/div>$/, glance + "</div>") : `<div class="verdict">${glance}</div>`}${callouts.slice(0,2).join("")}
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
-    <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : `<button class="badge b-${conf.lvl} tipbadge" data-tip="conf" aria-label="What confidence means">${conf.label} ⓘ</button>`}</div>
-    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : ""}</div>
+    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
-    <div class="qleg"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
   ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
@@ -2702,18 +2706,19 @@ function glanceHTML(C, slNow){
     <div><span>Next storm</span><b class="num">${stTxt}</b></div>
     <div><span>Snow level</span><b class="num">${fmtEl(slNow)}</b></div></div>`;
 }
-/* ---------- Model agreement: where each model lands for the next 5 days, and Snowline's call ---------- */
+/* ---------- Confidence, in plain words: how sure we are about the next 5 days, and the realistic range ---------- */
 function agreeHTML(C, N, winTot, conf){
-  const mt = MODELS.filter(m=>m.id!=="hrrr" && S.enabled[m.id] && C.modelDays[m.id]).map(m=>({m, v:modelWindow(C, m.id, N)})).filter(x=>isNum(x.v)).sort((a,b)=>a.v-b.v);
-  if(mt.length < 3 || mt[mt.length-1].v < 1) return "";
-  const lo = mt[0], hi = mt[mt.length-1], max = Math.max(hi.v, winTot||0) * 1.08 || 1, pos = v => Math.max(1, Math.min(99, v/max*100));
-  const spread = hi.v - lo.v, close = mt.filter(x=>Math.abs(x.v-(winTot||0)) <= Math.max(1.5, (winTot||0)*0.3)).length;
-  const say = conf.lvl==="hi"? `Models agree` : conf.lvl==="md"? `Models mostly agree` : `Models disagree, so expect this to change`;
-  return `<div class="agree"><div class="ag-h"><b>${say}</b><span class="muted">next ${N} days · ${close} of ${mt.length} near Snowline</span></div>
-    <div class="ag-track"><i class="ag-rng" style="left:${pos(lo.v)}%;width:${Math.max(1,pos(hi.v)-pos(lo.v))}%"></i>
-      ${mt.map(x=>`<i class="ag-dot" title="${x.m.name}: ${fmtSnow(x.v,0)}" style="left:${pos(x.v)}%;background:${x.m.c}"></i>`).join("")}
-      ${isNum(winTot)? `<span class="ag-me" style="left:${pos(winTot)}%"><b>${fmtSnow(winTot,0)}</b></span>` : ""}</div>
-    <div class="ag-ends"><span>${lo.m.name.replace(" IFS","")} ${fmtSnow(lo.v,0)}</span><span>${spread < 1? "" : `${fmtSnow(spread,0)} apart`}</span><span>${hi.m.name.replace(" IFS","")} ${fmtSnow(hi.v,0)}</span></div></div>`;
+  const v = MODELS.filter(m=>m.id!=="hrrr" && S.enabled[m.id] && C.modelDays[m.id]).map(m=>modelWindow(C, m.id, N)).filter(isNum).sort((a,b)=>a-b);
+  if(v.length < 3 || v[v.length-1] < 1 || !isNum(winTot)) return "";
+  const q = f => { const x = f*(v.length-1), i = Math.floor(x); return v[i] + (v[Math.min(i+1, v.length-1)] - v[i])*(x-i); };
+  const lo = Math.min(q(.2), winTot), hi = Math.max(q(.8), winTot), max = Math.max(v[v.length-1], hi) * 1.05 || 1, pos = x => Math.max(0, Math.min(100, x/max*100));
+  const word = {hi:"High", md:"Medium", lo:"Low"}[conf.lvl] || "Medium";
+  const note = conf.lvl==="hi"? "The weather models agree." : conf.lvl==="md"? "The weather models mostly agree." : "The weather models disagree, so this may change.";
+  const r = `${fmtSnow(lo,0).replace(/"|\s?cm/,"")}–${fmtSnow(hi,0)}`;
+  return `<button class="conf-b" data-tip="conf" aria-label="About forecast confidence">
+    <div class="cf-h"><span class="cf-l c-${conf.lvl}">${word} confidence</span><span class="cf-r">Next ${N} days: <b>${fmtSnow(winTot,0)}</b>, likely ${r}</span></div>
+    <div class="cf-bar"><i class="cf-rng" style="left:${pos(lo)}%;width:${Math.max(2, pos(hi)-pos(lo))}%"></i><i class="cf-me" style="left:${pos(winTot)}%"></i></div>
+    <div class="cf-n">${note} <span>ⓘ</span></div></button>`;
 }
 /* ---------- Nordic Pulse live grooming, shown as Nordic Pulse's own page inside Snowline (nothing copied or stored) ---------- */
 const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Elk Lake Resort (Nordic), OR": "https://nordic-pulse.com/ski-areas/US/OR/Elk-Lake-Resort", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
@@ -2756,10 +2761,11 @@ function renderMeissner(){
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
   quality: () => ["Ski quality", qualityExplainHTML()],
-  conf: () => ["Confidence", `<p><b>How much the weather models agree</b> on the snow total for the next 5 days at this elevation.</p>
+  conf: () => ["Confidence", `<p><b>How sure Snowline is</b> about the snow total for the next 5 days at this elevation, based on how much the weather models agree.</p>
+    <p>The <b>white mark</b> is Snowline's forecast. The <b>blue band</b> is the likely range: where most of the models land.</p>
     <p><b>High:</b> the models are within about a third of each other. <b>Medium:</b> they differ by up to about two-thirds. <b>Low:</b> some models show a lot more or less than others, so the total could change a lot. <b>Dry:</b> less than half an inch expected.</p>
     <p class="muted">Low confidence is common 5+ days out and with storms that could track north or south of you. Check back as it gets closer.</p>`],
-  best: () => ["Best day", `<p>The day in the next 7 with the <b>highest ski quality score</b> for ${MODE_NAME[S.mode].toLowerCase()} skiing, and its best 3-hour window between 8am and 5pm.</p><p class="muted">The number is that window's 0–10 score. It's about the snow surface and weather only. Tap "Ski quality" on the Snow Summary card for how the score works.</p>`],
+  best: () => ["Best day", `<p>The day in the next 7 with the <b>highest ski quality score</b> for ${MODE_NAME[S.mode].toLowerCase()} skiing, and its best 3-hour window between 8am and 5pm.</p><p class="muted">The number is that window's 0–10 score. It's about the snow surface and weather only. Tap any score for how it works.</p>`],
   lifts: () => ["Lift holds", `<p>Based on the forecast wind at ridgetop and the gusts.</p>
     <p><b>Lifts OK:</b> under about 30 mph. <b>Holds possible:</b> about 30–45 mph, when upper lifts often slow down or pause. <b>Holds likely:</b> over about 45 mph.</p>
     <p class="muted">An estimate from the weather, not the resort's lift status. Each resort decides lift by lift.</p>`],
