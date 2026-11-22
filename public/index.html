@@ -759,6 +759,7 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 const PRESETS = [
   {name:"Mt. Bachelor, OR", lat:43.979, lon:-121.688, base:6300, top:9065},
   {name:"Meissner Nordic (Bend), OR", lat:44.006, lon:-121.548, base:5350, top:5900},
+  {name:"Elk Lake Resort (Nordic), OR", lat:43.978, lon:-121.808, base:4900, top:5300},
   {name:"Mt. Bachelor Nordic Center, OR", lat:43.988, lon:-121.676, base:6300, top:6700},
   {name:"Methow Valley Trails, WA", lat:48.594, lon:-120.405, base:1750, top:3500},
   {name:"Hoodoo, OR", lat:44.408, lon:-121.871, base:4668, top:5703},
@@ -1442,7 +1443,7 @@ function updateSeasonSummary(){
 }
 
 /* ---------- Favorites ---------- */
-const SHORT_NAMES = {"Mt. Bachelor, OR":"Mt. Bachelor","Mt. Bachelor Nordic Center, OR":"Bachelor Nordic","Meissner Nordic (Bend), OR":"Meissner"};
+const SHORT_NAMES = {"Mt. Bachelor, OR":"Mt. Bachelor","Mt. Bachelor Nordic Center, OR":"Bachelor Nordic","Meissner Nordic (Bend), OR":"Meissner","Elk Lake Resort (Nordic), OR":"Elk Lake"};
 function dispName(n){ return SHORT_NAMES[n] || String(n||"").replace(/,\s*[A-Z]{2}$/,""); }
 const DEFAULT_FAVS = ["Mt. Bachelor, OR","Mt. Bachelor Nordic Center, OR","Meissner Nordic (Bend), OR","Hoodoo, OR"];
 async function renderFavs(force){
@@ -2651,7 +2652,7 @@ function openFeedback(){
 
 
 /* ---------- Nordic Pulse live grooming, shown as Nordic Pulse's own page inside Snowline (nothing copied or stored) ---------- */
-const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
+const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Elk Lake Resort (Nordic), OR": "https://nordic-pulse.com/ski-areas/US/OR/Elk-Lake-Resort", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
 function npEmbed(name){
   const u = NP_PAGES[name]; if(!u) return "";
   return `<div class="np"><div class="np-h"><b>Live grooming</b><span><button class="np-full" data-np="${u}">Full screen</button><a href="${u}" target="_blank" rel="noopener">Open ↗</a></span></div>
@@ -2713,15 +2714,17 @@ const TIPS = {
 document.addEventListener("click", e => { const b = e.target.closest("[data-tip]"); if(!b) return; e.preventDefault(); e.stopPropagation();
   const f = TIPS[b.dataset.tip]; if(!f) return; const [h, body] = f(); $("#tipTitle").textContent = h; $("#tipBox").innerHTML = body; openSheet("tipSheet"); }, true);
 /* ================= Grooming, avalanche observations, snow stake time-lapse ================= */
-const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Methow Valley Trails, WA", "Birkie Trail (Cable, WI)", "Mt. Spokane, WA"];
+const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Elk Lake Resort (Nordic), OR", "Methow Valley Trails, WA", "Birkie Trail (Cable, WI)", "Mt. Spokane, WA"];
 function renderGroom(){
   const card = $("#groomCard"); if(!card || !S.loc) return; const G = extrasFor(S.loc).groom;
   if(!G || S.mode==="bc"){ card.hidden = true; return; }
-  if(G.links){ if(!G.links.length || S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = true; return; }
+  if(G.links && S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = true; return; }
+  if(G.links && NP_PAGES[S.loc.name] && S.mode!=="bc"){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2>${RESORT_SITE[S.loc.name]? `<a class="muted" href="${RESORT_SITE[S.loc.name]}" target="_blank" rel="noopener">Area site ↗</a>` : ""}</div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
+  if(G.links){ if(!G.links.length){ card.hidden = true; return; }
     card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><div class="row" style="gap:8px;flex-wrap:wrap">${G.links.map(([t,u])=>`<a class="btn" style="text-decoration:none" href="${u}" target="_blank" rel="noopener">${t} ↗</a>`).join("")}</div>
       <div class="muted" style="font-size:11px;margin-top:6px">Live grooming for this area is published on its own report; Snowline links to it rather than copying it.</div>`; return; }
   if(G.error){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><a href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor's grooming report ↗</a>`; return; }
-  const nordic = !isAlp(), D = nordic ? G.nordic : G.alpine, R = G.report; card.hidden = false;
+  const nordic = !isAlp() || S.loc.name==="Mt. Bachelor Nordic Center, OR", D = nordic ? G.nordic : G.alpine, R = G.report; card.hidden = false;
   if(!D.total && !D.groomed){ D.preseason = true; }
   const kinds = Object.entries(D.kinds||{}).map(([k,n])=>`<span class="chip-s">${esc(k.replace(/ And /g," & "))} · ${n}</span>`).join("");
   const head = D.groomed ? `<div class="gr-big"><b class="num">${D.groomed}</b><span>of ${D.total} ${nordic? "trails" : "runs"} groomed${D.latest? `<br><small>last update ${ago(D.latest)}</small>` : ""}</span></div>`
@@ -3088,7 +3091,7 @@ const b64u = s => { const p='='.repeat((4-s.length%4)%4); const r=atob((s+p).rep
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent), standalone = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
 async function pushSub(){ if(!("serviceWorker" in navigator)) return null; const reg = await navigator.serviceWorker.ready; return reg.pushManager.getSubscription(); }
 /* ================= FEATURES v5 ================= */
-const NORDIC_SPOTS = { "Meissner Nordic (Bend), OR": {thr:14, label:"Meissner grooming", snopark:true}, "Mt. Bachelor Nordic Center, OR": {thr:18, label:"Bachelor Nordic trails"}, "Methow Valley Trails, WA": {thr:12, label:"Methow trail grooming"}, "Birkie Trail (Cable, WI)": {thr:8, label:"Birkie trail grooming"} };
+const NORDIC_SPOTS = { "Meissner Nordic (Bend), OR": {thr:14, label:"Meissner grooming", snopark:true}, "Elk Lake Resort (Nordic), OR": {thr:14, label:"Elk Lake grooming"}, "Mt. Bachelor Nordic Center, OR": {thr:18, label:"Bachelor Nordic trails"}, "Methow Valley Trails, WA": {thr:12, label:"Methow trail grooming"}, "Birkie Trail (Cable, WI)": {thr:8, label:"Birkie trail grooming"} };
 const OREGON = n => /,\s*OR\)?$/.test(n) || /\(.*,\s*OR\)/.test(n);
 
 /* ---------- Trail-opening predictor ---------- */
@@ -3775,6 +3778,7 @@ const RESORT_SITE = {
   "Mt. Bachelor, OR": "https://www.mtbachelor.com/",
   "Mt. Bachelor Nordic Center, OR": "https://www.mtbachelor.com/nordic/overview/",
   "Meissner Nordic (Bend), OR": "https://meissnernordic.org/",
+  "Elk Lake Resort (Nordic), OR": "https://elklakeresort.com/",
   "Methow Valley Trails, WA": "https://www.methowtrails.org/",
   "Hoodoo, OR": "https://skihoodoo.com/",
   "Willamette Pass, OR": "https://www.willamettepass.com/",
@@ -4103,11 +4107,12 @@ function spotRow(sp, opts={}){
   return `<button class="li" data-spot="${encodeURIComponent(sp.name)}">${opts.rank?`<span class="rk">${opts.rank}</span>`:""}<span class="nm"><b>${sp.name}${nordic?'<span class="tag">XC</span>':""}</b><small>${Math.round(sp.base).toLocaleString()}–${Math.round(sp.top).toLocaleString()} ft</small></span>${S.loc?.name===sp.name?'<span style="color:var(--ice)">●</span>':""}</button>`;
 }
 /* Central Oregon first: the spots most people here look for, plus easy search by everyday names */
-const CO_RESORTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Hoodoo, OR", "Willamette Pass, OR"];
+const CO_RESORTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Elk Lake Resort (Nordic), OR", "Hoodoo, OR", "Willamette Pass, OR"];
 const SPOT_AKA = {
   "Mt. Bachelor, OR": "mount bachelor mt bachelor mtb bachelor butte bend ski resort sunrise west village pine marten summit",
   "Mt. Bachelor Nordic Center, OR": "mount bachelor nordic mt bachelor nordic cross country xc skate classic bachelor nordic lodge west village",
   "Meissner Nordic (Bend), OR": "virginia meissner sno park snopark nordic cross country xc skate bend swampy wanoga",
+  "Elk Lake Resort (Nordic), OR": "elk lake resort nordic cross country xc skate classic loop cascade lakes bend",
   "Hoodoo, OR": "hoodoo ski area santiam pass sisters",
   "Willamette Pass, OR": "willamette pass odell lake crescent",
   "Tumalo Mountain, OR": "tumalo mtn dutchman flat sno park backcountry tour bc",

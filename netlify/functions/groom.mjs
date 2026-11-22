@@ -7,6 +7,7 @@ import { json } from "../lib/shared.mjs";
 const BACH = "https://api.mtbachelor.com/api/v1/dor/drupal";
 const LINKS = {
   "Meissner Nordic (Bend), OR": [["Meissner grooming report", "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park"], ["Meissner Nordic", "https://meissnernordic.org/"]],
+  "Elk Lake Resort (Nordic), OR": [["Elk Lake grooming report", "https://nordic-pulse.com/ski-areas/US/OR/Elk-Lake-Resort"], ["Elk Lake Resort", "https://elklakeresort.com/"]],
   "Methow Valley Trails, WA": [["Methow grooming report", "https://nordic-pulse.com/ski-areas/US/WA/Methow-Trails"], ["Methow Trails", "https://www.methowtrails.org/"]],
   "Birkie Trail (Cable, WI)": [["Birkie grooming report", "https://nordic-pulse.com/ski-areas/US/WI/American-Birkebeiner"], ["Birkie trail report", "https://www.birkie.com/trail-maps-conditions/winter/"]],
   "Mt. Spokane, WA": [["Mt. Spokane Nordic grooming", "https://nordic-pulse.com/ski-areas/US/WA/Mount-Spokane"]],
