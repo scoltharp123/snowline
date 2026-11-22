@@ -656,6 +656,9 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .mx-gr{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #1f1f22;font-size:13.5px}.mx-gr .muted{font-size:12px;text-align:right}
 .mx-links{display:flex;gap:6px;margin-top:8px}.mx-links .btn{flex:1;text-align:center;text-decoration:none;font-size:12.5px;padding:8px 6px;white-space:nowrap}.mx-links .btn.pri{flex:1.4;background:#1d4ed8;border-color:#1d4ed8;color:#fff}
 .mx-cam img{aspect-ratio:2/1 !important}
+.np{margin-top:12px}.np-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13.5px}.np-h span{display:flex;gap:12px;align-items:center}.np-h a,.np-full{font-size:12.5px;color:#7dd3fc;background:none;border:0;padding:0;cursor:pointer;text-decoration:none;font-weight:600}
+.np-f{border-radius:12px;overflow:hidden;background:#f4f5f7;height:480px;border:1px solid #1f1f22}.np-f iframe{width:100%;height:100%;border:0;display:block}.np-c{font-size:11px;margin-top:6px}
+.np-sheet{position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;padding-top:var(--sat)}.np-bar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;font-size:15px;border-bottom:1px solid #1f1f22}.np-bar button{background:#1d4ed8;color:#fff;border:0;border-radius:99px;padding:7px 16px;font-weight:700;font-size:14px}.np-sheet iframe{flex:1;width:100%;border:0;background:#fff}
 </style>
 </head>
 <body>
@@ -2646,6 +2649,20 @@ function openFeedback(){
   openSheet("tipSheet");
 }
 
+
+/* ---------- Nordic Pulse live grooming, shown as Nordic Pulse's own page inside Snowline (nothing copied or stored) ---------- */
+const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
+function npEmbed(name){
+  const u = NP_PAGES[name]; if(!u) return "";
+  return `<div class="np"><div class="np-h"><b>Live grooming</b><span><button class="np-full" data-np="${u}">Full screen</button><a href="${u}" target="_blank" rel="noopener">Open ↗</a></span></div>
+    <div class="np-f"><iframe src="${u}" loading="lazy" title="Live grooming map from Nordic Pulse" referrerpolicy="no-referrer"></iframe></div>
+    <div class="muted np-c">Live from Nordic Pulse · posted by the groomers as they work</div></div>`;
+}
+function wireNP(root){ root.querySelectorAll(".np-full").forEach(b=>b.onclick=()=>{
+  const d = document.createElement("div"); d.className = "np-sheet";
+  d.innerHTML = `<div class="np-bar"><b>Live grooming · Nordic Pulse</b><button aria-label="Close">Done</button></div><iframe src="${b.dataset.np}" title="Live grooming map from Nordic Pulse"></iframe>`;
+  d.querySelector("button").onclick = () => { d.remove(); document.body.style.overflow = ""; };
+  document.body.appendChild(d); document.body.style.overflow = "hidden"; }); }
 /* ---------- Live at Meissner: the club's own station, ODOT's Wanoga Butte station, the parking-lot cam ---------- */
 function mxGroomLine(){ const m = new Date().getMonth(); return (m===11 || m<=2)? "7 days a week through March" : "Daily Dec–Mar, snow permitting"; }
 function renderMeissner(){
@@ -2665,8 +2682,10 @@ function renderMeissner(){
   el.innerHTML = `<div class="card-h"><h2>Live at Meissner</h2><a class="muted" href="https://meissnernordic.org/weather/" target="_blank" rel="noopener">Meissner Nordic ↗</a></div>
     <div class="mx-grid">${st}</div>${cam}
     <div class="mx-gr"><b>Grooming</b><span class="muted">${mxGroomLine()}</span></div>
-    <div class="mx-links">${(M.links||[]).map(([l,u],i)=>`<a class="btn ${i? "" : "pri"}" href="${u}" target="_blank" rel="noopener">${l} ↗</a>`).join("")}</div>
-    <div class="muted" style="font-size:11px;margin-top:8px">Stations: Meissner Nordic, and ODOT via the National Weather Service. Grooming is posted live by Meissner Nordic.</div>`;
+    ${npEmbed(S.loc.name)}
+    <div class="mx-links">${(M.links||[]).filter(([l])=>!/grooming map/i.test(l)).map(([l,u])=>`<a class="btn" href="${u}" target="_blank" rel="noopener">${l} ↗</a>`).join("")}</div>
+    <div class="muted" style="font-size:11px;margin-top:8px">Stations: Meissner Nordic, and ODOT via the National Weather Service.</div>`;
+  wireNP(el);
 }
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
@@ -2708,13 +2727,15 @@ function renderGroom(){
   const head = D.groomed ? `<div class="gr-big"><b class="num">${D.groomed}</b><span>of ${D.total} ${nordic? "trails" : "runs"} groomed${D.latest? `<br><small>last update ${ago(D.latest)}</small>` : ""}</span></div>`
     : D.preseason ? `<p class="muted" style="margin:4px 0">Mt. Bachelor hasn't posted ${nordic? "Nordic trail" : "run"} grooming yet. It shows here once the mountain opens.</p>`
     : `<p class="muted" style="margin:4px 0">No ${nordic? "trails" : "runs"} marked groomed right now${D.open? ` · ${D.open} open` : ""}.</p>`;
+  const npHere = nordic && NP_PAGES[S.loc.name];
   card.innerHTML = `<div class="card-h"><h2>${nordic? "Grooming · Nordic" : "Grooming & resort report"}</h2><a class="muted" href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor ↗</a></div>
-    ${head}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
+    ${npHere? npEmbed(S.loc.name) + `<div class="grp">From Mt. Bachelor</div>` : ""}${npHere && D.preseason? "" : head}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
     ${!nordic? liftsHTML(G.lifts) : ""}
     ${D.trails?.length? `<details class="nb" style="margin-top:8px"><summary>See groomed ${nordic? "trails" : "runs"}</summary><div class="list">${D.trails.map(x=>`<div class="li" style="min-height:38px"><span class="nm"><b>${esc(x.name)}</b><small>${esc((x.groom||"").replace(/ And /g," & "))}${x.updated? " · "+ago(x.updated) : ""}</small></span></div>`).join("")}</div></details>` : ""}
     ${R? `<div class="grp">Resort snow report</div><div class="fr"><div><b class="num">${R.overnight ?? "—"}″</b><small>Overnight</small></div><div><b class="num">${R.h24 ?? "—"}″</b><small>24 hours</small></div><div><b class="num">${R.base ?? "—"}″</b><small>Base</small></div></div>
       ${R.text? `<p class="muted clamp3" style="margin:8px 0 0;font-size:13px">${esc(R.text)}</p>` : ""}` : ""}
     <div class="muted" style="font-size:11px;margin-top:6px">From Mt. Bachelor's own mountain report.</div>`;
+  wireNP(card);
 }
 function liftsHTML(L){
   if(!L || !L.length) return "";
