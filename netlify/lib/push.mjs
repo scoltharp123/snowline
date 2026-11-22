@@ -20,7 +20,12 @@ export async function send(sub, payload) {
   }
 }
 
-// model snow (inches) from Open-Meteo at the spot's summit elevation
+// Alerts check snow at the elevation the person picked (base / mid / summit; summit by default).
+export function bandSpot(sp, prefs) {
+  const b = +sp.base || +sp.top || 5000, t = +sp.top || b, k = prefs?.band || "summit";
+  return { ...sp, top: k === "base" ? b : k === "mid" ? Math.round((b + t) / 2) : t };
+}
+// model snow (inches) from Open-Meteo at the spot's chosen elevation (summit unless bandSpot changed it)
 // Returns past 12h, next N days, peak day, 9am temp, and a simple "cold" signal for powder language
 export async function modelSnow(spot, days = 10) {
   const elev = Math.round((spot.top || spot.base || 5000) / 3.28084);
@@ -120,7 +125,7 @@ export async function buildAlert(sub) {
 
   const getM = async (sp) => {
     if (!cache.has(sp.name)) {
-      cache.set(sp.name, Promise.all([modelSnow(sp).catch(() => null), measuredOvernight(sp)]));
+      cache.set(sp.name, Promise.all([modelSnow(bandSpot(sp, sub.prefs)).catch(() => null), measuredOvernight(sp)]));
     }
     return cache.get(sp.name);
   };
@@ -224,7 +229,7 @@ export async function buildBrief(sub, force) {
 
   for (const sp of (sub.spots || []).slice(0, 4)) {
     const [m, meas] = await Promise.all([
-      modelSnow(sp, 3).catch(() => null),
+      modelSnow(bandSpot(sp, sub.prefs), 3).catch(() => null),
       measuredOvernight(sp),
     ]);
     if (!m) continue;
@@ -287,7 +292,7 @@ export async function buildWatch(sub) {
   for (const sp of (sub.spots || []).slice(0, 6)) {
     let j;
     try {
-      const elev = Math.round((sp.top || sp.base || 5000) / 3.28084);
+      const bs = bandSpot(sp, sub.prefs), elev = Math.round((bs.top || 5000) / 3.28084);
       j = await getJSON(
         `https://api.open-meteo.com/v1/forecast?latitude=${sp.lat}&longitude=${sp.lon}&elevation=${elev}` +
         `&daily=snowfall_sum&forecast_days=7&timezone=auto`
