@@ -1252,7 +1252,7 @@ function render(){
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : ""}</div>
     ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
-    <button class="qkey" data-tip="quality" aria-label="What ski quality means"><span>Ski quality</span><i class="qk-bar"></i><span class="qk-e">Poor → Epic ⓘ</span></button>
+    <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
