@@ -673,6 +673,9 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .cf-bar{position:relative;height:8px;margin:10px 0 8px;background:#202024;border-radius:6px}.cf-rng{position:absolute;top:0;bottom:0;background:rgba(96,165,250,.45);border-radius:6px}.cf-me{position:absolute;top:-4px;width:4px;height:16px;margin-left:-2px;background:#fff;border-radius:2px;box-shadow:0 0 0 2px #111113}
 .cf-n{font-size:12px;color:#8e8e93}.cf-n span{opacity:.8}
 .v-sc{cursor:pointer;display:inline-flex}
+.qkey{display:flex;align-items:center;gap:8px;margin:6px 14px 0;padding:6px 0;background:none;border:0;color:#8e8e93;font:inherit;font-size:11.5px;cursor:pointer}.qkey span:first-child{color:#c7c7cc;font-weight:600}
+.qk-bar{flex:0 0 74px;height:6px;border-radius:4px;background:linear-gradient(90deg,#fca5a5,#fde68a,#86efac,#38bdf8,#a78bfa)}
+#snowCard .glance{grid-template-columns:1fr 1fr;margin:10px 14px 0;padding-top:12px}
 </style>
 </head>
 <body>
@@ -1244,11 +1247,13 @@ function render(){
   $("#app").innerHTML = `
   ${a2hsHTML()}${modelNote}
   <div id="nwsAlerts"></div>
-  ${verdict? verdict.replace(/<\/div>$/, glance + "</div>") : `<div class="verdict">${glance}</div>`}${callouts.slice(0,2).join("")}
+  ${verdict}${callouts.slice(0,2).join("")}
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : ""}</div>
-    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    <button class="qkey" data-tip="quality" aria-label="What ski quality means"><span>Ski quality</span><i class="qk-bar"></i><span class="qk-e">Poor → Epic ⓘ</span></button>
+    ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
@@ -2698,11 +2703,10 @@ function openFeedback(){
 
 /* ---------- At a glance: the three numbers people check first ---------- */
 function glanceHTML(C, slNow){
-  const n24 = C.cons.slice(C.nowIdx, C.nowIdx+24).reduce((a,c)=>a+(c?.snow||0), 0);
   const st = findStorms(C)[0];
   const wk = d => { const l = dayLabel(d); return /\d/.test(l)? new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"}) : l; };
   const stTxt = !st? "None soon" : (st.a - C.nowIdx <= 3? `${fmtSnow(st.tot,0)} now` : `${fmtSnow(st.tot,0)} ${st.b - st.a > 36? "from " : ""}${wk(C.time[st.a].slice(0,10))}`);
-  return `<div class="glance"><div><span>Next 24 h</span><b class="num">${fmtSnow(n24, n24>=1 || n24<0.05? 0 : 1)}</b></div>
+  return `<div class="glance">
     <div><span>Next storm</span><b class="num">${stTxt}</b></div>
     <div><span>Snow level</span><b class="num">${fmtEl(slNow)}</b></div></div>`;
 }
