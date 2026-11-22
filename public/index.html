@@ -24,10 +24,9 @@
 <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
 <link rel="preconnect" href="https://ensemble-api.open-meteo.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <style>
 :root{
   --bg:#000; --card:#151517; --card2:#212124; --line:#2a2a2e; --text:#f2f2f4; --mute:#8e8e93; --dim:#5a5a60;
@@ -659,6 +658,7 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .np{margin-top:12px}.np-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13.5px}.np-h span{display:flex;gap:12px;align-items:center}.np-h a,.np-full{font-size:12.5px;color:#7dd3fc;background:none;border:0;padding:0;cursor:pointer;text-decoration:none;font-weight:600}
 .np-f{border-radius:12px;overflow:hidden;background:#f4f5f7;height:480px;border:1px solid #1f1f22}.np-f iframe{width:100%;height:100%;border:0;display:block}.np-c{font-size:11px;margin-top:6px}
 .np-sheet{position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;padding-top:var(--sat)}.np-bar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;font-size:15px;border-bottom:1px solid #1f1f22}.np-bar button{background:#1d4ed8;color:#fff;border:0;border-radius:99px;padding:7px 16px;font-weight:700;font-size:14px}.np-sheet iframe{flex:1;width:100%;border:0;background:#fff}
+.upd-bar{position:fixed;left:50%;bottom:calc(var(--sab,0px) + 96px);transform:translate(-50%,20px);opacity:0;transition:all .25s ease;z-index:9000;display:flex;gap:10px;align-items:center;background:#1d4ed8;color:#fff;border:0;border-radius:99px;padding:10px 16px;font:600 13.5px Inter,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);white-space:nowrap}.upd-bar span{opacity:.85;font-weight:500}.upd-bar.on{opacity:1;transform:translate(-50%,0)}
 </style>
 </head>
 <body>
@@ -855,7 +855,27 @@ function snowAt(P, Tref, FLmodel, ref, e){
 /* ================= Data ================= */
 // a storm-watch notification opens the forecast with the share card ready
 if(location.hash==="#share"){ S.pendingShare = true; history.replaceState(null, "", location.pathname + location.search + "#forecast"); }
-const libsReady = new Promise(r=>{ if(window.Chart && window.L) r(); else document.addEventListener("DOMContentLoaded", ()=>r(), {once:true}); });
+/* Charts and maps load on demand (they're never above the fold), so the forecast paints without waiting for them.
+   Until Chart.js arrives, "new Chart(...)" queues the chart and draws it the moment the library is ready. */
+const LIBS = { chart:"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js", leaflet:"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js", leafletCss:"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" };
+const libP = {};
+function loadScript(u){ return new Promise((res, rej)=>{ const s = document.createElement("script"); s.src = u; s.async = true; s.onload = res; s.onerror = ()=>{ s.remove(); rej(new Error("load "+u)); }; document.head.appendChild(s); }); }
+const chartQ = [];
+class PendingChart { constructor(el, cfg){ this.el = el; this.cfg = cfg; chartQ.push(this); needChart(); } destroy(){ this.dead = true; if(this.real) this.real.destroy(); } }
+if(!window.Chart) window.Chart = PendingChart;
+function needChart(){
+  if(window.Chart && window.Chart !== PendingChart) return Promise.resolve();
+  return libP.chart ||= loadScript(LIBS.chart).then(()=>{ const Real = window.Chart; chartQ.splice(0).forEach(p=>{ if(!p.dead && p.el && p.el.isConnected){ try{ p.real = new Real(p.el, p.cfg); }catch(e){} } }); })
+    .catch(e=>{ libP.chart = null; window.Chart = PendingChart; throw e; });
+}
+function needMap(){
+  if(window.L && window.L.map) return Promise.resolve();
+  return libP.map ||= new Promise((res, rej)=>{ const l = document.createElement("link"); l.rel = "stylesheet"; l.href = LIBS.leafletCss; document.head.appendChild(l);
+    Promise.all([new Promise(r=>{ l.onload = r; l.onerror = r; }), loadScript(LIBS.leaflet)]).then(res, e=>{ libP.map = null; rej(e); }); });
+}
+const libsReady = Promise.resolve();
+// Warm both up once the forecast is on screen, so opening a map or chart is instant.
+function warmLibs(){ const go = ()=>{ needChart().catch(()=>{}); needMap().catch(()=>{}); }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:4000}) : setTimeout(go, 2500); }
 // Open-Meteo answers 429 when busy (per phone/network); retry busy, server and network errors with growing waits.
 const OM_CACHE = "om-answers-v1";
 const isOM = u => /open-meteo\.com\//.test(u) && !/geocoding-api|\/elevation\?/.test(u);
@@ -1161,8 +1181,8 @@ function tidyGroups(){
 }
 let tidyQ = 0; new MutationObserver(()=>{ if(!tidyQ) tidyQ = requestAnimationFrame(()=>{ tidyQ = 0; tidyGroups(); }); }).observe(document.getElementById("app"), {childList:true, subtree:true, attributes:true, attributeFilter:["hidden"]});
 function render(){
-  if(!window.Chart || !window.L){ libsReady.then(()=>{ if(S.data) render(); }); return; }
   if(!S.data) return;
+  if(!render.warmed){ render.warmed = true; warmLibs(); }
   destroyCharts(); updateTop();
   const e = bandElev(), C = computeAt(e), SIM = simulate(C), D = S.data;
   S.ctx = {C, SIM, e}; S.ctx.SIMN = simulate(C, 0); S.ctx.SIMS = simulate(C, 180);
@@ -1888,8 +1908,8 @@ function renderSeason(C){
 /* ================= Views / tabs ================= */
 const VIEWS = ["forecast","favs","maps","alerts"];
 function showView(){
-  if(!window.L){ libsReady.then(showView); return; }
   let v = (location.hash||"").slice(1); if(v==="finder"){ history.replaceState(null,"","#maps"); v = "maps"; } if(!VIEWS.includes(v)) v = "forecast";
+  if(v==="maps" && !(window.L && window.L.map)){ needMap().then(showView, ()=>toast("Couldn't load the map. Check your connection.")); return; }
   VIEWS.forEach(x=>{ const el=$("#view-"+x); if(el) el.style.display = x===v? "" : "none"; });
   document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===v));
   S.view = v; updateTop(); window.scrollTo(0,0);
@@ -2196,6 +2216,10 @@ function saveSnap(loc){ if(S.data && Object.keys(S.data.models).filter(id=>id!==
   try{ const all = store.get("snap", {}) || {}; all[loc.name] = {t:Date.now(), html:$("#app").innerHTML};
   const keys = Object.keys(all).sort((a,b)=>all[b].t-all[a].t); keys.slice(4).forEach(k=>delete all[k]); store.set("snap", all); }catch(e){} }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
+/* A new version was saved in the background: offer it without interrupting. */
+if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e=>{ if(e.data?.type!=="app-updated" || document.querySelector(".upd-bar")) return;
+  const b = document.createElement("button"); b.className = "upd-bar"; b.innerHTML = `<b>Snowline was updated</b><span>Tap to refresh</span>`; b.onclick = ()=>location.reload();
+  document.body.appendChild(b); setTimeout(()=>b.classList.add("on"), 30); });
 const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 function miniBars(vals){ const w=4, gap=2, H=18; const mx=Math.max(4,...vals); return `<svg width="${vals.length*(w+gap)}" height="${H}" viewBox="0 0 ${vals.length*(w+gap)} ${H}">${vals.map((v,i)=>{ const h=Math.max(1.5, v/mx*H); return `<rect x="${i*(w+gap)}" y="${H-h}" width="${w}" height="${h}" rx="1" fill="${v<0.05?'#3a3a3e':barColor(v)}"/>`; }).join("")}</svg>`; }
 function a2hsHTML(){
@@ -3577,14 +3601,15 @@ function wireHourlyChart(C, SIM, el){ el.querySelectorAll("[data-hc]").forEach(b
 let miniMap=null, miniTimer=null;
 let mmObs = null;
 function renderMiniMap(){
-  const card=$("#miniMapCard"); if(!card || !S.loc || !window.L) { card && card.remove(); return; }
+  const card=$("#miniMapCard"); if(!card || !S.loc) return;
   if(!card.innerHTML) card.innerHTML = `<div class="card-h"><h2>Snow map</h2></div><div id="miniMap"></div>`;
   if(mmObs) mmObs.disconnect();
   if(!("IntersectionObserver" in window)) return drawMiniMap();
   mmObs = new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ mmObs.disconnect(); drawMiniMap(); } }, {rootMargin:"300px"}); mmObs.observe(card);
 }
 async function drawMiniMap(){
-  const card=$("#miniMapCard"); if(!card || !S.loc || !window.L) return; const L0=S.loc;
+  const card=$("#miniMapCard"); if(!card || !S.loc) return; const L0=S.loc;
+  try{ await needMap(); }catch(e){ card.remove(); return; } if(!$("#miniMapCard") || S.loc!==L0) return;
   card.innerHTML = `<div class="card-h"><h2>Snow map</h2><button class="link" id="mmBig">Full map ↗</button></div><div id="miniMap"></div>${snowLegendHTML()}
     <div class="mm-ctl"><button class="mm-play" id="mmPlay" aria-label="Play">▶</button><input type="range" id="mmSlide" min="0" max="6" value="6" aria-label="Day"><span class="mm-lbl" id="mmLbl">Loading…</span></div>`;
   $("#mmBig").onclick = () => { location.hash="maps"; };
@@ -3689,7 +3714,7 @@ async function renderCamCard(){
       ${cams.length? `<div class="muted" style="font-size:11px;margin-top:6px">${rc.length? `Resort cams: <a href="${rc[0].page.split("webcam-modal")[0]}" target="_blank" rel="noopener">${rc[0].src} ↗</a>${rc[0].live? " · tap a cam for live video" : ""} · `:""}${road.length? "Road cams: ODOT TripCheck · ":""}☆ saves a camera to Favorites</div>`:""}`;
     card.querySelectorAll("[data-cv]").forEach(b=>b.onclick=()=>{ store.set("camView", b.dataset.cv); draw(); });
     wireCamStars(card, draw);
-    if(v==="map" && window.L) camMapInit(L0, rc, road);
+    if(v==="map") needMap().then(()=>camMapInit(L0, rc, road), ()=>{});
   };
   draw();
 }
@@ -3895,7 +3920,7 @@ async function tmViewer(tm){
     // Draw a quick sharp-enough version first, then swap in a detailed one for zooming in.
     const toURL = async cv => URL.createObjectURL(await new Promise(r=>cv.toBlob(r, "image/jpeg", .88)));
     const draw = async () => {
-      const my = ++gen; msg("Drawing map…");
+      const my = ++gen; msg("Drawing map…"); await needMap();
       const {cv, pages} = await tmRenderDoc(doc, page, 1600); if(my!==gen || !$("#tvMap")) return;
       if(page===1 && !localStorage.getItem(tmThumbKey(tm.url))) tmThumbFrom(cv, tm.url);
       if(url) URL.revokeObjectURL(url); url = await toURL(cv);
@@ -4272,6 +4297,7 @@ async function setPin(lat, lon, name, elFt){
   $("#pBase").value = el; $("#pTop").value = el + 1500;
 }
 function openPicker(lat, lon, name, elFt){
+  if(!(window.L && window.L.map)){ openSheet("mapModal"); needMap().then(()=>openPicker(lat, lon, name, elFt), ()=>toast("Couldn't load the map.")); return; }
   openSheet("mapModal");
   setTimeout(()=>{
     if(!map){ map = L.map("map").setView([lat??44,lon??-121.5], lat? 10 : 6);

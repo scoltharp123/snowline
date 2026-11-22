@@ -1,5 +1,5 @@
 // Snowline service worker: offline app + saved forecasts, and push notifications
-const V = "snowline-v12";
+const V = "snowline-v13";
 const TRAILMAPS = "sl-trailmaps";   // official trail maps the user chose to download; kept across app updates
 const SHELL = ["/", "/index.html", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
 const WEATHER = /(^|\.)open-meteo\.com$/;
@@ -22,6 +22,22 @@ async function networkFirst(req, timeoutMs) {
     return net;   // nothing saved: keep waiting for the network
   }
 }
+// The app itself opens instantly from the saved copy; the network copy is fetched alongside and saved for
+// next time. If the app changed, open pages are told so they can offer a one-tap refresh.
+async function appShell(e) {
+  const cache = await caches.open(V);
+  const saved = await cache.match("/", { ignoreSearch: true });
+  const net = fetch(e.request.url.split("#")[0], { cache: "no-cache" }).then(async res => {
+    if (res && res.ok && res.type === "basic") {
+      const old = saved && saved.headers.get("etag"), neu = res.headers.get("etag");
+      await cache.put("/", res.clone());
+      if (saved && old && neu && old !== neu) (await self.clients.matchAll({ type: "window" })).forEach(c => c.postMessage({ type: "app-updated" }));
+    }
+    return res;
+  });
+  if (saved) { e.waitUntil(net.catch(() => {})); return saved; }
+  return net.catch(() => caches.match("/index.html"));
+}
 async function cacheFirst(req) {
   const cache = await caches.open(V); const hit = await cache.match(req);
   if (hit) return hit;
@@ -34,6 +50,7 @@ self.addEventListener("fetch", (e) => {
   if (u.origin === location.origin) {
     // Trail maps: the downloaded copy if there is one, otherwise straight from the network (not auto-cached; they're large).
     if (u.pathname.startsWith("/tm/")) { e.respondWith(caches.open(TRAILMAPS).then(c => c.match(req)).then(hit => hit || fetch(req))); return; }
+    if (req.mode === "navigate" && (u.pathname === "/" || u.pathname === "/index.html")) { e.respondWith(appShell(e)); return; }
     if (req.mode === "navigate") { e.respondWith(networkFirst(req, 2500).catch(() => caches.match("/"))); return; }
     e.respondWith(networkFirst(req, u.pathname.startsWith("/api/pistes") ? 20000 : u.pathname.startsWith("/api/") ? 12000 : 6000)); return;
   }
