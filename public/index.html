@@ -910,6 +910,11 @@ function syncModeFor(loc){
   const isTour = !!loc.bc;
   if(isTour && S.mode!=="bc"){ S.prevMode = S.mode; S.autoBC = true; setMode("bc"); }
   else if(!isTour && S.mode==="bc" && S.autoBC){ S.autoBC = false; setMode(S.prevMode || "alpine"); }
+  // Nordic-only areas open in your Nordic mode; Mt. Bachelor (alpine) opens in Alpine
+  const nordicOnly = /Nordic|Sno-?Park|Trails|XC/i.test(loc.name||"") && !/^Mt\. Bachelor, OR$/.test(loc.name);
+  if(nordicOnly && S.mode==="alpine") setMode(store.get("lastNordic","skate"));
+  else if(loc.name==="Mt. Bachelor, OR" && (S.mode==="skate" || S.mode==="classic")) setMode("alpine");
+  if(S.mode==="skate" || S.mode==="classic") store.set("lastNordic", S.mode);
 }
 /* Elevation follows the sport: Nordic forecasts the trails (base), Alpine mid-mountain, Tour the summit. Tapping the forecast-point line overrides it per sport. */
 function bandFor(m){ return store.get("band_"+m, null) || ({skate:"base", classic:"base", alpine:"mid", bc:"summit"}[m] || "mid"); }
