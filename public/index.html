@@ -2706,7 +2706,8 @@ function openFeedback(){
 function glanceHTML(C, slNow){
   const st = findStorms(C)[0];
   const wk = d => { const l = dayLabel(d); return /\d/.test(l)? new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"}) : l; };
-  const stTxt = !st? "None soon" : (st.a - C.nowIdx <= 3? `${fmtSnow(st.tot,0)} now` : `${fmtSnow(st.tot,0)} ${st.b - st.a > 36? "from " : ""}${wk(C.time[st.a].slice(0,10))}`);
+  const stTxt = !st? "None soon" : (st.a - C.nowIdx <= 3? `${fmtSnow(st.tot,0)} now` : (()=>{ const d1 = C.time[st.a].slice(0,10), d2 = C.time[st.b].slice(0,10), w = d => new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"});
+      return `${fmtSnow(st.tot,0)} ${d1===d2? wk(d1) : (d1===todayStr()? "now" : w(d1))+"–"+w(d2)}`; })());
   return `<div class="glance">
     <div><span>Next storm</span><b class="num">${stTxt}</b></div>
     <div><span>Snow level</span><b class="num">${fmtEl(slNow)}</b></div></div>`;
