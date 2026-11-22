@@ -2697,7 +2697,7 @@ function glanceHTML(C, slNow){
   const n24 = C.cons.slice(C.nowIdx, C.nowIdx+24).reduce((a,c)=>a+(c?.snow||0), 0);
   const st = findStorms(C)[0];
   const wk = d => { const l = dayLabel(d); return /\d/.test(l)? new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"}) : l; };
-  const stTxt = !st? "None soon" : (st.a - C.nowIdx <= 3? `${fmtSnow(st.tot,0)} now` : `${fmtSnow(st.tot,0)} ${wk(C.time[st.a].slice(0,10))}`);
+  const stTxt = !st? "None soon" : (st.a - C.nowIdx <= 3? `${fmtSnow(st.tot,0)} now` : `${fmtSnow(st.tot,0)} ${st.b - st.a > 36? "from " : ""}${wk(C.time[st.a].slice(0,10))}`);
   return `<div class="glance"><div><span>Next 24 h</span><b class="num">${fmtSnow(n24, n24>=1 || n24<0.05? 0 : 1)}</b></div>
     <div><span>Next storm</span><b class="num">${stTxt}</b></div>
     <div><span>Snow level</span><b class="num">${fmtEl(slNow)}</b></div></div>`;
