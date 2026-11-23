@@ -715,7 +715,7 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
   <div class="seg" id="modeSeg"><button data-m="alpine">Alpine</button><button data-m="skate">Skate</button><button data-m="classic">Classic</button><button data-m="bc">Tour</button></div>
   <div class="seg" id="bandSeg" style="display:none"><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
 </div>
-<nav class="jtabs" id="jtabs" aria-label="Jump to"><button data-j="snowCard" class="on">Snow</button><button data-j="nowCard">Now</button><button data-j="hourCard">Hourly</button><button data-j="dailyCard">Daily</button><button data-j="fxCard">Forecast</button><button data-j="camCard" data-g="g-mtn">Cams</button><button data-j="moreH">More</button></nav>
+<nav class="jtabs" id="jtabs" aria-label="Jump to"><button data-j="snowCard" class="on">Snow</button><button data-j="nowCard">Now</button><button data-j="hourCard">Hourly</button><button data-j="dailyCard">Daily</button><button data-j="camCard">Cams</button><button data-j="fxCard">Forecast</button><button data-j="moreH">More</button></nav>
   <div id="alertBanner"></div><div id="app"><div class="skel"></div><div class="skel" style="height:120px"></div><div class="skel" style="height:240px"></div></div></div>
   <div id="view-favs" style="display:none"></div>
   <div id="view-maps" style="display:none"><div class="card">
@@ -1275,25 +1275,27 @@ function render(){
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
   ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
-  <section class="card" id="nowCard"></section>
-  ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="mtnCard"></section><section class="card" id="zoneCard"></section>` : ""}
-  ${!isAlp() && S.mode!=="bc"? `<section class="card" id="glideCard"></section>` : ""}
   ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
+  <section class="card" id="nowCard"></section>
+  ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="mtnCard"></section>` : ""}
+  ${!isAlp() && S.mode!=="bc"? `<section class="card" id="glideCard"></section>` : ""}
   <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div><button class="link dl-lr" id="lrOpen">Long range · weeks 1–5 and the season ›</button></section>
+  ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="zoneCard"></section>` : ""}
+  <section class="card" id="camCard"></section>
   <section class="card" id="fxCard"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read the full forecast</button></section>
   <div class="more-h" id="moreH">More for this spot</div>
   ${grp("g-mtn", "On the mountain", `${isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
-    <section class="card" id="reportCard"></section><section class="card" id="camCard"></section>
+    <section class="card" id="reportCard"></section>
     ${S.loc && RESORT_CAMS[S.loc.name]?.some(c=>c.id==="mtb-14")? `<section class="card" id="stakeCard"></section>`:""}
     <section class="card" id="tmCard"></section>
     ${!isAlp()? `<section class="card" id="openCard"></section>`:""}
     <section class="card" id="repCard"></section>`)}
-  ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
-  ${grp("g-storm", "Storm & elevation", `<section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
   ${grp("g-plan", "Plan your day", `<section class="card" id="workCard"></section><section class="card" id="roadCard"></section>
     ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
+  ${grp("g-storm", "Storm & elevation", `<section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
+  ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
   ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
   <div class="promise"><b>Free forever · no ads · no account</b><span>Your favorites and settings stay on your phone.</span><a href="/accuracy">How accurate is Snowline? ›</a></div>
