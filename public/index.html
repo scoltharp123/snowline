@@ -686,6 +686,13 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .gl-h{display:flex;flex-direction:column;gap:2px;margin:2px 0 10px}.gl-h b{font-size:17px}.gl-h .muted{font-size:12.5px}
 .gl-strip{display:grid;grid-template-columns:repeat(9,1fr);gap:4px}.gl-c{display:flex;flex-direction:column;align-items:center;gap:4px}.gl-c i{display:block;width:100%;height:10px;border-radius:4px}.gl-c span{font-size:10.5px;color:#8e8e93}
 .gl-key{display:flex;gap:12px;margin-top:8px;font-size:11px;color:#8e8e93}.gl-key i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.nc{display:flex;gap:12px;align-items:center;margin:0 0 12px;padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,rgba(56,189,248,.16),rgba(167,139,250,.12));border:1px solid rgba(125,211,252,.25)}
+.nc-rain{background:linear-gradient(135deg,rgba(148,163,184,.16),rgba(56,189,248,.08));border-color:rgba(148,163,184,.25)}
+.nc-i{position:relative;font-size:24px;line-height:1}.nc-dot{position:absolute;top:-2px;right:-4px;width:8px;height:8px;border-radius:50%;background:#38bdf8;animation:ncp 1.6s ease-in-out infinite}@keyframes ncp{50%{opacity:.25;transform:scale(1.6)}}
+.nc-t{font-size:16px;font-weight:700}.nc-t b{color:#7dd3fc}.nc-s{font-size:12.5px;color:#c9d4e3;margin-top:2px;line-height:1.35}
+.rc{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:10px 10px 10px 14px;border-radius:14px;background:#141417;border:1px solid #232328}
+.rc-b{flex:1;min-width:0}.rc-h{font-size:11.5px;color:#8e8e93;margin-bottom:3px}.rc-n{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:#c9d4e3}.rc-n b{color:#fff}.rc-v{font-weight:700;color:#fcd34d}.rc-v.ok{color:#6ee7a0}
+.rc-sh{background:#1d4ed8;color:#fff;border:0;border-radius:99px;padding:7px 12px;font-weight:700;font-size:13px}.rc-x{background:none;border:0;color:#8e8e93;font-size:14px;padding:6px}
 </style>
 </head>
 <body>
@@ -1256,8 +1263,8 @@ function render(){
   const glance = glanceHTML(C, slNow);
   $("#app").innerHTML = `
   ${a2hsHTML()}${modelNote}
-  <div id="nwsAlerts"></div>
-  ${verdict}${callouts.slice(0,2).join("")}
+  <div id="nwsAlerts"></div><div id="ncStrip"></div>
+  ${verdict}<div id="rcptStrip"></div>${callouts.slice(0,2).join("")}
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : ""}</div>
@@ -1302,7 +1309,7 @@ function render(){
   const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e);
+  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
@@ -2408,7 +2415,7 @@ function loadExtras(loc){
   api(`/obs?${q}`).then(r=>{ X.obs=r; done(); }).catch(()=>{});
   if(loc.name==="Meissner Nordic (Bend), OR") api("/meissner").then(r=>{ X.mx=r; if(S.loc===loc) renderMeissner(); }).catch(()=>{ X.mx={stations:[]}; if(S.loc===loc) renderMeissner(); });
   api(`/season?${q}`).then(r=>{ X.season=r; if(S.loc===loc) renderSeasonCard(); }).catch(()=>{});
-  api(`/verify?${q}`).then(r=>{ X.verify=r; done(); setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
+  api(`/verify?${q}`).then(r=>{ X.verify=r; done(); if(S.loc===loc) try{ renderReceipt(); }catch(err){} setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
   api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
   api(`/nws?${q}`).then(r=>{ X.nws=r; if(S.loc===loc){ renderNwsAlerts(); renderAFD(); } }).catch(()=>{});
@@ -2738,6 +2745,61 @@ function agreeHTML(C, N, winTot, conf){
     <div class="cf-h"><span class="cf-l c-${conf.lvl}">${word} confidence</span><span class="cf-r">Next ${N} days: <b>${fmtSnow(winTot,0)}</b>, likely ${r}</span></div>
     <div class="cf-bar"><i class="cf-rng" style="left:${pos(lo)}%;width:${Math.max(2, pos(hi)-pos(lo))}%"></i><i class="cf-me" style="left:${pos(winTot)}%"></i></div>
     <div class="cf-n">${note} <span>ⓘ</span></div></button>`;
+}
+
+
+/* =====================  Snow countdown (live) + storm receipts  ===================== */
+// Same engine as the push alert: Open-Meteo's 15-minute forecast says when snow starts, how hard, and when it lets up.
+function ncAnalyze(m, off, now = Date.now()){
+  if(!m?.time?.length) return null;
+  const S = m.time.map((t,i)=>({ms: Date.parse(t+":00Z") - off*1000, sn: m.snowfall?.[i]||0, p: m.precipitation?.[i]||0, T: m.temperature_2m?.[i]}));
+  const snowy = s => s && (s.sn >= 0.05 || (s.p >= 0.1 && s.T != null && s.T <= 0.5)), wet = s => s && s.p >= 0.1 && !snowy(s);
+  let k0 = S.findIndex(s=>s.ms > now) - 1; if(k0 < 0) k0 = 0;
+  const inch = cm => cm/2.54, rate = s => inch(s.sn)*4;
+  const endFrom = j => { let k = j; while(k < S.length && (snowy(S[k]) || snowy(S[k+1]))) k++; return k; };
+  const pack = (a, b) => { const sl = S.slice(a, b), pk = sl.reduce((x,s)=>rate(s)>rate(x)? s : x, sl[0]); return {endMs: b < S.length? S[b].ms : null, totIn: inch(sl.reduce((x,s)=>x+s.sn,0)), peakMs: pk?.ms, peakRate: pk? rate(pk) : 0, nowRate: rate(S[k0]||{sn:0})}; };
+  if(snowy(S[k0]) || (snowy(S[k0-1]) && snowy(S[k0+1]))) return {state:"now", ...pack(k0, endFrom(k0))};
+  for(let j=k0+1; j<S.length && S[j].ms-now <= 6*3600e3; j++){
+    if(snowy(S[j])) return {state:"soon", startMs:S[j].ms, ...pack(j, endFrom(j))};
+    if(wet(S[j])){ let k = j; while(k < S.length && !snowy(S[k]) && S[k].ms-now <= 6*3600e3) k++; return {state:"rain", startMs:S[j].ms, snowMs: k < S.length && snowy(S[k])? S[k].ms : null}; }
+  }
+  return {state:"dry"};
+}
+const ncClock = ms => new Date(ms).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}).replace(":00","").replace(/\s?(AM|PM)/i, (x,a)=>a.toLowerCase());
+const ncIn = ms => { const m = Math.max(0, Math.round((ms - Date.now())/60e3)); return m < 60? `${m} min` : `${Math.floor(m/60)} h ${String(m%60).padStart(2,"0")} min`; };
+async function loadNowcast(){
+  const loc = S.loc; if(!loc || !S.ctx) return; const e = Math.round(S.ctx.e), k = loc.name+"|"+e;
+  S.nc ||= {}; const c = S.nc[k];
+  if(!c || Date.now() - c.at > 10*60e3){
+    try{ const j = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${e}&minutely_15=snowfall,precipitation,temperature_2m&past_minutely_15=2&forecast_minutely_15=28&timezone=auto`).then(r=>r.json());
+      S.nc[k] = {at: Date.now(), m: j.minutely_15, off: j.utc_offset_seconds||0}; }catch(err){ return; }
+  }
+  if(S.loc === loc) renderNowcast();
+}
+function renderNowcast(){
+  const el = $("#ncStrip"); if(!el || !S.ctx) return; const c = S.nc?.[S.loc.name+"|"+Math.round(S.ctx.e)]; if(!c){ el.innerHTML = ""; return; }
+  const n = ncAnalyze(c.m, c.off); const hard = r => r >= 1? "heavy" : r >= 0.4? "steady" : "light";
+  let h = "";
+  if(n?.state==="soon" && (n.totIn >= 0.3)) h = `<div class="nc nc-soon"><div class="nc-i">❄️</div><div><div class="nc-t">Snow in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
+      <div class="nc-s">Starts around ${ncClock(n.startMs)}${n.totIn >= 0.5? ` · about ${fmtSnow(n.totIn, n.totIn<1?1:0)}${n.endMs? ` by ${ncClock(n.endMs)}` : ""}` : ""}${n.peakRate >= 0.4? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
+  else if(n?.state==="now") h = `<div class="nc nc-now"><div class="nc-i"><span class="nc-dot"></span>❄️</div><div><div class="nc-t">Snowing now · ${hard(n.nowRate)}</div>
+      <div class="nc-s">${n.totIn >= 0.3? `About ${fmtSnow(n.totIn, n.totIn<1?1:0)} more` : "Light"}${n.endMs? ` · lets up around ${ncClock(n.endMs)}` : " · keeps going for a while"}${n.peakRate >= 0.8 && n.peakMs > Date.now()+20*60e3? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
+  else if(n?.state==="rain") h = `<div class="nc nc-rain"><div class="nc-i">🌧️</div><div><div class="nc-t">Rain in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
+      <div class="nc-s">Starts around ${ncClock(n.startMs)} at ${fmtEl(S.ctx.e)}${n.snowMs? ` · turns to snow around ${ncClock(n.snowMs)}` : ""}</div></div></div>`;
+  el.innerHTML = h;
+  clearInterval(S.ncTick); if(h.includes("data-nc")) S.ncTick = setInterval(()=>{ const b = $("#ncStrip [data-nc]"); if(!b){ clearInterval(S.ncTick); return; } const ms = +b.dataset.nc; if(ms <= Date.now()) { clearInterval(S.ncTick); renderNowcast(); } else b.textContent = ncIn(ms); }, 30e3);
+}
+
+// Storm receipt: for 3 days after a storm, a slim strip at the top shows how Snowline did, with one-tap share.
+function renderReceipt(){
+  const el = $("#rcptStrip"); if(!el || !S.loc) return; const R = recapData(); if(!R){ el.innerHTML = ""; return; }
+  const end = R.st.end || R.st.start; const key = S.loc.name+"|"+end;
+  if(!end || end < dateAdd(todayStr(), -3) || store.get("rcptHide","")===key){ el.innerHTML = ""; return; }
+  const got = R.st.obsSnow, mark = R.nailed? "✓ Nailed it" : R.close? "✓ On target" : got > R.said? "Overdelivered" : "Came up short";
+  el.innerHTML = `<div class="rc"><div class="rc-b"><div class="rc-h">🧾 Storm receipt · ${esc(R.range)}</div>
+      <div class="rc-n"><span>Snowline said <b>${fmtSnow(R.said,0)}</b></span><span>${esc((R.fell||"Measured").replace(" reported",""))} got <b>${fmtSnow(got,0)}</b></span><span class="rc-v ${R.close? "ok" : ""}">${mark}</span></div></div>
+    <button class="rc-sh" onclick="openRecapSheet()">Share</button><button class="rc-x" aria-label="Hide">✕</button></div>`;
+  el.querySelector(".rc-x").onclick = ()=>{ store.set("rcptHide", key); el.innerHTML = ""; };
 }
 
 /* =====================  Mt. Bachelor: wind holds, crowds, where it's skiing best · Nordic: glide  ===================== */
@@ -3490,7 +3552,7 @@ function evalAlerts(F){
 }
 function pushSpots(){ const L = S.favs.length? S.favs : (S.loc? [S.loc] : []); return L.slice(0,6).map(x=>({name:x.name, lat:x.lat, lon:x.lon, base:x.base, top:x.top})); }
 function pushRules(){ const all=[...S.favs, ...PRESETS]; return activeRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
-async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","summit")}})}); }catch(e){} }
+async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","summit"), nowcast: store.get("ncOn", true)}})}); }catch(e){} }
 function renderAlerts(){
   const el = $("#view-alerts"); const spots = finderSpots(); const on = store.get("pushOn", false);
   if(!alertRules().length && !store.get("alertsSeeded")){ store.set("alerts", [{spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); store.set("alertsSeeded", 1); }
@@ -3502,6 +3564,7 @@ function renderAlerts(){
     : `<div class="al-row"><div><b>Lock-screen notifications</b><div class="muted">${on? "On · checked around 6am each morning" : "Off · alerts only show inside the app"}</div></div><button class="btn ${on?"":"primary"}" id="pToggle" style="flex:0 0 auto">${on? "Turn off" : "Turn on"}</button></div>`;
   el.innerHTML = `<div class="vh"><h1>Alerts</h1></div>
     <div class="card al-card">${master}
+      ${sw("ncTog", "Snow starting", "A heads-up about an hour before snow starts at a favorite", store.get("ncOn", true))}
       ${sw("watchTog", "Storm watch", "A heads-up when 8″+ is coming to a favorite 2–5 days out, ready to share", store.get("watch", true))}
       ${sw("powderTog", "Powder alert", `${fmtSnow(4,0)}+ overnight or ${fmtSnow(8,0)}+ in the next 3 days at any favorite`, store.get("powderOn", true))}
       ${sw("briefTog", "Morning brief", "Around 6am: overnight snow, more today, grooming and the temperature up top", briefOn)}
@@ -3530,10 +3593,11 @@ function renderAlerts(){
     if(on){ try{ const sub = await pushSub(); if(sub){ await post({action:"unsubscribe", endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); } }catch(e){} store.set("pushOn", false); toast("Lock-screen alerts off"); renderAlerts(); return; }
     try{ const perm = await Notification.requestPermission(); if(perm!=="granted"){ toast("Notifications are blocked in Settings"); return; }
       const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
-      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","summit")}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
+      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","summit"), nowcast: store.get("ncOn", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
     }catch(e){ toast("Couldn't turn on notifications"); } };
   document.querySelectorAll("#briefSeg button").forEach(b=>b.onclick=()=>{ store.set("brief", b.dataset.b); document.querySelectorAll("#briefSeg button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(b.dataset.b==="off"? "Morning brief off" : b.dataset.b==="daily"? "Morning brief every day" : "Morning brief on snow days"); });
   const flip = (id, get, set, msg) => { const b = $("#"+id); if(b) b.onclick = () => { const v = !get(); set(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); pushSync(); toast(msg(v)); }; };
+  flip("ncTog", ()=>store.get("ncOn", true), v=>store.set("ncOn", v), v=>v? "Snow-starting alerts on" : "Snow-starting alerts off");
   flip("watchTog", ()=>store.get("watch", true), v=>store.set("watch", v), v=>v? "Storm watch on" : "Storm watch off");
   flip("powderTog", ()=>store.get("powderOn", true), v=>{ store.set("powderOn", v); if(v && !alertRules().some(r=>r.spot==="*favs")) store.set("alerts", [...alertRules(), {spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); checkAlerts(); }, v=>v? "Powder alert on" : "Powder alert off");
   document.querySelectorAll("#bandAl button").forEach(b=>b.onclick=()=>{ store.set("alertBand", b.dataset.k); document.querySelectorAll("#bandAl button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(`Alerts now check snow at ${b.textContent.toLowerCase()} elevation`); });
