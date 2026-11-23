@@ -1,7 +1,7 @@
 [build]
   publish = "public"
   # Builds the ski area search index (public/skiareas.json). Never fails the deploy.
-  command = "node scripts/build-skiareas.mjs || true"
+  command = "node scripts/probe.mjs; node scripts/build-skiareas.mjs || true"
 
 [functions]
   directory = "netlify/functions"
