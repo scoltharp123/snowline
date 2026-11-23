@@ -677,6 +677,15 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .qk-bar{flex:0 0 74px;height:6px;border-radius:4px;background:linear-gradient(90deg,#fca5a5,#fde68a,#86efac,#38bdf8,#a78bfa)}
 #snowCard .glance{grid-template-columns:1fr 1fr;margin:10px 14px 0;padding-top:12px}
 #snowCard .qleg{flex-wrap:nowrap;gap:7px;font-size:11px;letter-spacing:-.1px;white-space:nowrap;overflow:hidden}#snowCard .qleg i{margin-right:3px}#snowCard .qleg .qinfo{padding:0;margin-right:2px}
+.mt-row{display:grid;grid-template-columns:84px 1fr;gap:10px;padding:10px 0;border-top:1px solid #1f1f22}.mt-row:first-of-type{border-top:0;padding-top:2px}.mt-k{font-size:12px;color:#8e8e93;padding-top:2px}
+.wh{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:14px;margin-bottom:4px}.wh .muted{font-size:12px}.wh-t{font-size:12px;font-weight:700;padding:1px 7px;border-radius:99px}.w-hi{background:rgba(248,113,113,.18);color:#fca5a5}.w-md{background:rgba(252,211,77,.16);color:#fcd34d}.wh.ok b{color:#6ee7a0}
+.mt-tip{font-size:13px;color:#c9d4e3}.mt-foot{font-size:11px;margin-top:10px;line-height:1.45}.mt-foot a{color:#7dd3fc}
+.zn-seg{margin:0}.zn-seg button{font-size:12px;padding:5px 10px}.zn-best{margin:2px 0 6px;font-size:15px}.zn-best .muted{font-size:12px}.zn-best b{font-size:17px}
+.zn-svg{display:block;width:100%;max-width:300px;margin:6px auto 4px}.zn-t{font:600 10.5px Inter,system-ui,sans-serif;fill:#0b0b0d}.zn-more{margin-top:4px}.zn-s{font:700 12px "Space Grotesk",Inter,sans-serif;fill:#0b0b0d}.zn-n{font:700 11px Inter,sans-serif;fill:#8e8e93}
+.zn-list{margin-top:6px}.zn-li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #1f1f22}.zn-li b{font-size:14px}.zn-li small{display:block;font-size:11.5px;color:#8e8e93}.zn-li .zn-l{color:#c9d4e3;font-size:12.5px;margin-top:1px}
+.gl-h{display:flex;flex-direction:column;gap:2px;margin:2px 0 10px}.gl-h b{font-size:17px}.gl-h .muted{font-size:12.5px}
+.gl-strip{display:grid;grid-template-columns:repeat(9,1fr);gap:4px}.gl-c{display:flex;flex-direction:column;align-items:center;gap:4px}.gl-c i{display:block;width:100%;height:10px;border-radius:4px}.gl-c span{font-size:10.5px;color:#8e8e93}
+.gl-key{display:flex;gap:12px;margin-top:8px;font-size:11px;color:#8e8e93}.gl-key i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 </style>
 </head>
 <body>
@@ -1260,6 +1269,8 @@ function render(){
   </section>
   ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
   <section class="card" id="nowCard"></section>
+  ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="mtnCard"></section><section class="card" id="zoneCard"></section>` : ""}
+  ${!isAlp() && S.mode!=="bc"? `<section class="card" id="glideCard"></section>` : ""}
   ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
   <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div><button class="link dl-lr" id="lrOpen">Long range · weeks 1–5 and the season ›</button></section>
@@ -1291,7 +1302,9 @@ function render(){
   const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  renderRightNow(C, SIM, e);
+  { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
+  if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -2726,6 +2739,144 @@ function agreeHTML(C, N, winTot, conf){
     <div class="cf-bar"><i class="cf-rng" style="left:${pos(lo)}%;width:${Math.max(2, pos(hi)-pos(lo))}%"></i><i class="cf-me" style="left:${pos(winTot)}%"></i></div>
     <div class="cf-n">${note} <span>ⓘ</span></div></button>`;
 }
+
+/* =====================  Mt. Bachelor: wind holds, crowds, where it's skiing best · Nordic: glide  ===================== */
+const isBach = () => S.loc?.name === "Mt. Bachelor, OR";
+const tgtDay = (cutHr) => { const h = +S.ctx.C.time[S.ctx.C.nowIdx].slice(11,13); return h >= cutHr ? dateAdd(todayStr(), 1) : todayStr(); };
+const dayWord = d => d===todayStr()? "Today" : d===dateAdd(todayStr(),1)? "Tomorrow" : dayLabel(d);
+function cAt(ft){ const k = Math.round(ft/100); S.ctx.zc ||= {}; return S.ctx.zc[k] ||= computeAt(ft/FT); }
+const windM = c => c? Math.max(c.RW||0, (c.G||0)*0.8) : 0;
+const angD = (a, b) => { const d = Math.abs(((a - b) % 360 + 360) % 360); return d > 180 ? 360 - d : d; };
+
+/* Lift wind holds. Each lift's tipping point starts from how exposed it is, then is replaced by what Snowline has
+   learned from Bachelor's own lift reports (logged every 30 minutes all season). */
+const BACH_LIFTS = [
+  {n:"Summit", ft:9000, mid:55}, {n:"Northwest", ft:7900, mid:70}, {n:"Outback", ft:7700, mid:72}, {n:"Cloudchaser", ft:7700, mid:72},
+  {n:"Pine Marten", ft:7750, mid:80}, {n:"Skyliner", ft:7650, mid:82}, {n:"Alpenglow", ft:7300, mid:88}, {n:"Rainbow", ft:7100, mid:92},
+  {n:"Red Chair", ft:7000, mid:92}, {n:"Sunrise", ft:6900, mid:95}, {n:"Early Riser", ft:6700, mid:98}, {n:"Little Pine", ft:6700, mid:100}];
+function liftHolds(d){
+  const learned = S.liftwx?.lifts || {};
+  return BACH_LIFTS.map(L=>{
+    const C = cAt(L.ft), learnedMid = Object.entries(learned).find(([k])=>k.toLowerCase().startsWith(L.n.toLowerCase()))?.[1]?.mid;
+    const mid = learnedMid || L.mid; let am = 0, pm = 0;
+    for(let h=9; h<16; h++){ const i = idxOf(C).get(`${d}T${String(h).padStart(2,"0")}:00`); if(i==null) continue; const m = windM(C.cons[i]); if(h<12) am = Math.max(am, m); else pm = Math.max(pm, m); }
+    const p = m => 1/(1+Math.exp(-(m-mid)/7)), pa = p(am), pp = p(pm);
+    return {...L, pa, pp, p:Math.max(pa,pp), when: pa>=0.35 && pp>=0.35? "all day" : pa>=pp? "morning" : "afternoon", gust: Math.max(am,pm), learned: !!learnedMid};
+  });
+}
+
+/* Crowds: an estimate from the day, school holidays, fresh snow and sunshine. Not live lot data. */
+function nthMon(y, m, n){ const d = new Date(Date.UTC(y, m, 1)); const off = (8 - d.getUTCDay()) % 7; return new Date(Date.UTC(y, m, 1 + off + 7*(n-1))).toISOString().slice(0,10); }
+function crowdFor(d, holds){
+  const dt = new Date(d+"T12:00"), dow = dt.getDay(), y = dt.getFullYear(), md = d.slice(5);
+  let s = [0.6,0.6,0.6,0.6,0.6,1.2,3,2.5][dow===0? 7 : dow] ?? 0.6; if(dow===0) s = 2.5; const why = [];
+  if(dow===6) why.push("Saturday"); else if(dow===0) why.push("Sunday");
+  const thx = (()=>{ const n = new Date(Date.UTC(y,10,1)); const off = (11 - n.getUTCDay()) % 7; return new Date(Date.UTC(y,10,1+off+21)).toISOString().slice(0,10); })();
+  const hol = (md >= "12-20" || md <= "01-04")? "Winter break" : d===nthMon(y,0,3)? "MLK Day" : d===nthMon(y,1,3)? "Presidents' Day" : (d===thx || d===dateAdd(thx,1))? "Thanksgiving" : (md >= "03-21" && md <= "03-29")? "Spring break" : null;
+  if(hol){ s = Math.max(s, 2.2) + (hol==="Spring break"? 1 : 1.8); why.push(hol); }
+  const C = cAt(7700), i8 = idxOf(C).get(`${d}T08:00`); let fresh = 0, cc = 0, n = 0, snowing = 0;
+  if(i8!=null){ for(let i=Math.max(0,i8-24); i<=i8; i++) fresh += C.cons[i]?.snow||0; for(let h=9; h<14; h++){ const c = C.cons[i8+h-8]; if(c){ cc += c.CC??50; n++; snowing += c.snow||0; } } }
+  if(fresh >= 6){ s += 1.6; why.push(`${fmtSnow(fresh,0)} new`); } else if(fresh >= 3){ s += 0.8; why.push(`${fmtSnow(fresh,0)} new`); }
+  if(n && cc/n < 35){ s += 0.5; why.push("sunny"); } if(snowing >= 3) { s -= 0.6; why.push("stormy"); }
+  if(holds?.[0]?.pa > 0.6) s -= 0.3;
+  const lv = s >= 4.5? ["Packed", "Lots likely full by about 8:45. Aim to park by 8:15.", "#fca5a5"] : s >= 3? ["Very busy", "Lots likely full by about 9:30. Aim to park by 9.", "#fcd34d"] : s >= 1.6? ["Busy", "Lots may fill by late morning.", "#93c5fd"] : ["Quiet", "Parking should be easy.", "#6ee7a0"];
+  return {lv:lv[0], tip:lv[1], c:lv[2], why: why.length? why.join(" · ") : "Weekday"};
+}
+
+function renderMtn(){
+  const el = $("#mtnCard"); if(!el || !isBach() || !S.ctx) return;
+  const d = tgtDay(14), holds = liftHolds(d).sort((a,b)=>b.p-a.p), cr = crowdFor(d, holds);
+  const risky = holds.filter(h=>h.p >= 0.35), top = holds[0], learnedN = S.liftwx?.days || 0;
+  const tag = p => p >= 0.65? ["Likely hold", "hi"] : ["Possible hold", "md"];
+  const preseason = !(extrasFor(S.loc).groom?.lifts||[]).some(l=>l.status==="open");
+  el.innerHTML = `<div class="card-h"><h2>${dayWord(d)} at Mt. Bachelor</h2>${preseason? `<span class="muted">Preview</span>` : ""}</div>
+    <div class="mt-row"><div class="mt-k">Wind holds</div><div class="mt-v">
+      ${risky.length? risky.slice(0,4).map(h=>{ const [t,c] = tag(h.p); return `<div class="wh"><b>${esc(h.n)}</b><span class="wh-t w-${c}">${t}</span><span class="muted">${h.when}</span></div>`; }).join("") + (risky.length>4? `<div class="muted" style="font-size:12px">+${risky.length-4} more lifts at risk</div>` : "")
+        : `<div class="wh ok"><b>No wind holds expected</b><span class="muted">Summit gusts to ${fmtWind(top.gust)} ${windU()}</span></div>`}
+    </div></div>
+    <div class="mt-row"><div class="mt-k">Crowds</div><div class="mt-v"><div class="wh"><b style="color:${cr.c}">${cr.lv}</b><span class="muted">${esc(cr.why)}</span></div><div class="mt-tip">${cr.tip}</div></div></div>
+    <div class="muted mt-foot">Snowline's estimates. Wind holds come from the summit wind forecast${learnedN? `, tuned by ${learnedN} day${learnedN>1?"s":""} of Bachelor lift reports` : ` and get sharper as Snowline logs Bachelor's lift reports this season`}. Crowds come from the day, holidays and fresh snow, not live lot counts. <a href="https://www.mtbachelor.com/the-mountain/lift-trail-report/" target="_blank" rel="noopener">Lift report ↗</a></div>`;
+}
+
+/* Where it's skiing best: each part of the mountain gets its own snow-surface simulation for the way it faces and its
+   height (sun, warmth, refreeze), then wind: slopes downwind of recent snow + wind get loaded, upwind slopes get scoured. */
+const BACH_ZONES = [
+  {n:"Summit", sub:"Summit Express", az:null, ft:8800, x:0, y:0},
+  {n:"Frontside", sub:"Pine Marten · Skyliner", az:0, ft:7300},
+  {n:"Outback", sub:"Outback Express", az:330, ft:7300},
+  {n:"Northwest", sub:"Northwest Express", az:285, ft:7700},
+  {n:"Rainbow", sub:"Rainbow · Sunrise", az:60, ft:6900},
+  {n:"Cloudchaser", sub:"Cloudchaser · Alpenglow", az:115, ft:7300},
+  {n:"South side", sub:"from the Summit", az:185, ft:8400}];
+const AZN = a => a==null? "all ways" : ["north","northeast","east","southeast","south","southwest","west","northwest"][Math.round(a/45)%8];
+function zoneRead(z, d, h){
+  const C = cAt(z.ft), i = idxOf(C).get(`${d}T${String(h).padStart(2,"0")}:00`); if(i==null) return null;
+  const k = "s"+z.ft+"_"+z.az; S.ctx.zs ||= {}; const SIM = S.ctx.zs[k] ||= simulate(C, z.az); const sim = SIM[i]; if(!sim) return null;
+  let sc = scoreOf(sim), lab = sim.label, wind = null;
+  let u = 0, v = 0, mx = 0, snow = 0; for(let j=Math.max(0,i-18); j<=i; j++){ const c = C.cons[j]; if(!c) continue; snow += c.snow||0; const m = windM(c); mx = Math.max(mx, m); if(isNum(c.WD) && m){ u += Math.sin(c.WD*Math.PI/180)*m; v += Math.cos(c.WD*Math.PI/180)*m; } }
+  const from = (Math.atan2(u, v)*180/Math.PI + 360) % 360;
+  if(mx >= 30 && (u || v)){
+    if(z.az==null){ if(mx >= 45){ wind = "scoured"; } }
+    else if(snow >= 1.5 && angD(z.az, from+180) <= 60){ wind = "loaded"; }
+    else if(angD(z.az, from) <= 60){ wind = "scoured"; }
+  }
+  if(wind==="loaded"){ sc = Math.min(10, sc + 0.6); lab = "Wind-loaded powder"; }
+  if(wind==="scoured"){ sc = Math.max(0, sc - 1.2); lab = "Wind-scoured, firm in spots"; }
+  return {sc, lab, wind};
+}
+function renderZones(){
+  const el = $("#zoneCard"); if(!el || !isBach() || !S.ctx) return;
+  const d = tgtDay(14), h = S.zoneHr ?? (+S.ctx.C.time[S.ctx.C.nowIdx].slice(11,13) >= 11 && d===todayStr()? 14 : 10);
+  const Z = BACH_ZONES.map(z=>({...z, r: zoneRead(z, d, h)})).filter(z=>z.r);
+  if(!Z.length){ el.remove(); return; }
+  const best = [...Z].sort((a,b)=>b.r.sc-a.r.sc)[0], R = 118, cx = 130, cy = 130;
+  const arc = (a0, a1, r0, r1) => { const p = (a, r) => [cx + r*Math.sin(a*Math.PI/180), cy - r*Math.cos(a*Math.PI/180)]; const [x0,y0] = p(a0,r1), [x1,y1] = p(a1,r1), [x2,y2] = p(a1,r0), [x3,y3] = p(a0,r0); return `M${x0},${y0} A${r1},${r1} 0 0 1 ${x1},${y1} L${x2},${y2} A${r0},${r0} 0 0 0 ${x3},${y3}Z`; };
+  const ring = Z.filter(z=>z.az!=null), sum = Z.find(z=>z.az==null);
+  const svg = `<svg viewBox="0 -4 260 266" class="zn-svg" role="img" aria-label="Mt. Bachelor snow quality by side of the mountain">
+    ${ring.sort((a,b)=>a.az-b.az).map((z,k,A)=>{ const prev = A[(k-1+A.length)%A.length].az, next = A[(k+1)%A.length].az;
+      const gapL = ((z.az - prev + 360) % 360) || 360, gapR = ((next - z.az + 360) % 360) || 360;
+      const a0 = z.az - Math.min(40, gapL/2 - 2), a1 = z.az + Math.min(40, gapR/2 - 2), mid = (a0+a1)/2, tx = cx + 86*Math.sin(mid*Math.PI/180), ty = cy - 86*Math.cos(mid*Math.PI/180);
+      return `<path d="${arc(a0,a1,52,R)}" fill="${scoreColor(z.r.sc)}" stroke="${z===best? "#fff" : "#111113"}" stroke-width="${z===best? 2.5 : 2}"/>
+      <text x="${tx}" y="${ty-3}" text-anchor="middle" class="zn-t">${z.n}</text><text x="${tx}" y="${ty+12}" text-anchor="middle" class="zn-s">${z.r.sc.toFixed(1)}</text>`; }).join("")}
+    ${sum? `<circle cx="${cx}" cy="${cy}" r="46" fill="${scoreColor(sum.r.sc)}" stroke="${sum===best? "#fff" : "#111113"}" stroke-width="${sum===best? 2.5 : 2}"/><text x="${cx}" y="${cy-3}" text-anchor="middle" class="zn-t">Summit</text><text x="${cx}" y="${cy+12}" text-anchor="middle" class="zn-s">${sum.r.sc.toFixed(1)}</text>` : ""}
+    <text x="${cx}" y="8" text-anchor="middle" class="zn-n">N ↑</text></svg>`;
+  el.innerHTML = `<div class="card-h"><h2>Where to ski</h2><div class="seg sm zn-seg">${[[10,"Morning"],[14,"Afternoon"]].map(([v,l])=>`<button data-h="${v}" class="${v===h?"on":""}">${l}</button>`).join("")}</div></div>
+    <div class="zn-best"><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"}</span><div><b>${best.n}</b> · ${esc(best.r.lab.toLowerCase())}</div></div>
+    ${svg}
+    ${(()=>{ const row = z=>`<div class="zn-li"><div><b>${z.n}</b><small>${esc(z.sub)} · faces ${AZN(z.az)}</small><small class="zn-l">${esc(z.r.lab)}</small></div>${scoreChip(z.r.sc)}</div>`, L = [...Z].sort((a,b)=>b.r.sc-a.r.sc);
+      return `<div class="zn-list">${L.slice(0,3).map(row).join("")}</div>${L.length>3? `<details class="nb zn-more"><summary>All sides</summary><div class="zn-list">${L.slice(3).map(row).join("")}</div></details>` : ""}`; })()}
+    <div class="muted mt-foot">Snowline's estimate. Each side of the mountain is simulated for its sun, warmth and height, then adjusted for wind: slopes downwind of recent snow and wind collect it, upwind slopes get blown firm. Sides are approximate.</div>`;
+  el.querySelectorAll(".zn-seg button").forEach(b=>b.onclick=()=>{ S.zoneHr = +b.dataset.h; renderZones(); });
+}
+
+/* Nordic glide forecast: how fast skis will run, hour by hour, from air temperature, humidity, sun and new snow. */
+function glideAt(C, i){
+  const c = C.cons[i]; if(!c || !isNum(c.Te)) return null; const T = c.Te, RH = c.RH ?? 70, sun = (c.SW||0) > 350 && (c.CC??100) < 50, snowing = (c.snow||0) > 0.04;
+  let new12 = 0; for(let j=Math.max(0,i-12); j<=i; j++) new12 += C.cons[j]?.snow||0;
+  if(T >= 1.5) return (RH >= 85 || snowing || (c.P||0) > 0.2)? {r:1, t:"Wet and grabby"} : {r:2, t:"Slushy"};
+  if(T > -1.5) return (sun || RH >= 90 || snowing)? {r:1, t:"Sticky"} : {r:2, t:"Medium"};
+  if(new12 >= 1 && T < -6) return {r:1, t:"Slow: fresh, cold snow"};
+  if(T <= -12) return {r:1, t:"Slow: very cold, dry snow"};
+  if(new12 >= 1) return {r:2, t:"Medium: new snow"};
+  return {r:3, t:"Fast"};
+}
+function renderGlide(){
+  const el = $("#glideCard"); if(!el || !S.ctx) return; const {C, SIM} = S.ctx;
+  const d = tgtDay(14), hrs = [8,9,10,11,12,13,14,15,16];
+  const G = hrs.map(h=>{ const i = idxOf(C).get(`${d}T${String(h).padStart(2,"0")}:00`); return i==null? null : {h, i, g: glideAt(C, i)}; }).filter(x=>x?.g);
+  if(G.length < 4){ el.remove(); return; }
+  const best = Math.max(...G.map(x=>x.g.r)); let run = [], cur = [];
+  G.forEach(x=>{ if(x.g.r===best){ cur.push(x); if(cur.length > run.length) run = [...cur]; } else cur = []; });
+  const word = {3:"Fast", 2:"Medium", 1:"Slow"}, col = {3:"#38bdf8", 2:"#fde68a", 1:"#fca5a5"};
+  const w = wax(SIM[run[0].i], C.cons[run[0].i]);
+  const all = run.length === G.length;
+  const head = all? `${word[best]} glide all day` : best===3? `Fastest ${hl(run[0].h)}–${hl(run[run.length-1].h+1)}` : best===2? `Medium glide at best, ${hl(run[0].h)}–${hl(run[run.length-1].h+1)}` : `Slow all day`;
+  el.innerHTML = `<div class="card-h"><h2>Glide</h2><span class="muted">${dayWord(d)} · ${fmtEl(S.ctx.e)}</span></div>
+    <div class="gl-h"><b>${head}</b><span class="muted">${esc(run[0].g.t)}${w? ` · wax: ${esc(w.glide.split(" (")[0].toLowerCase())}` : ""}</span></div>
+    <div class="gl-strip">${G.map(x=>`<div class="gl-c" title="${esc(x.g.t)}"><i style="background:${col[x.g.r]}"></i><span>${hl(x.h)}</span></div>`).join("")}</div>
+    <div class="gl-key"><span><i style="background:#38bdf8"></i>Fast</span><span><i style="background:#fde68a"></i>Medium</span><span><i style="background:#fca5a5"></i>Slow / sticky</span></div>`;
+}
+
 /* ---------- Nordic Pulse live grooming, shown as Nordic Pulse's own page inside Snowline (nothing copied or stored) ---------- */
 const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Elk Lake Resort (Nordic), OR": "https://nordic-pulse.com/ski-areas/US/OR/Elk-Lake-Resort", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
 function npEmbed(name){
