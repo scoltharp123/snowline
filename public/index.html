@@ -1196,6 +1196,7 @@ function snowBarsSVG(vals, dates, o={}){
     g += `<text x="${i*cw+cw/2}" y="${top+H+15}" class="t-d ${we?"we":""}">${LETTER[wd]}</text><text x="${i*cw+cw/2}" y="${top+H+30}" class="t-d ${we?"we":""}">${+d.slice(8,10)}</text>`;
   });
   let hh = top + H + 36;
+  if(o.labels) dates.forEach((d,i)=>{ if(d) g += `<rect data-bd="${d}" x="${i*cw}" y="0" width="${cw}" height="${top+H+60}" fill="transparent" style="cursor:pointer"/>`; });
   if(o.q){ o.q.forEach((sc,i)=>{ if(!isNum(sc)) return; g += `<rect x="${i*cw+8}" y="${hh+8}" width="${cw-16}" height="5" rx="2.5" fill="${scoreColor(sc)}"/>`; }); hh += 18; }
   return `<svg class="bars" width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}">${g}</svg>`;
 }
@@ -1969,7 +1970,8 @@ function showView(){
   if(v==="maps" && !(window.L && window.L.map)){ needMap().then(showView, ()=>toast("Couldn't load the map. Check your connection.")); return; }
   VIEWS.forEach(x=>{ const el=$("#view-"+x); if(el) el.style.display = x===v? "" : "none"; });
   document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===v));
-  S.view = v; updateTop(); window.scrollTo(0,0);
+  if(S.view && S.view !== v){ saveSpot(); S.prevView = S.view; }
+  const same = S.view === v; S.view = v; updateTop(); if(!same && !restoreSpot(v)) window.scrollTo(0,0);
   const ve = $("#view-"+v); if(ve){ ve.classList.remove("enter"); void ve.offsetWidth; ve.classList.add("enter"); }
   if(v==="maps"){ initBigMap(); renderFinder(); }
   if(v==="favs") renderFavs();
@@ -2764,6 +2766,35 @@ function agreeHTML(C, N, winTot, conf){
 }
 
 
+
+
+/* =====================  Getting around: back gestures, remembered places, tappable snow bars  ===================== */
+
+// A swipe in from the left edge goes back: closes the open sheet, or returns to the screen you came from.
+(()=>{ let x0 = null, y0 = 0;
+  addEventListener("touchstart", e=>{ const t = e.touches[0]; x0 = (t.clientX < 22 && e.touches.length===1)? t.clientX : null; y0 = t.clientY; }, {passive:true});
+  addEventListener("touchend", e=>{ if(x0==null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = Math.abs(t.clientY - y0); x0 = null;
+    if(dx < 70 || dy > 60) return;
+    const sh = [...document.querySelectorAll(".sheet.on")].pop(); if(sh){ closeSheet(sh.id); return; }
+    if(S.prevView && S.prevView !== (S.view||"forecast")) history.back(); }, {passive:true});
+})();
+
+// Remember where you were on each screen: coming back to Forecast (same spot), Favorites, Maps or Alerts
+// returns to the same place on the page instead of the top.
+S.sp = {};
+function saveSpot(force){ if(!force && Date.now() - (S.spAt||0) < 800) return; const v = S.view || "forecast"; S.sp[v] = {y: scrollY, loc: S.loc?.name}; S.spAt = Date.now(); }
+// Save the spot on the tap itself: changing the address jumps the page to the top before the screen switches.
+document.addEventListener("click", e=>{ const a = e.target.closest('a[href^="#"], a[href^="/#"], #tabs a, [data-v]'); if(a) saveSpot(true); }, true);
+function restoreSpot(v){ const s = S.sp[v]; if(!s || (v==="forecast" && s.loc !== S.loc?.name)) return false;
+  const go = () => scrollTo({top: s.y}); requestAnimationFrame(go); setTimeout(go, 120); setTimeout(()=>{ if(Math.abs(scrollY - s.y) > 40) go(); }, 500); return true; }
+
+// Tap a day in the Snow Summary bars: jump to that day in the Daily list, opened.
+document.addEventListener("click", e=>{ const r = e.target.closest("#snowCard [data-bd]"); if(!r) return;
+  const d = r.dataset.bd, row = document.querySelector(`#dailyList .dl-day[data-d="${d}"]`); if(!row) return;
+  if(getComputedStyle(row).display === "none") document.querySelector("#dailyList ~ .dl-all, #dailyCard .dl-all")?.click();
+  if(S.selDay !== d) row.click();
+  const off = (document.querySelector(".top")?.getBoundingClientRect().height || 56) + ($("#jtabs")?.offsetHeight || 0) + 8;
+  scrollTo({top: scrollY + row.getBoundingClientRect().top - off, behavior: "smooth"}); });
 
 /* =====================  Everyday polish  ===================== */
 // 1) Fresh when you come back: a Home Screen app can sit frozen in the background for hours. Returning after 15+ minutes
@@ -4460,8 +4491,14 @@ async function openShareSheet(){
 }
 
 /* ================= Sheets ================= */
-function openSheet(id){ $("#"+id).classList.add("on"); document.body.style.overflow="hidden"; if(id==="setSheet") renderSyncBox(); }
-function closeSheet(id){ $("#"+id).classList.remove("on"); document.body.style.overflow=""; }
+var openSheet = function(id){ $("#"+id).classList.add("on"); document.body.style.overflow="hidden"; if(id==="setSheet") renderSyncBox(); };
+var closeSheet = function(id){ $("#"+id).classList.remove("on"); if(!document.querySelector(".sheet.on")) document.body.style.overflow=""; };
+// Sheets join the history, so the phone's back button / gesture closes them instead of leaving the app.
+const _openSheet = openSheet, _closeSheet = closeSheet;
+openSheet = function(id){ const was = document.querySelector(".sheet.on"); _openSheet(id); if(!was && history.state?.sheet !== id) history.pushState({sheet:id}, "", location.href); };
+closeSheet = function(id, fromPop){ _closeSheet(id); if(!fromPop && history.state?.sheet && !document.querySelector(".sheet.on")) history.back(); };
+addEventListener("popstate", ()=>{ const open = [...document.querySelectorAll(".sheet.on")]; if(open.length && !history.state?.sheet) open.forEach(s=>closeSheet(s.id, true)); });
+
 document.querySelectorAll(".sheet").forEach(sh=>{
   sh.addEventListener("click", e=>{ if(e.target===sh) closeSheet(sh.id); });
   sh.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>closeSheet(sh.id));
