@@ -705,6 +705,7 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 #flakes{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;transition:opacity .8s}main{position:relative;z-index:1}
 .flk{display:flex;gap:12px;align-items:center;width:calc(100% - 28px);margin:10px 14px 0;padding:12px 0 2px;border:0;border-top:1px solid #1f1f22;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .flk svg{flex:none;filter:drop-shadow(0 0 6px rgba(125,211,252,.35))}.flk>div{display:flex;flex-direction:column;gap:1px;min-width:0}.flk .muted{font-size:11px;text-transform:uppercase;letter-spacing:.04em}.flk b{font-size:15px}.flk small{font-size:12px;color:#c9d4e3;line-height:1.35}
+.flk-card .flk{width:100%;margin:0;padding:2px 0;border-top:0}#flkRow:empty{display:none}
 </style>
 </head>
 <body>
@@ -1294,7 +1295,6 @@ function render(){
     ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
-    <div id="flkRow">${flakeHTML(C, e)}</div>
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
@@ -1318,7 +1318,7 @@ function render(){
     <section class="card" id="repCard"></section>`)}
   ${grp("g-plan", "Plan your day", `<section class="card" id="workCard"></section><section class="card" id="roadCard"></section>
     ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
-  ${grp("g-storm", "Storm & elevation", `<section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
+  ${grp("g-storm", "Storm & elevation", `<section class="card flk-card" id="flkRow">${flakeHTML(C, e)}</section><section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
   ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
   ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
@@ -1336,7 +1336,7 @@ function render(){
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
   renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast();
-  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r) r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); } }); } try{ renderReceipt(); }catch(err){}
+  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
