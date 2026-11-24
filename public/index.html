@@ -706,6 +706,10 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 .flk{display:flex;gap:12px;align-items:center;width:calc(100% - 28px);margin:10px 14px 0;padding:12px 0 2px;border:0;border-top:1px solid #1f1f22;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .flk svg{flex:none;filter:drop-shadow(0 0 6px rgba(125,211,252,.35))}.flk>div{display:flex;flex-direction:column;gap:1px;min-width:0}.flk .muted{font-size:11px;text-transform:uppercase;letter-spacing:.04em}.flk b{font-size:15px}.flk small{font-size:12px;color:#c9d4e3;line-height:1.35}
 .flk-card .flk{width:100%;margin:0;padding:2px 0;border-top:0}#flkRow:empty{display:none}
+.lt{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px}.lt>#ltBtn{max-width:100%}.lt>.lt-sub,.lt>.fav-row{flex-basis:100%}
+#ltStatus{margin-top:4px}#ltStatus .st-pill{font-size:12px;padding:3px 9px}
+.zn-same{display:flex;justify-content:space-between;align-items:center;gap:10px}.zn-same>div{display:flex;flex-direction:column;gap:2px}.zn-same b{font-size:15px}.zn-same .muted{font-size:12.5px}
+.cam-more{display:block;width:100%;margin-top:10px;text-align:center}.tipbtn{background:none;border:0;color:#8e8e93;padding:0 2px;font-size:12px}
 </style>
 </head>
 <body>
@@ -723,7 +727,7 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 
 <main>
   <div id="ptr"><div class="spin"></div></div>
-  <div id="view-forecast"><div class="lt"><button id="ltBtn" aria-label="Change location"><span id="ltName">Snowline</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="lt-sub" id="ltSub"></div><div class="fav-row" id="favRow" hidden></div><div id="ltStatus"></div></div>
+  <div id="view-forecast"><div class="lt"><button id="ltBtn" aria-label="Change location"><span id="ltName">Snowline</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div id="ltStatus"></div><div class="lt-sub" id="ltSub"></div><div class="fav-row" id="favRow" hidden></div></div>
 <div class="ctrl" id="ctrl">
   <div class="seg" id="modeSeg"><button data-m="alpine">Alpine</button><button data-m="skate">Skate</button><button data-m="classic">Classic</button><button data-m="bc">Tour</button></div>
   <div class="seg" id="bandSeg" style="display:none"><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
@@ -1252,7 +1256,15 @@ function render(){
   const bigDay = consDaily.slice(0,7).reduce((b,v,i)=>v>b.v?{v,i}:b,{v:0,i:0});
   const rainHrs = C.cons.slice(C.nowIdx, C.nowIdx+24*N).filter(c=>c && c.P>0.3 && c.sl > e).length;
   if(bigDay.v >= 6) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}.${S.mode==="bc"? "" : " "+firstPowDay(C)}</div>`);
-  if(rainHrs >= 6) callouts.push(`<div class="callout rain">🌧️ <b>Rain risk:</b> about ${rainHrs} wet hours in the next ${N} days at this elevation.</div>`);
+  if(rainHrs >= 6){
+    const wet = C.cons.map((c,i)=>[c,i]).slice(C.nowIdx, C.nowIdx+24*N).filter(([c,i])=>c && c.P>0.3 && c.sl > e && +C.time[i].slice(11,13) >= 6 && +C.time[i].slice(11,13) <= 18);
+    const byDay = {}; wet.forEach(([c,i])=>{ const d = C.time[i].slice(0,10); byDay[d] = (byDay[d]||0) + 1; });
+    const days = Object.keys(byDay).filter(d=>byDay[d] >= 2).sort();
+    const sls = wet.map(([c])=>c.sl).sort((a,b)=>a-b), slMid = sls[Math.floor(sls.length/2)];
+    const wd = d => d===todayStr()? "today" : d===dateAdd(todayStr(),1)? "tomorrow" : new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"});
+    const dayTxt = days.length >= 4? `on and off for ${days.length} days` : days.length===3? `${wd(days[0])}, ${wd(days[1])} and ${wd(days[2])}` : days.length===2? `${wd(days[0])} and ${wd(days[1])}` : days.length? wd(days[0]) : "";
+    if(days.length) callouts.push(`<div class="callout rain">🌧️ <b>Rain at ${fmtEl(e)}</b> ${dayTxt}.${isNum(slMid) && slMid < (S.loc.top||0)/FT? ` Snow above about ${fmtEl(Math.round(slMid/30.48)*30.48)}.` : ""}</div>`);
+  }
   const days7 = C.days.slice(0,7);
   if(!isAlp()){ const cr = days7.filter(d=>crustCruise(C,SIM,d)); if(cr.length) callouts.push(byMode("", `<div class="callout crust">✨ <b>Crust cruising ${cr.map(dow).join(", ")}:</b> skate off-trail from about 7–10am, before the sun softens the crust.</div>`, `<div class="callout crust">🧊 <b>Firm, icy tracks early ${cr.map(dow).join(", ")}:</b> klister for kick before about 10am, or wait for the tracks to soften. Tracks soften by late morning.</div>`)); }
   else { const corn = days7.filter(d=>at(C,SIM,d,12)?.sim?.key==="corn"); if(corn.length) callouts.push(`<div class="callout">🌽 <b>Corn cycle ${corn.map(dow).join(", ")}:</b> start on east-facing slopes around 10am and follow the sun.</div>`); }
@@ -1395,7 +1407,7 @@ function renderRightNow(C, SIM, e){
       ${ts? `<div class="full"><div class="l">Best window ${tsDay}${tipI("quality")}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
       ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
       <div><div class="l">New snow</div><div class="v">${fmtSnow(now.newSnow)}${now.newSnow>0.5? ` · ${now.age<24?"last 24h":Math.round(now.age/24)+"d ago"}`:""}</div></div>
-      ${S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span> <span class="muted" style="white-space:nowrap">ridge ${fmtWind(c.RW)} ${windU()}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : `<div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${fmtEl(c.sl)}</div></div>`}
+      ${S.mode==="alpine" && isBach()? `<div><div class="l">Ridge wind</div><div class="v">${fmtWind(c.RW)} ${windU()}</div></div>` : S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span> <span class="muted" style="white-space:nowrap">ridge ${fmtWind(c.RW)} ${windU()}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : `<div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${fmtEl(c.sl)}</div></div>`}
 
     </div>
     ${(()=>{ const more = [
@@ -3071,7 +3083,7 @@ function renderMtn(){
         : `<div class="wh ok"><b>No wind holds expected</b><span class="muted">Summit gusts to ${fmtWind(top.gust)} ${windU()}</span></div>`}
     </div></div>
     <div class="mt-row"><div class="mt-k">Crowds</div><div class="mt-v"><div class="wh"><b style="color:${cr.c}">${cr.lv}</b><span class="muted">${esc(cr.why)}</span></div><div class="mt-tip">${cr.tip}</div></div></div>
-    <div class="muted mt-foot">Snowline's estimates. Wind holds come from the summit wind forecast${learnedN? `, tuned by ${learnedN} day${learnedN>1?"s":""} of Bachelor lift reports` : ` and get sharper as Snowline logs Bachelor's lift reports this season`}. Crowds come from the day, holidays and fresh snow, not live lot counts. <a href="https://www.mtbachelor.com/the-mountain/lift-trail-report/" target="_blank" rel="noopener">Lift report ↗</a></div>`;
+    <div class="muted mt-foot">Snowline's estimates <button class="tipbtn" data-tip="mtnest" aria-label="How these are estimated">ⓘ</button> · <a href="https://www.mtbachelor.com/the-mountain/lift-trail-report/" target="_blank" rel="noopener">Lift report ↗</a></div>`;
 }
 
 /* Where it's skiing best: each part of the mountain gets its own snow-surface simulation for the way it faces and its
@@ -3106,6 +3118,8 @@ function renderZones(){
   const Z = BACH_ZONES.map(z=>({...z, r: zoneRead(z, d, h)})).filter(z=>z.r);
   if(!Z.length){ el.remove(); return; }
   const best = [...Z].sort((a,b)=>b.r.sc-a.r.sc)[0], R = 118, cx = 130, cy = 130;
+  const spread = best.r.sc - Math.min(...Z.map(z=>z.r.sc));
+  if(spread < 0.4){ el.innerHTML = `<div class="card-h"><h2>Where to ski</h2></div><div class="zn-same"><div><b>About the same on every side</b><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"} · ${esc(best.r.lab.toLowerCase())}</span></div>${scoreChip(best.r.sc)}</div><div class="muted" style="font-size:11.5px;margin-top:6px">When one side of the mountain skis noticeably better, a map of every side shows here.</div>`; return; }
   const arc = (a0, a1, r0, r1) => { const p = (a, r) => [cx + r*Math.sin(a*Math.PI/180), cy - r*Math.cos(a*Math.PI/180)]; const [x0,y0] = p(a0,r1), [x1,y1] = p(a1,r1), [x2,y2] = p(a1,r0), [x3,y3] = p(a0,r0); return `M${x0},${y0} A${r1},${r1} 0 0 1 ${x1},${y1} L${x2},${y2} A${r0},${r0} 0 0 0 ${x3},${y3}Z`; };
   const ring = Z.filter(z=>z.az!=null), sum = Z.find(z=>z.az==null);
   const svg = `<svg viewBox="0 -4 260 266" class="zn-svg" role="img" aria-label="Mt. Bachelor snow quality by side of the mountain">
@@ -3193,6 +3207,7 @@ function renderMeissner(){
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
+  mtnest: () => ["How these are estimated", `<p><b>Wind holds</b> come from the forecast wind near each lift's top. Every 30 minutes all season, Snowline saves Bachelor's lift status next to the wind, so each lift's tipping point is learned from what really happened${S.liftwx?.days? ` (${S.liftwx.days} days so far)` : ""}.</p><p><b>Crowds</b> come from the day of the week, school holidays, fresh snow and sunshine. They're not live parking counts.</p>`],
   flakes: () => ["Snowflake forecast", `<p>A snowflake's shape is set by the <b>temperature of the cloud it grows in</b>. Snowline checks the temperature and moisture at four heights above the mountain (about 5,000 to 18,000 ft) for each hour of the storm.</p>
     <p><b>Stellar dendrites</b> grow around 0 to −6°F (−12 to −18°C) and make the lightest, fluffiest powder. <b>Needles and columns</b> grow around 14 to 25°F (−4 to −10°C) and pack down denser. <b>Rimed flakes and graupel</b> collect frozen droplets in milder, wetter storms. <b>Strong wind</b> breaks crystals into fragments that pack firm.</p>
     <p class="muted">An estimate from forecast temperatures aloft. Real storms usually bring a mix; this is the most common type.</p>`],
@@ -4187,13 +4202,14 @@ async function renderCamCard(){
   const road = (await loadSpotCams(L0)).filter(c=>!ROAD_CAM_FILTER[L0.name] || ROAD_CAM_FILTER[L0.name].test(c.name)); if(S.loc!==L0) return;
   const rc = RESORT_CAMS[L0.name] || []; const cams = [...rc, ...road];
   if(!cams.length && !links.length){ card.remove(); return; }
-  const view = store.get("camView","list");
+  const view = store.get("camView","grid");
   const resort = rc.length? "" : links.map(([t,u])=>`<a class="cam-resort" href="${u}" target="_blank" rel="noopener"><span class="cam-ic">📷</span><span><b>${t}</b><small>Snow stake, summit and lift cams on the resort's site</small></span><span style="color:var(--ice)">↗</span></a>`).join("");
-  const draw = () => { const v = store.get("camView","list");
+  const draw = () => { const v = store.get("camView","grid");
     card.innerHTML = `<div class="card-h"><h2>Cams</h2>${cams.length? `<div class="seg sm" id="camSeg">${[["list","List"],["grid","Grid"]].concat(cams.some(c=>isNum(c.lat))? [["map","Map"]] : []).map(([k,l])=>`<button data-cv="${k}" class="${v===k?"on":""}">${l}</button>`).join("")}</div>`:""}</div>
       ${resort}
-      ${cams.length? (v==="map"? `<div class="cmap-wrap" id="camWrap"><div id="camMini"></div><button class="cmap-fs" id="camFs" aria-label="Full screen map">⤢</button></div>` : `<div class="cams-${v}">${cams.map(c=>camTile(c, v==="list")).join("")}</div>`) : ""}
+      ${cams.length? (v==="map"? `<div class="cmap-wrap" id="camWrap"><div id="camMini"></div><button class="cmap-fs" id="camFs" aria-label="Full screen map">⤢</button></div>` : `<div class="cams-${v}">${(S.camAll? cams : cams.slice(0,6)).map(c=>camTile(c, v==="list")).join("")}</div>${!S.camAll && cams.length > 6? `<button class="btn cam-more" id="camMore">Show all ${cams.length} cams</button>` : ""}`) : ""}
       ${cams.length? `<div class="muted" style="font-size:11px;margin-top:6px">${rc.length? `Resort cams: <a href="${rc[0].page.split("webcam-modal")[0]}" target="_blank" rel="noopener">${rc[0].src} ↗</a>${rc[0].live? " · tap a cam for live video" : ""} · `:""}${road.length? "Road cams: ODOT TripCheck · ":""}☆ saves a camera to Favorites</div>`:""}`;
+    const more = card.querySelector("#camMore"); if(more) more.onclick = ()=>{ S.camAll = true; draw(); };
     card.querySelectorAll("[data-cv]").forEach(b=>b.onclick=()=>{ store.set("camView", b.dataset.cv); draw(); });
     wireCamStars(card, draw);
     if(v==="map") needMap().then(()=>camMapInit(L0, rc, road), ()=>{});
