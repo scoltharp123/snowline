@@ -24,6 +24,7 @@
 <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
 <link rel="preconnect" href="https://ensemble-api.open-meteo.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<script>try{if(localStorage.getItem("sl_sun")==="1")document.documentElement.classList.add("sun")}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
@@ -693,6 +694,14 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 .rc{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:10px 10px 10px 14px;border-radius:14px;background:#141417;border:1px solid #232328}
 .rc-b{flex:1;min-width:0}.rc-h{font-size:11.5px;color:#8e8e93;margin-bottom:3px}.rc-n{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:#c9d4e3}.rc-n b{color:#fff}.rc-v{font-weight:700;color:#fcd34d}.rc-v.ok{color:#6ee7a0}
 .rc-sh{background:#1d4ed8;color:#fff;border:0;border-radius:99px;padding:7px 12px;font-weight:700;font-size:13px}.rc-x{background:none;border:0;color:#8e8e93;font-size:14px;padding:6px}
+.fav-row{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:10px -12px 0;padding:0 12px 2px}.fav-row::-webkit-scrollbar{display:none}
+.fav-row button{flex:0 0 auto;background:#161619;border:1px solid #26262b;color:#c7c7cc;border-radius:99px;padding:6px 12px;font:600 13px Inter,system-ui,sans-serif;white-space:nowrap}.fav-row button.on{background:#f5f5f7;color:#000;border-color:#f5f5f7}
+.elv-r{display:inline-flex;gap:4px;align-items:center;margin-left:auto}.ic-l{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;color:var(--ice);background:#161619}
+#app.sw-l{animation:swl .28s ease}#app.sw-r{animation:swr .28s ease}@keyframes swl{from{opacity:.4;transform:translateX(24px)}}@keyframes swr{from{opacity:.4;transform:translateX(-24px)}}
+html.sun{filter:invert(1) hue-rotate(180deg);background:#fff}
+html.sun img,html.sun video,html.sun iframe,html.sun canvas,html.sun .np-sheet iframe{filter:invert(1) hue-rotate(180deg)}
+html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{color:#a1a1aa}
+.upd-at{font-size:11.5px}.upd-at.old{color:#fcd34d}
 </style>
 </head>
 <body>
@@ -710,7 +719,7 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 
 <main>
   <div id="ptr"><div class="spin"></div></div>
-  <div id="view-forecast"><div class="lt"><button id="ltBtn" aria-label="Change location"><span id="ltName">Snowline</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="lt-sub" id="ltSub"></div><div id="ltStatus"></div></div>
+  <div id="view-forecast"><div class="lt"><button id="ltBtn" aria-label="Change location"><span id="ltName">Snowline</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="lt-sub" id="ltSub"></div><div class="fav-row" id="favRow" hidden></div><div id="ltStatus"></div></div>
 <div class="ctrl" id="ctrl">
   <div class="seg" id="modeSeg"><button data-m="alpine">Alpine</button><button data-m="skate">Skate</button><button data-m="classic">Classic</button><button data-m="bc">Tour</button></div>
   <div class="seg" id="bandSeg" style="display:none"><button data-b="base">Base</button><button data-b="mid">Mid</button><button data-b="summit">Top</button></div>
@@ -763,6 +772,7 @@ details.sec > summary .ttl{font-size:16px}details.sec > summary .sv{font-size:12
 <div class="sheet" id="setSheet"><div class="sheet-b">
   <div class="grab"></div>
   <div class="sheet-h"><h2 id="setTitle">Settings</h2><button class="link" data-close>Done</button></div>
+  <div class="field">Display<div class="seg" id="sunSeg"><button data-s="0">Dark</button><button data-s="1">Bright sun</button></div><div class="muted" style="font-size:12px;margin-top:6px">Bright sun is a light, high-contrast look that's easier to read outside.</div></div>
   <div class="field">Units<div class="seg" id="unitSeg"><button data-u="imp">Inches · °F · ft</button><button data-u="met">cm · °C · m</button></div></div>
   <div id="ownerBox" hidden><div class="row" style="justify-content:space-between;align-items:center;gap:12px;margin-top:16px"><div><b>App health notices</b><div class="muted">A notification if one of Snowline's data sources breaks, and when it's fixed. Needs lock-screen notifications on.</div></div><button class="tog" id="healthTog" role="switch" aria-label="App health notices"><i></i></button></div>
   <button class="link" id="setStatus" style="margin-top:6px;padding-left:0">Data source status</button></div>
@@ -916,12 +926,14 @@ const isOM = u => /open-meteo\.com\//.test(u) && !/geocoding-api|\/elevation\?/.
 const omMaxAge = () => (S.freshAsk && Date.now() < S.freshAsk) ? 10*60e3 : 60*60e3;   // pull-to-refresh accepts answers up to 10 min old
 async function omCacheGet(url){ try{ const c = await caches.open(OM_CACHE), hit = await c.match(url); if(hit && Date.now() - (+hit.headers.get("x-at")||0) < omMaxAge()) return await hit.json(); }catch(e){} return null; }
 function omCachePut(url, j){ try{ caches.open(OM_CACHE).then(c=>c.put(url, new Response(JSON.stringify(j), {headers:{"content-type":"application/json","x-at":String(Date.now())}}))).catch(()=>{}); }catch(e){} }
-(async()=>{ try{ const c = await caches.open(OM_CACHE); for(const req of await c.keys()){ const r = await c.match(req); if(!r || Date.now() - (+r.headers.get("x-at")||0) > 6*3600e3) await c.delete(req); } }catch(e){} })();   // tidy old answers
+(async()=>{ try{ const c = await caches.open(OM_CACHE); for(const req of await c.keys()){ const r = await c.match(req); if(!r || Date.now() - (+r.headers.get("x-at")||0) > 24*3600e3) await c.delete(req); } }catch(e){} })();   // tidy old answers
 const omInflight = new Map();   // the same request asked twice at once goes out once
 async function getJSON(url, tries=3, wait=1500){
   if(isOM(url)){ const hit = await omCacheGet(url); if(hit) return hit;
     if(omInflight.has(url)) return omInflight.get(url);
-    const p = getJSONnet(url, tries, wait).then(j=>{ omCachePut(url, j); return j; }).finally(()=>omInflight.delete(url)); omInflight.set(url, p); return p; }
+    const p = getJSONnet(url, tries, wait).then(j=>{ omCachePut(url, j); return j; })
+      .catch(async err=>{ try{ const c = await caches.open(OM_CACHE), hit = await c.match(url); if(hit){ S.usedOld = +hit.headers.get("x-at")||1; return await hit.json(); } }catch(e){} throw err; })
+      .finally(()=>omInflight.delete(url)); omInflight.set(url, p); return p; }
   return getJSONnet(url, tries, wait);
 }
 async function getJSONnet(url, tries=3, wait=1500){
@@ -984,7 +996,7 @@ function openBandPicker(){
 function setMode(m){ S.mode = m; store.set("mode", m); applyBand(); document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===m)); if(m==="bc") bcAcknowledge(); }
 async function load(loc){
   syncModeFor(PRESETS.find(p=>p.name===loc.name) || loc);
-  S.loc = loc; store.set("last", loc); S.selDay = null; S.avyMini = null; S.avyLabel = ""; S.season = null; S.outlook = null;
+  S.loc = loc; store.set("last", loc); S.usedOld = 0; S.selDay = null; S.avyMini = null; S.avyLabel = ""; S.season = null; S.outlook = null;
   const ref = ((loc.base+loc.top)/2)/FT; // reference elevation (m) = mid-mountain
   const mem = MEM.get(loc.name);
   if(mem && Date.now()-mem.t < MEM_TTL){ loadExtras(loc); S.data = mem.data; S.season = mem.data.seasonCache || null; S.outlook = mem.data.outlookCache || null; $("#upd").classList.remove("on"); $("#app").classList.remove("stale"); await libsReady; if(S.loc===loc) render(); return; }
@@ -1122,14 +1134,15 @@ const VIEW_TITLE = {favs:"Favorites", finder:"Explore", maps:"Maps", alerts:"Ale
 function updateTop(){
   const L = S.loc, v = S.view || "forecast";
   document.body.dataset.view = v;
-  if(v !== "forecast"){ $("#locName").textContent = VIEW_TITLE[v]||"Snowline"; $("#locSub").textContent = ""; return; }
+  if(v !== "forecast"){ $("#locName").textContent = VIEW_TITLE[v]||"Snowline"; $("#locSub").textContent = ""; favRowRender(); return; }
   if(!L) return;
   const bandName = {base:"Base", mid:"Mid", summit:"Summit"}[S.band];
   $("#locName").textContent = dispName(L.name); $("#ltName").textContent = dispName(L.name); $("#ltName").title = L.name;
   $("#locSub").textContent = `${bandName} · ${fmtEl(bandElev())}`;
   // Base · Mid · Summit as one quiet row: each shows its elevation, the sport's default is picked, a tap switches
   const elv = [["base","Base",L.base],["mid","Mid",(L.base+L.top)/2],["summit","Summit",L.top]];
-  $("#ltSub").innerHTML = `<span class="elv" role="tablist" aria-label="Forecast elevation">${elv.map(([k,l,ft])=>`<button data-band="${k}" class="${S.band===k?"on":""}" role="tab" aria-selected="${S.band===k}"><b>${l}</b> ${fmtEl(ft/FT)}</button>`).join("")}</span>${RESORT_SITE[L.name]? `<a class="elv-r" href="${RESORT_SITE[L.name]}" target="_blank" rel="noopener">Site ↗</a>` : ""}`;
+  $("#ltSub").innerHTML = `<span class="elv" role="tablist" aria-label="Forecast elevation">${elv.map(([k,l,ft])=>`<button data-band="${k}" class="${S.band===k?"on":""}" role="tab" aria-selected="${S.band===k}"><b>${l}</b> ${fmtEl(ft/FT)}</button>`).join("")}</span><span class="elv-r">${dirURL(L)? `<a class="ic-l" href="${dirURL(L)}" target="_blank" rel="noopener" aria-label="Directions" title="Directions"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg></a>` : ""}${RESORT_SITE[L.name]? `<a class="ic-l" href="${RESORT_SITE[L.name]}" target="_blank" rel="noopener" aria-label="Area website" title="Area website"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></a>` : ""}</span>`;
+  favRowRender();
   const fav = S.favs.some(f=>f.name===L.name);
   $("#favBtn").classList.toggle("on", fav); $("#favBtn svg").setAttribute("fill", fav? "currentColor" : "none");
 }
@@ -1267,7 +1280,8 @@ function render(){
   ${verdict}<div id="rcptStrip"></div>${callouts.slice(0,2).join("")}
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
-    <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : ""}</div>
+    <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+      return old? `<span class="muted upd-at old">No signal · saved ${t2}</span>` : `<span class="muted upd-at">Updated ${t2}</span>`; })()}</div>
     ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
@@ -1311,7 +1325,7 @@ function render(){
   const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); try{ renderReceipt(); }catch(err){}
+  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
@@ -2749,6 +2763,65 @@ function agreeHTML(C, N, winTot, conf){
     <div class="cf-n">${note} <span>ⓘ</span></div></button>`;
 }
 
+
+
+/* =====================  Everyday polish  ===================== */
+// 1) Fresh when you come back: a Home Screen app can sit frozen in the background for hours. Returning after 15+ minutes
+//    reloads the forecast (and the snow countdown) on its own.
+(()=>{ let hid = 0; document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "hidden"){ hid = Date.now(); return; }
+  if(hid && Date.now() - hid > 15*60e3 && (S.view||"forecast") === "forecast" && S.loc && navigator.onLine !== false){ MEM.delete(S.loc.name); load(S.loc).catch(()=>{}); }
+  hid = 0; }); })();
+
+// 2) Favorites one tap away: a row of your spots under the name, and swipe left/right on the forecast to move between them.
+function favRowRender(){
+  const el = $("#favRow"); if(!el) return; const F = S.favs || [];
+  if(F.length < 2 || (S.view||"forecast") !== "forecast"){ el.innerHTML = ""; el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = F.map(f=>`<button data-fav="${esc(f.name)}" class="${f.name===S.loc?.name? "on" : ""}">${esc(dispName(f.name))}</button>`).join("");
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{ const f = F.find(x=>x.name===b.dataset.fav); if(f && f.name !== S.loc?.name){ scrollTo({top:0}); load(f); } });
+  const on = el.querySelector(".on"); if(on) el.scrollTo({left: on.offsetLeft - el.clientWidth/2 + on.offsetWidth/2});
+}
+function favStep(dir){
+  const F = S.favs || []; if(F.length < 2) return; let i = F.findIndex(f=>f.name===S.loc?.name);
+  const f = F[i < 0? 0 : (i + dir + F.length) % F.length]; const a = $("#app");
+  a.classList.remove("sw-l","sw-r"); void a.offsetWidth; a.classList.add(dir > 0? "sw-l" : "sw-r");
+  scrollTo({top:0}); load(f); toast(dispName(f.name));
+}
+(()=>{ let x0 = null, y0 = 0, t0 = 0;
+  const skip = "#bigmap,.ss-r,.hs,.dh,.tablewrap,.fav-row,.leaflet-container,iframe,.np-f,.zn-svg,.gl-strip,.jtabs,.elv,.seg,.cf-bar,canvas,.mx-cam,input,.sheet";
+  addEventListener("touchstart", e=>{ if((S.view||"forecast")!=="forecast" || e.touches.length>1 || e.target.closest(skip) || document.querySelector(".sheet.on")){ x0 = null; return; } x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); }, {passive:true});
+  addEventListener("touchend", e=>{ if(x0==null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+    if(Date.now() - t0 < 600 && Math.abs(dx) > 80 && Math.abs(dy) < 45) favStep(dx < 0? 1 : -1); }, {passive:true});
+})();
+
+// 3) Works with no signal at the trailhead: once the forecast is up, quietly fetch your other favorites so switching is
+//    instant and still works offline (answers are kept on the phone for a day as a fallback).
+function preloadFavs(){
+  if(S.preT && Date.now() - S.preT < 40*60e3) return; S.preT = Date.now();
+  const list = (S.favs||[]).filter(f=>f.name!==S.loc?.name && isNum(f.lat) && isNum(f.base) && isNum(f.top)).slice(0,5); let k = 0;
+  const next = async () => { const f = list[k++]; if(!f) return; if(document.visibilityState !== "visible"){ S.preT = 0; return; }
+    const ref = ((f.base+f.top)/2)/FT;
+    await Promise.all([...MODELS.map(m=>fetchDet(m, f, ref).catch(()=>null)), ...ENS.map(m=>fetchEns(m, f, ref).catch(()=>null))]);
+    setTimeout(next, 1500); };
+  setTimeout(next, 5000);
+}
+
+// 4) Directions to the right lot, in Apple Maps on iPhone and Google Maps elsewhere.
+const DIR_PLACE = {"Mt. Bachelor, OR":"Mt. Bachelor West Village Lodge, Bend, OR", "Mt. Bachelor Nordic Center, OR":"Mt. Bachelor Nordic Center, Bend, OR", "Meissner Nordic (Bend), OR":"Virginia Meissner Sno-Park, Bend, OR"};
+const DIR_NONE = new Set(["Elk Lake Resort (Nordic), OR"]);   // no winter road to the resort itself
+function dirURL(L){
+  if(!L || DIR_NONE.has(L.name)) return null; const q = DIR_PLACE[L.name], ios = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
+  if(ios) return q? `https://maps.apple.com/?daddr=${encodeURIComponent(q)}&dirflg=d` : `https://maps.apple.com/?daddr=${L.lat},${L.lon}&dirflg=d`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${q? encodeURIComponent(q) : `${L.lat},${L.lon}`}`;
+}
+
+// 5) Bright-sun display: a light, high-contrast version that's readable on a sunny chairlift with sunglasses on.
+function applySun(){ const on = localStorage.getItem("sl_sun")==="1"; document.documentElement.classList.toggle("sun", on);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", on? "#ffffff" : "#0b1220");
+  document.querySelectorAll("#sunSeg button").forEach(b=>b.classList.toggle("on", (b.dataset.s==="1")===on)); }
+document.addEventListener("click", e=>{ const b = e.target.closest("#sunSeg button"); if(!b) return; localStorage.setItem("sl_sun", b.dataset.s); applySun(); });
+applySun();
 
 /* =====================  Snow countdown (live) + storm receipts  ===================== */
 // Same engine as the push alert: Open-Meteo's 15-minute forecast says when snow starts, how hard, and when it lets up.
