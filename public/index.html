@@ -4626,6 +4626,14 @@ function spotRow(sp, opts={}){
 }
 /* Central Oregon first: the spots most people here look for, plus easy search by everyday names */
 const CO_RESORTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Elk Lake Resort (Nordic), OR", "Hoodoo, OR", "Willamette Pass, OR"];
+// One-time tidy: favorites used to be added newest-first. Put the Central Oregon areas in their usual order
+// (Bachelor, Bachelor Nordic, Meissner, Elk Lake…), everything else after them as before. Reorder anytime in Favorites → Edit.
+if(!store.get("favOrder1") && Array.isArray(S.favs) && S.favs.length > 1){
+  const rank = f => { const i = CO_RESORTS.indexOf(f.name); return i < 0? 100 : i; };
+  S.favs = S.favs.map((f,i)=>[f,i]).sort((a,b)=>rank(a[0])-rank(b[0]) || a[1]-b[1]).map(x=>x[0]); store.set("favs", S.favs);
+  setTimeout(()=>{ try{ syncSoon(); pushSync(); updateTop(); }catch(e){} }, 2000);   // keep synced devices and alerts in the same order
+}
+store.set("favOrder1", 1);
 const SPOT_AKA = {
   "Mt. Bachelor, OR": "mount bachelor mt bachelor mtb bachelor butte bend ski resort sunrise west village pine marten summit",
   "Mt. Bachelor Nordic Center, OR": "mount bachelor nordic mt bachelor nordic cross country xc skate classic bachelor nordic lodge west village",
@@ -4673,7 +4681,7 @@ $("#setBtn").onclick = () => openSheet("setSheet");
 $("#ltBtn").onclick = () => $("#locBtn").click();
 $("#shareBtn").onclick = () => openShareSheet();
 $("#bellBtn").onclick = () => openBell();
-$("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.unshift({...S.loc}); store.set("favs",S.favs); updateTop(); pushSync(); toast(i>=0? "Removed from Favorites" : "Saved to Favorites"); };
+$("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.push({...S.loc}); store.set("favs",S.favs); updateTop(); pushSync(); toast(i>=0? "Removed from Favorites" : "Saved to Favorites"); };
 
 /* ---------- Search: Snowline spots, then every named ski area (OpenSkiMap), then towns and peaks ---------- */
 const STATES = {AL:"alabama",AK:"alaska",AZ:"arizona",AR:"arkansas",CA:"california",CO:"colorado",CT:"connecticut",DE:"delaware",FL:"florida",GA:"georgia",HI:"hawaii",ID:"idaho",IL:"illinois",IN:"indiana",IA:"iowa",KS:"kansas",KY:"kentucky",LA:"louisiana",ME:"maine",MD:"maryland",MA:"massachusetts",MI:"michigan",MN:"minnesota",MS:"mississippi",MO:"missouri",MT:"montana",NE:"nebraska",NV:"nevada",NH:"new hampshire",NJ:"new jersey",NM:"new mexico",NY:"new york",NC:"north carolina",ND:"north dakota",OH:"ohio",OK:"oklahoma",OR:"oregon",PA:"pennsylvania",RI:"rhode island",SC:"south carolina",SD:"south dakota",TN:"tennessee",TX:"texas",UT:"utah",VT:"vermont",VA:"virginia",WA:"washington",WV:"west virginia",WI:"wisconsin",WY:"wyoming",
