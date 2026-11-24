@@ -702,6 +702,9 @@ html.sun{filter:invert(1) hue-rotate(180deg);background:#fff}
 html.sun img,html.sun video,html.sun iframe,html.sun canvas,html.sun .np-sheet iframe{filter:invert(1) hue-rotate(180deg)}
 html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{color:#a1a1aa}
 .upd-at{font-size:11.5px}.upd-at.old{color:#fcd34d}
+#flakes{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;transition:opacity .8s}main{position:relative;z-index:1}
+.flk{display:flex;gap:12px;align-items:center;width:calc(100% - 28px);margin:10px 14px 0;padding:12px 0 2px;border:0;border-top:1px solid #1f1f22;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.flk svg{flex:none;filter:drop-shadow(0 0 6px rgba(125,211,252,.35))}.flk>div{display:flex;flex-direction:column;gap:1px;min-width:0}.flk .muted{font-size:11px;text-transform:uppercase;letter-spacing:.04em}.flk b{font-size:15px}.flk small{font-size:12px;color:#c9d4e3;line-height:1.35}
 </style>
 </head>
 <body>
@@ -773,6 +776,7 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
   <div class="grab"></div>
   <div class="sheet-h"><h2 id="setTitle">Settings</h2><button class="link" data-close>Done</button></div>
   <div class="field">Display<div class="seg" id="sunSeg"><button data-s="0">Dark</button><button data-s="1">Bright sun</button></div><div class="muted" style="font-size:12px;margin-top:6px">Bright sun is a light, high-contrast look that's easier to read outside.</div></div>
+  <div class="field">Falling snow<div class="seg" id="fallSeg"><button data-f="1">On</button><button data-f="0">Off</button></div><div class="muted" style="font-size:12px;margin-top:6px">When it's snowing at your spot, flakes drift behind the forecast at the real intensity and wind.</div></div>
   <div class="field">Units<div class="seg" id="unitSeg"><button data-u="imp">Inches · °F · ft</button><button data-u="met">cm · °C · m</button></div></div>
   <div id="ownerBox" hidden><div class="row" style="justify-content:space-between;align-items:center;gap:12px;margin-top:16px"><div><b>App health notices</b><div class="muted">A notification if one of Snowline's data sources breaks, and when it's fixed. Needs lock-screen notifications on.</div></div><button class="tog" id="healthTog" role="switch" aria-label="App health notices"><i></i></button></div>
   <button class="link" id="setStatus" style="margin-top:6px;padding-left:0">Data source status</button></div>
@@ -1290,6 +1294,7 @@ function render(){
     ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
+    <div id="flkRow">${flakeHTML(C, e)}</div>
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
@@ -1330,7 +1335,8 @@ function render(){
   const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); try{ renderReceipt(); }catch(err){}
+  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast();
+  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r) r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); } }); } try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
@@ -1975,7 +1981,7 @@ function showView(){
   VIEWS.forEach(x=>{ const el=$("#view-"+x); if(el) el.style.display = x===v? "" : "none"; });
   document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===v));
   if(S.view && S.view !== v){ saveSpot(); S.prevView = S.view; }
-  const same = S.view === v; S.view = v; updateTop(); if(!same && !restoreSpot(v)) window.scrollTo(0,0);
+  const same = S.view === v; S.view = v; updateTop(); if(v!=="forecast") fallSet(0); else if(!same) fallFromForecast(); if(!same && !restoreSpot(v)) window.scrollTo(0,0);
   const ve = $("#view-"+v); if(ve){ ve.classList.remove("enter"); void ve.offsetWidth; ve.classList.add("enter"); }
   if(v==="maps"){ initBigMap(); renderFinder(); }
   if(v==="favs") renderFavs();
@@ -2781,6 +2787,92 @@ function agreeHTML(C, N, winTot, conf){
 
 
 
+
+/* =====================  Snowflake forecast + falling snow  ===================== */
+// A snowflake's shape is set by the temperature (and moisture) of the cloud it grows in. One small extra request per spot
+// gets temperature and humidity at 4 heights (about 5,000 to 18,000 ft); the storm's flakes are classified from the
+// layers that are saturated, weighted by how much snow falls each hour.
+const FLAKES = {
+  dendrite: {name:"Stellar dendrites", line:"Big, feathery six-armed stars. The fluffiest, lightest powder there is.", fluff:5},
+  plate:    {name:"Plates and stars", line:"Flat six-sided plates and simple stars. Light, soft snow.", fluff:4},
+  column:   {name:"Columns and needles", line:"Tiny needles and columns. Packs down into denser, smooth snow.", fluff:2},
+  rimed:    {name:"Rimed flakes and graupel", line:"Flakes coated in frozen droplets, some like little foam pellets. Heavier, grippy snow.", fluff:2},
+  broken:   {name:"Wind-broken crystals", line:"Strong wind snaps flakes into fragments, which pack into firm, wind-pressed snow.", fluff:1},
+  cold:     {name:"Cold bullets and columns", line:"Small, very cold crystals. Light and dry, but not much loft.", fluff:3},
+};
+function flakeSVG(k, s=44){
+  const c = "#e0f2fe", arm = (a, inner) => `<g transform="rotate(${a} 50 50)">${inner}</g>`, six = inner => [0,60,120,180,240,300].map(a=>arm(a, inner)).join("");
+  const body = {
+    dendrite: six(`<line x1="50" y1="50" x2="50" y2="10" /><line x1="50" y1="30" x2="40" y2="21"/><line x1="50" y1="30" x2="60" y2="21"/><line x1="50" y1="20" x2="43" y2="13"/><line x1="50" y1="20" x2="57" y2="13"/><line x1="50" y1="40" x2="44" y2="34"/><line x1="50" y1="40" x2="56" y2="34"/>`),
+    plate: `<polygon points="50,18 78,34 78,66 50,82 22,66 22,34" fill="rgba(224,242,254,.15)"/>` + six(`<line x1="50" y1="50" x2="50" y2="24"/>`),
+    column: `<polygon points="38,22 62,22 68,30 68,70 62,78 38,78 32,70 32,30" fill="rgba(224,242,254,.12)"/><line x1="44" y1="24" x2="44" y2="76"/><line x1="56" y1="24" x2="56" y2="76"/>`,
+    rimed: `<circle cx="50" cy="50" r="22" fill="rgba(224,242,254,.18)"/>` + [0,40,80,120,160,200,240,280,320].map(a=>`<circle cx="${50+22*Math.cos(a*Math.PI/180)}" cy="${50+22*Math.sin(a*Math.PI/180)}" r="5" fill="${c}"/>`).join("") + `<circle cx="44" cy="45" r="4" fill="${c}"/><circle cx="56" cy="54" r="4" fill="${c}"/>`,
+    broken: `<line x1="30" y1="28" x2="46" y2="42"/><line x1="38" y1="30" x2="34" y2="38"/><line x1="58" y1="60" x2="72" y2="74"/><line x1="64" y1="64" x2="70" y2="60"/><line x1="56" y1="26" x2="66" y2="38"/><line x1="28" y1="64" x2="40" y2="70"/>`,
+    cold: `<polygon points="44,26 56,26 60,32 60,62 56,68 44,68 40,62 40,32" fill="rgba(224,242,254,.12)"/><polygon points="50,70 44,82 56,82" fill="${c}"/>`,
+  }[k] || "";
+  return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" fill="none" stroke="${c}" stroke-width="4" stroke-linecap="round" aria-hidden="true">${body}</svg>`;
+}
+async function loadFlakes(loc){
+  const k = loc.name; S.flk ||= {}; if(S.flk[k]?.at && Date.now() - S.flk[k].at < 60*60e3) return S.flk[k];
+  const L = [850,700,600,500], v = L.flatMap(p=>[`temperature_${p}hPa`, `relative_humidity_${p}hPa`]).join(",");
+  try{ const j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=${v}&forecast_days=10&timezone=auto&models=gfs_seamless`);
+    const h = j.hourly, idx = new Map(h.time.map((t,i)=>[t,i]));
+    S.flk[k] = {at: Date.now(), get: t => { const i = idx.get(t); if(i==null) return null; return L.map(p=>({p, T: h[`temperature_${p}hPa`]?.[i], RH: h[`relative_humidity_${p}hPa`]?.[i], z: {850:1500,700:3000,600:4200,500:5600}[p]})); }};
+  }catch(e){ S.flk[k] = {at: Date.now() - 50*60e3, get: ()=>null}; }
+  return S.flk[k];
+}
+function flakeType(lay, c, e){
+  if(!lay) return null; const cloud = lay.filter(x=>x.z > e - 200 && isNum(x.T) && isNum(x.RH) && x.RH >= 85); if(!cloud.length) return null;
+  if(windM(c) >= 60) return "broken";
+  if(cloud.some(x=>x.T <= -12 && x.T >= -18)) return "dendrite";
+  const warm = cloud.reduce((a,b)=>b.T > a.T? b : a, cloud[0]);
+  if(isNum(c?.Te) && c.Te > -3 && warm.T > -8 && (c.snow||0) >= 0.25) return "rimed";
+  if(warm.T > -4 || (warm.T <= -10 && warm.T > -12) || (warm.T < -18 && warm.T >= -25)) return "plate";
+  if(warm.T <= -4 && warm.T > -10) return "column";
+  return "cold";
+}
+function flakeForecast(C, e){
+  const F = S.flk?.[S.loc?.name]; if(!F?.get) return null;
+  const st = findStorms(C)[0], snowingNow = (C.cons[C.nowIdx]?.snow||0) > 0.02;
+  const a = snowingNow? C.nowIdx : st?.a, b = snowingNow? C.nowIdx + 12 : st?.b; if(a==null) return null;
+  const w = {}; let tot = 0;
+  for(let i=a; i<=Math.min(b, C.cons.length-1); i++){ const c = C.cons[i], s = c?.snow||0; if(s < 0.03) continue; const k = flakeType(F.get(C.time[i]), c, e); if(!k) continue; w[k] = (w[k]||0) + s; tot += s; }
+  if(tot < 0.3) return null; const k = Object.entries(w).sort((x,y)=>y[1]-x[1])[0][0];
+  return {k, share: w[k]/tot, now: snowingNow, when: snowingNow? "Falling now" : `Next storm's flakes`};
+}
+function flakeHTML(C, e){ const f = flakeForecast(C, e); if(!f) return ""; const F = FLAKES[f.k];
+  return `<button class="flk" data-tip="flakes" aria-label="About the snowflake forecast">${flakeSVG(f.k)}<div><span class="muted">${f.when}</span><b>${F.name}</b><small>${F.line}</small></div></button>`; }
+
+// The app snows when it snows: flakes drift behind the forecast at the real intensity and wind angle.
+const Fall = { cv:null, ctx:null, P:[], raf:0, rate:0, dx:0, last:0 };
+function fallSet(rateInHr, windKmh, fromDeg){
+  const off = !rateInHr || rateInHr < 0.03 || matchMedia("(prefers-reduced-motion: reduce)").matches || localStorage.getItem("sl_fall")==="0" || document.documentElement.classList.contains("sun") || (S.view||"forecast")!=="forecast";
+  if(off){ Fall.rate = 0; if(Fall.cv) Fall.cv.style.opacity = 0; cancelAnimationFrame(Fall.raf); Fall.raf = 0; return; }
+  if(!Fall.cv){ Fall.cv = document.createElement("canvas"); Fall.cv.id = "flakes"; document.body.prepend(Fall.cv); Fall.ctx = Fall.cv.getContext("2d"); addEventListener("resize", fallSize); fallSize(); }
+  Fall.rate = rateInHr; const to = ((fromDeg??270) + 180) * Math.PI/180; Fall.dx = Math.sin(to) * Math.min(1, (windKmh||0)/45);
+  const n = Math.round(rateInHr >= 1? 170 : rateInHr >= 0.4? 100 : 45);
+  while(Fall.P.length < n) Fall.P.push(fallFlake(true)); Fall.P.length = n;
+  Fall.cv.style.opacity = 1; if(!Fall.raf){ Fall.last = performance.now(); Fall.raf = requestAnimationFrame(fallTick); }
+}
+function fallSize(){ const d = devicePixelRatio || 1; Fall.cv.width = innerWidth*d; Fall.cv.height = innerHeight*d; Fall.ctx.setTransform(d,0,0,d,0,0); }
+function fallFlake(any){ const r = Math.random()*1.8 + 0.8; return {x: Math.random()*innerWidth, y: any? Math.random()*innerHeight : -8, r, v: 28 + r*22 + Math.random()*20, ph: Math.random()*6.28, o: 0.35 + Math.random()*0.5}; }
+function fallTick(now){
+  const dt = Math.min(0.05, (now - Fall.last)/1000); Fall.last = now; const g = Fall.ctx;
+  if(document.hidden || !Fall.rate){ Fall.raf = 0; return; }
+  g.clearRect(0, 0, innerWidth, innerHeight); g.fillStyle = "#fff";
+  for(const f of Fall.P){ f.ph += dt*1.3; f.y += f.v*dt; f.x += (Fall.dx*f.v*1.4 + Math.sin(f.ph)*10)*dt;
+    if(f.y > innerHeight + 8 || f.x < -20 || f.x > innerWidth + 20){ Object.assign(f, fallFlake(false)); if(Fall.dx > 0.3) f.x = Math.random()*innerWidth*0.7 - 10; else if(Fall.dx < -0.3) f.x = innerWidth*0.3 + Math.random()*innerWidth*0.7 + 10; }
+    g.globalAlpha = f.o; g.beginPath(); g.arc(f.x, f.y, f.r, 0, 6.283); g.fill(); }
+  g.globalAlpha = 1; Fall.raf = requestAnimationFrame(fallTick);
+}
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && Fall.rate && !Fall.raf){ Fall.last = performance.now(); Fall.raf = requestAnimationFrame(fallTick); } });
+function fallFromForecast(){
+  if(!S.ctx?.C) return fallSet(0); const C = S.ctx.C, c = C.cons[C.nowIdx];
+  const nc = S.nc?.[S.loc.name+"|"+Math.round(S.ctx.e)], n = nc? ncAnalyze(nc.m, nc.off) : null;
+  const rate = n? (n.state==="now"? Math.max(n.nowRate, 0.05) : 0) : (c?.snow||0);
+  fallSet(rate, c?.W, c?.WD);
+}
+
 /* =====================  Getting around: back gestures, remembered places, tappable snow bars  ===================== */
 
 // A swipe in from the left edge goes back: closes the open sheet, or returns to the screen you came from.
@@ -2864,7 +2956,10 @@ function dirURL(L){
 function applySun(){ const on = localStorage.getItem("sl_sun")==="1"; document.documentElement.classList.toggle("sun", on);
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", on? "#ffffff" : "#0b1220");
   document.querySelectorAll("#sunSeg button").forEach(b=>b.classList.toggle("on", (b.dataset.s==="1")===on)); }
-document.addEventListener("click", e=>{ const b = e.target.closest("#sunSeg button"); if(!b) return; localStorage.setItem("sl_sun", b.dataset.s); applySun(); });
+function syncFallSeg(){ const on = localStorage.getItem("sl_fall")!=="0"; document.querySelectorAll("#fallSeg button").forEach(b=>b.classList.toggle("on", (b.dataset.f==="1")===on)); }
+document.addEventListener("click", e=>{ const b = e.target.closest("#fallSeg button"); if(!b) return; localStorage.setItem("sl_fall", b.dataset.f); syncFallSeg(); fallFromForecast(); });
+syncFallSeg();
+document.addEventListener("click", e=>{ const b = e.target.closest("#sunSeg button"); if(!b) return; localStorage.setItem("sl_sun", b.dataset.s); applySun(); fallFromForecast(); });
 applySun();
 
 /* =====================  Snow countdown (live) + storm receipts  ===================== */
@@ -2905,7 +3000,7 @@ function renderNowcast(){
       <div class="nc-s">${n.totIn >= 0.3? `About ${fmtSnow(n.totIn, n.totIn<1?1:0)} more` : "Light"}${n.endMs? ` · lets up around ${ncClock(n.endMs)}` : " · keeps going for a while"}${n.peakRate >= 0.8 && n.peakMs > Date.now()+20*60e3? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
   else if(n?.state==="rain") h = `<div class="nc nc-rain"><div class="nc-i">🌧️</div><div><div class="nc-t">Rain in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
       <div class="nc-s">Starts around ${ncClock(n.startMs)} at ${fmtEl(S.ctx.e)}${n.snowMs? ` · turns to snow around ${ncClock(n.snowMs)}` : ""}</div></div></div>`;
-  el.innerHTML = h;
+  el.innerHTML = h; fallFromForecast();
   clearInterval(S.ncTick); if(h.includes("data-nc")) S.ncTick = setInterval(()=>{ const b = $("#ncStrip [data-nc]"); if(!b){ clearInterval(S.ncTick); return; } const ms = +b.dataset.nc; if(ms <= Date.now()) { clearInterval(S.ncTick); renderNowcast(); } else b.textContent = ncIn(ms); }, 30e3);
 }
 
@@ -3098,6 +3193,9 @@ function renderMeissner(){
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
+  flakes: () => ["Snowflake forecast", `<p>A snowflake's shape is set by the <b>temperature of the cloud it grows in</b>. Snowline checks the temperature and moisture at four heights above the mountain (about 5,000 to 18,000 ft) for each hour of the storm.</p>
+    <p><b>Stellar dendrites</b> grow around 0 to −6°F (−12 to −18°C) and make the lightest, fluffiest powder. <b>Needles and columns</b> grow around 14 to 25°F (−4 to −10°C) and pack down denser. <b>Rimed flakes and graupel</b> collect frozen droplets in milder, wetter storms. <b>Strong wind</b> breaks crystals into fragments that pack firm.</p>
+    <p class="muted">An estimate from forecast temperatures aloft. Real storms usually bring a mix; this is the most common type.</p>`],
   quality: () => ["Ski quality", qualityExplainHTML()],
   conf: () => ["Confidence", `<p><b>How sure Snowline is</b> about the snow total for the next 5 days at this elevation, based on how much the weather models agree.</p>
     <p>The <b>white mark</b> is Snowline's forecast. The <b>blue band</b> is the likely range: where most of the models land.</p>
