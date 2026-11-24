@@ -583,7 +583,7 @@ h1,.lt b,#ltName{letter-spacing:-.5px}
 .verdict i{flex:0 0 10px;height:10px;border-radius:50%;background:var(--q,#6ee7a0);box-shadow:0 0 0 4px color-mix(in srgb,var(--q,#6ee7a0) 22%,transparent)}
 .verdict > span:not(.sc){flex:1;min-width:0}.verdict .sc{flex:0 0 auto}.verdict.v-go{--q:#6ee7a0}.verdict.v-ok{--q:#7dd3fc}.verdict.v-meh{--q:#fde68a}.verdict.v-skip{--q:#fca5a5}
 .wk-r{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;border-top:1px solid #1f1f22;padding:11px 0;text-align:left;color:inherit}.wk-r:first-of-type{border-top:0}
-.wk-n{flex:0 0 26px;height:26px;border-radius:50%;background:#1c1c1f;color:var(--mute);font-weight:700;font-size:13px;display:grid;place-items:center}.wk-n.top{background:var(--ice2);color:#04121f}
+.wk-n{flex:0 0 26px;height:26px;border-radius:50%;background:#1c1c1f;color:var(--mute);font-weight:700;font-size:13px;display:grid;place-items:center}.wk-n.wk-top{background:var(--ice2);color:#04121f}
 .wk-t{flex:1;min-width:0}.wk-t b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wk-t small{color:var(--mute);font-size:12.5px}
 .fb-link{display:block;margin:10px auto 0;font-size:12.5px;color:var(--mute)}
 .fb-k{display:flex;flex-wrap:wrap;gap:8px}.fb-k button{background:#1c1c1f;border:1px solid #2a2a2e;border-radius:999px;padding:8px 13px;font-size:14px;color:var(--text)}.fb-k button.on{background:var(--ice2);border-color:var(--ice2);color:#04121f;font-weight:600}
@@ -2716,7 +2716,7 @@ function weekendHTML(list, rows){
   const pick = days.includes(S.wkDay)? S.wkDay : days[0], R = rankWeekend(rows.filter(r=>list.some(s=>s.name===r.spot.name)), pick);
   if(!R.length) return "";
   return `<div class="card wk"><div class="card-h"><h2>This weekend</h2>${days.length>1? `<div class="seg sm" id="wkSeg">${days.map(d=>`<button data-d="${d}" class="${d===pick?"on":""}">${d===todayStr()? "Today" : dow(d)}</button>`).join("")}</div>` : `<span class="muted">${dayLabel(pick)}</span>`}</div>
-    ${R.slice(0,5).map((x,i)=>`<button class="wk-r" data-n="${encodeURIComponent(x.r.spot.name)}"><span class="wk-n ${i===0?"top":""}">${i+1}</span><span class="wk-t"><b>${esc(x.r.spot.name.replace(/, [A-Z]{2}$/,""))}</b><small>${x.why}${x.drive!=null? ` · ${fmtDrive(x.drive)} from ${HOME.name}` : ""}</small></span>${scoreChip(x.s)}</button>`).join("")}
+    ${R.slice(0,5).map((x,i)=>`<button class="wk-r" data-n="${encodeURIComponent(x.r.spot.name)}"><span class="wk-n ${i===0?"wk-top":""}">${i+1}</span><span class="wk-t"><b>${esc(x.r.spot.name.replace(/, [A-Z]{2}$/,""))}</b><small>${x.why}${x.drive!=null? ` · ${fmtDrive(x.drive)} from ${HOME.name}` : ""}</small></span>${scoreChip(x.s)}</button>`).join("")}
     <div class="muted" style="font-size:11.5px;margin-top:6px">Ranked for ${MODE_NAME[S.mode].toLowerCase()} by fresh snow, temperature, wind and rain. Drive times are estimates.</div></div>`;
 }
 
