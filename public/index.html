@@ -1000,10 +1000,12 @@ async function load(loc){
   const ref = ((loc.base+loc.top)/2)/FT; // reference elevation (m) = mid-mountain
   const mem = MEM.get(loc.name);
   if(mem && Date.now()-mem.t < MEM_TTL){ loadExtras(loc); S.data = mem.data; S.season = mem.data.seasonCache || null; S.outlook = mem.data.outlookCache || null; $("#upd").classList.remove("on"); $("#app").classList.remove("stale"); await libsReady; if(S.loc===loc) render(); return; }
-  const snap = (store.get("snap", {}) || {})[loc.name];
-  if(snap && Date.now()-snap.t < 8*3600e3){ $("#app").innerHTML = snap.html; $("#app").classList.add("stale"); }   // a forecast older than 8 h only shows if the models can't be reached
+  const keep = S.shownLoc === loc.name && S.data && $("#app").querySelector("#snowCard");   // refreshing the page you're on: leave it up
+  const snap = keep? null : await getSnap(loc.name); if(S.loc !== loc) return;
+  if(keep) $("#app").classList.add("stale");
+  else if(snap && Date.now()-snap.t < 36*3600e3){ $("#app").innerHTML = snap.html; $("#app").classList.add("stale"); }
   else $("#app").innerHTML = `<div class="skel" style="height:64px"></div><div class="skel" style="height:230px"></div><div class="skel" style="height:190px"></div><div class="skel" style="height:150px"></div>`;
-  $("#upd").classList.add("on"); S.data = null; updateTop();
+  $("#upd").classList.add("on"); if(!keep) S.data = null; updateTop();
   // fire everything at once; show the forecast once most models are in (6s cap), let stragglers patch in
   const detPs = MODELS.map(m=>fetchDet(m, loc, ref));
   const ensPs = ENS.map(m=>fetchEns(m, loc, ref));
@@ -1022,8 +1024,9 @@ async function load(loc){
   const models = {}; det.forEach((d,i)=>{ if(d && d!==TIMEOUT) models[MODELS[i].id] = d; });
   const first = Object.values(models).sort((a,b)=>b.time.length-a.time.length)[0];   // models now cover different ranges: use the longest as the timeline
   $("#upd").classList.remove("on"); $("#app").classList.remove("stale");
+  if(!first && keep){ toast(navigator.onLine===false? "No signal · showing the last forecast" : "Couldn't refresh · showing the last forecast"); return; }
   if(!first){
-    const limited = S.omLimited && Date.now()-S.omLimited < 120e3, sn = (store.get("snap", {}) || {})[loc.name];
+    const limited = S.omLimited && Date.now()-S.omLimited < 120e3, sn = await getSnap(loc.name);
     const why = limited ? "Open-Meteo, the free weather service Snowline uses, limits how many forecasts one network can ask for in an hour, and this network hit that limit. It resets within the hour, and Snowline will try again on its own." : "Couldn't reach the forecast models. Pull down to try again.";
     if(sn && Date.now()-sn.t < 36*3600e3){ $("#app").innerHTML = `<div class="callout rain">⏳ <b>Showing the forecast from ${new Date(sn.t).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"})}.</b> ${why}</div>` + sn.html; $("#app").classList.add("stale"); }
     else $("#app").innerHTML = `<div class="card"><h2>${limited? "Weather service busy" : "No connection"}</h2><div class="muted" style="margin-top:6px">${why}</div></div>`;
@@ -1274,6 +1277,7 @@ function render(){
 
   const nIn = Object.keys(D.models).length, longIn = Object.keys(D.models).filter(id=>id!=="hrrr").length;
   const modelNote = nIn < MODELS.length-2 ? `<div class="callout rain">⏳ <b>${nIn} of ${MODELS.length} models loaded.</b> ${longIn<3? "The forecast past 2 days is incomplete until more arrive." : "The rest are still coming in."}${S.omLimited && Date.now()-S.omLimited<15*60e3? " Open-Meteo, the free weather service, has hit its hourly limit for this network; it resets within the hour." : ""} ${D.retrying? "Retrying now…" : `<a href="#" id="modelRetry">Try again</a>`}</div>` : "";
+  S.shownLoc = S.loc.name;
   const glance = glanceHTML(C, slNow);
   $("#app").innerHTML = `
   ${a2hsHTML()}${modelNote}
@@ -2271,9 +2275,18 @@ async function renderOutlook(){
 
 
 /* ================= Polish helpers ================= */
+// The last good forecast page for each spot, kept in Cache Storage (the old localStorage copy outgrew its ~5 MB limit
+// and silently stopped saving). Shown instantly on open while fresh data loads.
+const SNAP_CACHE = "snowline-snaps", snapKey = n => "/__snap/" + encodeURIComponent(n);
+const SNAPS = new Map();   // in-memory copy so a spot opens with zero wait
 function saveSnap(loc){ if(S.data && Object.keys(S.data.models).filter(id=>id!=="hrrr").length < 4) return;   // only keep complete forecasts as the fallback copy
-  try{ const all = store.get("snap", {}) || {}; all[loc.name] = {t:Date.now(), html:$("#app").innerHTML};
-  const keys = Object.keys(all).sort((a,b)=>all[b].t-all[a].t); keys.slice(4).forEach(k=>delete all[k]); store.set("snap", all); }catch(e){} }
+  const html = $("#app").innerHTML, s = {t: Date.now(), html}; SNAPS.set(loc.name, s);
+  try{ caches.open(SNAP_CACHE).then(async c=>{ await c.put(snapKey(loc.name), new Response(html, {headers:{"content-type":"text/html","x-at":String(s.t)}}));
+    const keys = await c.keys(); if(keys.length > 8){ const ages = await Promise.all(keys.map(async k=>[k, +((await c.match(k))?.headers.get("x-at"))||0])); ages.sort((a,b)=>a[1]-b[1]).slice(0, keys.length-8).forEach(([k])=>c.delete(k)); } }).catch(()=>{}); }catch(e){} }
+async function getSnap(name){ if(SNAPS.has(name)) return SNAPS.get(name);
+  try{ const c = await caches.open(SNAP_CACHE), r = await c.match(snapKey(name)); if(r){ const s = {t: +r.headers.get("x-at")||0, html: await r.text()}; SNAPS.set(name, s); return s; } }catch(e){} return null; }
+try{ localStorage.removeItem("snowline_snap"); }catch(e){}   // free the space the old copies took
+(async()=>{ try{ const c = await caches.open(SNAP_CACHE); for(const k of await c.keys()){ const r = await c.match(k); if(r) SNAPS.set(decodeURIComponent(new URL(k.url).pathname.slice(8)), {t:+r.headers.get("x-at")||0, html: await r.text()}); } }catch(e){} })();
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
 /* A new version was saved in the background: offer it without interrupting. */
 if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e=>{ if(e.data?.type!=="app-updated" || document.querySelector(".upd-bar")) return;
@@ -2288,7 +2301,7 @@ function a2hsHTML(){
   if(!APP.mobile || (store.get("visits",0) < 2 && !S.favs.length) || Date.now() < store.get("a2hsSnooze",0)) return "";
   return `<div class="callout tip ih" id="a2hs"><img src="/icon-192.png" alt="" width="40" height="40"><div><b>Add Snowline to your Home Screen</b><br><span class="muted">Opens like an app, one tap to your spots.</span><br><button class="link ih-go" onclick="openInstall()">Show me how</button></div><button class="ih-x" aria-label="Not now" onclick="store.set('a2hsSnooze',Date.now()+21*864e5);this.parentElement.remove()">✕</button></div>`;
 }
-async function refreshView(){ S.freshAsk = Date.now() + 30e3; const v=S.view||"forecast"; if(v==="forecast" && S.loc){ const all=store.get("snap",{})||{}; delete all[S.loc.name]; store.set("snap",all); await load(S.loc); } else if(v==="favs") await renderFavs(true); else if(v==="finder") await renderFinder(true); else if(v==="maps") await drawGrid(); }
+async function refreshView(){ S.freshAsk = Date.now() + 30e3; const v=S.view||"forecast"; if(v==="forecast" && S.loc){ MEM.delete(S.loc.name); await load(S.loc); } else if(v==="favs") await renderFavs(true); else if(v==="finder") await renderFinder(true); else if(v==="maps") await drawGrid(); }
 // scroll: compact title + auto-hide controls
 (function(){ let lastY=0; addEventListener("scroll",()=>{ const y=scrollY; $("#top").classList.toggle("scrolled", y>44);
   const c=$("#ctrl"); if(c){ if(y>lastY+6 && y>220) c.classList.add("hide"); else if(y<lastY-6 || y<160) c.classList.remove("hide"); } lastY=y; }, {passive:true}); })();
