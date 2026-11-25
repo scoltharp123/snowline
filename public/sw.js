@@ -1,7 +1,7 @@
 // Snowline service worker: offline app + saved forecasts, and push notifications
-const V = "snowline-v37";
+const V = "snowline-v38";
 const TRAILMAPS = "sl-trailmaps";   // official trail maps the user chose to download; kept across app updates
-const SHELL = ["/", "/index.html", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
+const SHELL = ["/", "/index.html", "/app.js?v=__APPV__", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
 const WEATHER = /(^|\.)open-meteo\.com$/;
 const STATIC_CDN = /(cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)$/;
 
@@ -51,6 +51,7 @@ self.addEventListener("fetch", (e) => {
     // Trail maps: the downloaded copy if there is one, otherwise straight from the network (not auto-cached; they're large).
     if (u.pathname.startsWith("/tm/")) { e.respondWith(caches.open(TRAILMAPS).then(c => c.match(req)).then(hit => hit || fetch(req))); return; }
     if (req.mode === "navigate" && (u.pathname === "/" || u.pathname === "/index.html")) { e.respondWith(appShell(e)); return; }
+    if (u.pathname === "/app.js") { e.respondWith(cacheFirst(req)); return; }   // fingerprinted: a new version has a new address
     if (req.mode === "navigate") { e.respondWith(networkFirst(req, 2500).catch(() => caches.match("/"))); return; }
     e.respondWith(networkFirst(req, u.pathname.startsWith("/api/pistes") ? 20000 : u.pathname.startsWith("/api/") ? 12000 : 6000)); return;
   }

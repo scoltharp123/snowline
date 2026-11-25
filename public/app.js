@@ -1,0 +1,4175 @@
+/* ================= Config ================= */
+const PRESETS = [
+  {name:"Mt. Bachelor, OR", lat:43.979, lon:-121.688, base:6300, top:9065},
+  {name:"Meissner Nordic (Bend), OR", lat:44.006, lon:-121.548, base:5350, top:5900},
+  {name:"Elk Lake Resort (Nordic), OR", lat:43.978, lon:-121.808, base:4900, top:5300},
+  {name:"Mt. Bachelor Nordic Center, OR", lat:43.988, lon:-121.676, base:6300, top:6700},
+  {name:"Methow Valley Trails, WA", lat:48.594, lon:-120.405, base:1750, top:3500},
+  {name:"Hoodoo, OR", lat:44.408, lon:-121.871, base:4668, top:5703},
+  {name:"Willamette Pass, OR", lat:43.597, lon:-122.034, base:5120, top:6683},
+  {name:"Mt. Hood Meadows, OR", lat:45.331, lon:-121.665, base:4523, top:7300},
+  {name:"Timberline, OR", lat:45.331, lon:-121.711, base:4850, top:8540},
+  {name:"Mt. Ashland, OR", lat:42.080, lon:-122.716, base:6350, top:7533},
+  {name:"Crystal Mountain, WA", lat:46.935, lon:-121.475, base:4400, top:7012},
+  {name:"Stevens Pass, WA", lat:47.745, lon:-121.089, base:4061, top:5845},
+  {name:"Mt. Baker, WA", lat:48.857, lon:-121.665, base:3500, top:5089},
+  {name:"Whistler Blackcomb, BC", lat:50.115, lon:-122.949, base:2214, top:7494},
+  {name:"Birkie Trail (Cable, WI)", lat:46.207, lon:-91.290, base:1380, top:1750},
+  {name:"Mt. Spokane, WA", lat:47.922, lon:-117.098, base:3818, top:5883},
+  {name:"Mission Ridge, WA", lat:47.292, lon:-120.400, base:4570, top:6820},
+  {name:"Teacup Lake Nordic (Mt. Hood), OR", lat:45.307, lon:-121.640, base:4250, top:4600},
+  {name:"Anthony Lakes, OR", lat:44.961, lon:-118.229, base:7100, top:8000},
+  {name:"Mt. Washington Alpine, BC", lat:49.742, lon:-125.288, base:3500, top:5215},
+  {name:"Tumalo Mountain, OR", lat:44.0054, lon:-121.6427, base:6350, top:7779, bc:{from:"Dutchman Flat Sno-Park", th:[44.0018,-121.6656]}},
+  {name:"Ball Butte, OR", lat:44.0659, lon:-121.6765, base:6350, top:8091, bc:{from:"Dutchman Flat Sno-Park", th:[44.0018,-121.6656]}},
+  {name:"Broken Top, OR", lat:44.0831, lon:-121.6989, base:6350, top:9177, bc:{from:"Dutchman Flat Sno-Park", th:[44.0018,-121.6656]}},
+  {name:"Tam McArthur Rim, OR", lat:44.0934, lon:-121.6495, base:6550, top:7732, bc:{from:"Three Creek Lake (snowmobile or ski in from Upper Three Creek Sno-Park)"}},
+  {name:"South Sister, OR", lat:44.1035, lon:-121.7693, base:5450, top:10358, bc:{from:"Devils Lake trailhead (road closed in winter)"}},
+  {name:"Paulina Peak, OR", lat:43.6892, lon:-121.2548, base:6330, top:7984, bc:{from:"Paulina Lake (road closed in winter)"}}
+];
+const MODELS = [
+  {id:"ecmwf", name:"ECMWF IFS",   api:["ecmwf_ifs025"], w:1.4, c:"#60a5fa", days:15},
+  {id:"aifs",  name:"ECMWF AIFS",  api:["ecmwf_aifs025_single","ecmwf_aifs025"], w:1.0, c:"#22d3ee", days:15},
+  {id:"gfs",   name:"GFS",         api:["gfs_seamless"], w:1.0, c:"#f472b6", days:16},
+  {id:"hrrr",  name:"HRRR (48h)",  api:["ncep_hrrr_conus","gfs_hrrr"], w:1.3, c:"#fb923c", days:3},
+  {id:"nbm",   name:"NBM",         api:["ncep_nbm_conus"], w:1.2, c:"#facc15", days:11},
+  {id:"gem",   name:"GEM",         api:["gem_seamless"], w:1.0, c:"#f87171", days:10},
+  {id:"icon",  name:"ICON",        api:["icon_seamless"], w:1.0, c:"#4ade80", days:8},
+  {id:"ukmo",  name:"UKMO",        api:["ukmo_seamless"], w:1.0, c:"#c084fc", days:7},
+  {id:"jma",   name:"JMA",         api:["jma_seamless"], w:0.7, c:"#94a3b8", days:11},
+];
+const ENS = [
+  {id:"ecmwf_ens", name:"ECMWF ENS", api:["ecmwf_ifs025"]},
+  {id:"gfs_ens",   name:"GFS ENS",   api:["gfs025","gfs_seamless"]},
+];
+const LAPSE = 0.0065, FT = 3.28084;
+const DET_VARS = "temperature_2m,precipitation,freezing_level_height,wind_speed_10m,wind_gusts_10m,cloud_cover,shortwave_radiation,wind_speed_850hPa,wind_speed_700hPa,relative_humidity_2m,wind_direction_10m";
+
+/* ================= State ================= */
+const store = {
+  get(k,d){try{const v=localStorage.getItem("snowline_"+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("snowline_"+k,JSON.stringify(v))}catch(e){}}
+};
+const S = {
+  loc: null, mode: store.get("mode","alpine"), band: store.get("band","summit"), win: store.get("win",5), units: store.get("units","imp"),
+  enabled: store.get("enabled", Object.fromEntries(MODELS.map(m=>[m.id,true]))),
+  favs: store.get("favs", []), data: null, charts: {}
+};
+
+/* ================= Helpers ================= */
+const $ = s => document.querySelector(s);
+const clamp = (x,a,b) => Math.max(a,Math.min(b,x));
+const isNum = v => typeof v === "number" && isFinite(v);
+const imp = () => S.units === "imp";
+const fmtSnow = (inch, d) => { if(!isNum(inch)) return "—"; const v = imp()? inch : inch*2.54; const dd = d ?? (v<10?1:0); return v.toFixed(dd) + (imp()? '"' : " cm"); };
+const snowNum = inch => imp()? inch : inch*2.54;
+const fmtT = c => !isNum(c) ? "—" : imp()? Math.round(c*9/5+32)+"°" : Math.round(c)+"°";
+const fmtEl = m => { if(!isNum(m)) return "—"; m=Math.max(0,m); return imp()? (Math.round(m*FT/10)*10).toLocaleString()+" ft" : Math.round(m).toLocaleString()+" m"; };
+const fmtWind = kmh => !isNum(kmh) ? "—" : imp()? Math.round(kmh*0.621371)+"" : Math.round(kmh)+"";
+const windU = () => imp()? "mph":"km/h";
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function dateAdd(d, n){ const t = new Date(d+"T12:00:00Z"); t.setUTCDate(t.getUTCDate()+n); return t.toISOString().slice(0,10); }
+function dow(d){ return DOW[new Date(d+"T12:00:00Z").getUTCDay()]; }
+function md(d){ const t=new Date(d+"T12:00:00Z"); return (t.getUTCMonth()+1)+"/"+t.getUTCDate(); }
+function periodOf(t){ let d=t.slice(0,10), h=+t.slice(11,13); if(h<6) return [dateAdd(d,-1),"night"]; return [d, h<18?"day":"night"]; }
+function pct(arr,p){ if(!arr.length) return null; const a=[...arr].sort((x,y)=>x-y); const i=(a.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i); return a[lo]+(a[hi]-a[lo])*(i-lo); }
+function getVar(h, name){ if(h[name]) return h[name]; const k=Object.keys(h).find(k=>k.startsWith(name+"_") && !/_member\d+/.test(k.slice(name.length))); return k? h[k] : null; }
+function snowColor(inch){ if(!isNum(inch)||inch<0.1) return "transparent"; if(inch<1) return "#12304a"; if(inch<3) return "#14507a"; if(inch<6) return "#1d6fb0"; if(inch<12) return "#4f46e5"; if(inch<24) return "#7c3aed"; return "#c026d3"; }
+
+/* ================= Snow physics ================= */
+// Snow-to-liquid ratio from temperature at elevation (Kuchera-style, °C)
+function slr(Te){ const s = Te > -2 ? 12 + 2*(-2 - Te) : 12 + (-2 - Te); return clamp(s, 4, 22); }
+// Fraction of precip falling as snow at elevation e (m)
+function snowFrac(Te, FL, e){
+  const fT = clamp((3.5 - Te)/2.5, 0, 1);
+  if(!isNum(FL)) return fT;
+  const fL = clamp((e - (FL - 450))/300, 0, 1); // snow level ≈ FL-300m, ±150m blend
+  return Math.min(fT, fL);
+}
+// returns {snow(in), Te, slr, sl(m)}
+function snowAt(P, Tref, FLmodel, ref, e){
+  if(!isNum(P) || !isNum(Tref)) return null;
+  const Te = Tref + LAPSE*(ref - e);
+  const FL = (isNum(FLmodel) && FLmodel > 0) ? FLmodel : ref + Tref/LAPSE;
+  const f = snowFrac(Te, FL, e), r = slr(Te);
+  return { snow: (P/25.4)*r*f, Te, slr:r, frac:f, sl: FL - 300 };
+}
+
+/* ================= Data ================= */
+// a storm-watch notification opens the forecast with the share card ready
+if(location.hash==="#share"){ S.pendingShare = true; history.replaceState(null, "", location.pathname + location.search + "#forecast"); }
+/* Charts and maps load on demand (they're never above the fold), so the forecast paints without waiting for them.
+   Until Chart.js arrives, "new Chart(...)" queues the chart and draws it the moment the library is ready. */
+const LIBS = { chart:"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js", leaflet:"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js", leafletCss:"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" };
+const libP = {};
+function loadScript(u){ return new Promise((res, rej)=>{ const s = document.createElement("script"); s.src = u; s.async = true; s.onload = res; s.onerror = ()=>{ s.remove(); rej(new Error("load "+u)); }; document.head.appendChild(s); }); }
+const chartQ = [];
+class PendingChart { constructor(el, cfg){ this.el = el; this.cfg = cfg; chartQ.push(this); needChart(); } destroy(){ this.dead = true; if(this.real) this.real.destroy(); } }
+if(!window.Chart) window.Chart = PendingChart;
+function needChart(){
+  if(window.Chart && window.Chart !== PendingChart) return Promise.resolve();
+  return libP.chart ||= loadScript(LIBS.chart).then(()=>{ const Real = window.Chart; chartQ.splice(0).forEach(p=>{ if(!p.dead && p.el && p.el.isConnected){ try{ p.real = new Real(p.el, p.cfg); }catch(e){} } }); })
+    .catch(e=>{ libP.chart = null; window.Chart = PendingChart; throw e; });
+}
+function needMap(){
+  if(window.L && window.L.map) return Promise.resolve();
+  return libP.map ||= new Promise((res, rej)=>{ const l = document.createElement("link"); l.rel = "stylesheet"; l.href = LIBS.leafletCss; document.head.appendChild(l);
+    Promise.all([new Promise(r=>{ l.onload = r; l.onerror = r; }), loadScript(LIBS.leaflet)]).then(res, e=>{ libP.map = null; rej(e); }); });
+}
+const libsReady = Promise.resolve();
+// Warm both up once the forecast is on screen, so opening a map or chart is instant.
+function warmLibs(){ const go = ()=>{ needChart().catch(()=>{}); needMap().catch(()=>{}); }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:4000}) : setTimeout(go, 2500); }
+// Open-Meteo answers 429 when busy (per phone/network); retry busy, server and network errors with growing waits.
+const OM_CACHE = "om-answers-v1";
+const isOM = u => /open-meteo\.com\//.test(u) && !/geocoding-api|\/elevation\?/.test(u);
+const omMaxAge = () => (S.freshAsk && Date.now() < S.freshAsk) ? 10*60e3 : 60*60e3;   // pull-to-refresh accepts answers up to 10 min old
+async function omCacheGet(url){ try{ const c = await caches.open(OM_CACHE), hit = await c.match(url); if(hit && Date.now() - (+hit.headers.get("x-at")||0) < omMaxAge()) return await hit.json(); }catch(e){} return null; }
+function omCachePut(url, j){ try{ caches.open(OM_CACHE).then(c=>c.put(url, new Response(JSON.stringify(j), {headers:{"content-type":"application/json","x-at":String(Date.now())}}))).catch(()=>{}); }catch(e){} }
+(async()=>{ try{ const c = await caches.open(OM_CACHE); for(const req of await c.keys()){ const r = await c.match(req); if(!r || Date.now() - (+r.headers.get("x-at")||0) > 24*3600e3) await c.delete(req); } }catch(e){} })();   // tidy old answers
+const omInflight = new Map();   // the same request asked twice at once goes out once
+async function getJSON(url, tries=3, wait=1500){
+  if(isOM(url)){ const hit = await omCacheGet(url); if(hit) return hit;
+    if(omInflight.has(url)) return omInflight.get(url);
+    const p = getJSONnet(url, tries, wait).then(j=>{ omCachePut(url, j); return j; })
+      .catch(async err=>{ try{ const c = await caches.open(OM_CACHE), hit = await c.match(url); if(hit){ S.usedOld = +hit.headers.get("x-at")||1; return await hit.json(); } }catch(e){} throw err; })
+      .finally(()=>omInflight.delete(url)); omInflight.set(url, p); return p; }
+  return getJSONnet(url, tries, wait);
+}
+async function getJSONnet(url, tries=3, wait=1500){
+  let r; try{ r = await fetch(url); }catch(e){ if(tries>1){ await new Promise(z=>setTimeout(z, wait)); return getJSONnet(url, tries-1, wait*2.5); } throw e; }
+  if((r.status===429 || r.status>=500) && tries>1){ await new Promise(z=>setTimeout(z, wait+Math.random()*800)); return getJSONnet(url, tries-1, wait*2.5); }
+  if(r.status===429){ S.omLimited = Date.now(); } if(!r.ok) throw new Error(r.status); const j = await r.json(); if(j.error) throw new Error(j.reason||"error"); S.omLimited = 0; return j; }
+async function fetchDet(m, loc, ref){
+  for(const api of m.api){
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&hourly=${DET_VARS}&models=${api}&timezone=auto&past_days=3&forecast_days=${m.days||16}`;
+    try{
+      const j = await getJSON(url); const h = j.hourly;
+      const P = getVar(h,"precipitation");
+      if(!P || !P.some(isNum)) continue;
+      return { time:h.time, offset:j.utc_offset_seconds, tz:j.timezone_abbreviation, P, T:getVar(h,"temperature_2m"), FL:getVar(h,"freezing_level_height"), W:getVar(h,"wind_speed_10m"), G:getVar(h,"wind_gusts_10m"), SD:getVar(h,"snow_depth"), CC:getVar(h,"cloud_cover"), SW:getVar(h,"shortwave_radiation"), W8:getVar(h,"wind_speed_850hPa"), W7:getVar(h,"wind_speed_700hPa"), RH:getVar(h,"relative_humidity_2m"), WD:getVar(h,"wind_direction_10m") };
+    }catch(e){}
+  }
+  return null;
+}
+async function fetchEns(m, loc, ref){
+  for(const api of m.api){
+    const url = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&hourly=temperature_2m,precipitation&models=${api}&timezone=auto&forecast_days=15`;
+    try{
+      const j = await getJSON(url); const h = j.hourly; const members = [];
+      for(const k of Object.keys(h)){
+        if(!k.startsWith("precipitation")) continue;
+        const suf = k.slice("precipitation".length);
+        const T = h["temperature_2m"+suf]; if(!T) continue;
+        if(h[k].some(isNum)) members.push({P:h[k], T});
+      }
+      if(members.length) return { time:h.time, members };
+    }catch(e){}
+  }
+  return null;
+}
+// in-memory cache so hopping between spots is instant
+const MEM = new Map(); const MEM_TTL = 20*60e3;
+let renderTimer;
+function scheduleRender(loc){ clearTimeout(renderTimer); renderTimer = setTimeout(()=>{ if(S.loc===loc && S.data){ const y=scrollY; render(); scrollTo(0,y); saveSnap(loc); } }, 350); }
+/* Each spot only offers the modes that make sense there, so Alpine and Nordic never mix:
+   an alpine resort shows Alpine + Tour, a Nordic center shows Skate + Classic, anywhere else shows all four. */
+const ALPINE_ONLY = new Set(["Mt. Bachelor, OR", "Hoodoo, OR"]);
+const isNordicArea = loc => /Nordic|Sno-?Park|Trails\b|XC|Elk Lake|Birkie/i.test(loc?.name||"") && !ALPINE_ONLY.has(loc?.name);
+function modesFor(loc){ if(!loc) return ["alpine","skate","classic","bc"]; if(ALPINE_ONLY.has(loc.name)) return ["alpine","bc"]; if(isNordicArea(loc)) return ["skate","classic"]; return ["alpine","skate","classic","bc"]; }
+function showModes(loc){ const ok = modesFor(loc); document.querySelectorAll("#modeSeg button").forEach(b=>{ b.hidden = !ok.includes(b.dataset.m); b.style.display = b.hidden? "none" : ""; }); }
+function syncModeFor(loc){
+  const isTour = !!loc.bc;
+  if(isTour && S.mode!=="bc"){ S.prevMode = S.mode; S.autoBC = true; setMode("bc"); }
+  else if(!isTour && S.mode==="bc" && S.autoBC){ S.autoBC = false; setMode(S.prevMode || "alpine"); }
+  const ok = modesFor(loc);
+  if(!ok.includes(S.mode)){ const ln = store.get("lastNordic","skate"); setMode(ok.includes(ln)? ln : ok[0]); }
+  showModes(loc);
+  if(S.mode==="skate" || S.mode==="classic") store.set("lastNordic", S.mode);
+}
+/* Elevation follows the sport: Nordic forecasts the trails (base), Alpine mid-mountain, Tour the summit. Tapping the forecast-point line overrides it per sport. */
+function bandFor(m){ return store.get("band_"+m, null) || ({skate:"base", classic:"base", alpine:"mid", bc:"summit"}[m] || "mid"); }
+function applyBand(){ S.band = bandFor(S.mode); store.set("band", S.band); }
+function openBandPicker(){
+  const L = S.loc; if(!L) return; const opts = [["base","Base",L.base],["mid","Mid-mountain",(L.base+L.top)/2],["summit","Summit",L.top]], def = ({skate:"base", classic:"base", alpine:"mid", bc:"summit"})[S.mode];
+  $("#tipTitle").textContent = "Forecast elevation";
+  $("#tipBox").innerHTML = `<p class="muted" style="margin:0 0 10px">Snow and temperature change a lot with height. Snowline picks ${({base:"the base",mid:"mid-mountain",summit:"the summit"})[def]} for ${MODE_NAME[S.mode]}; choose another if you like.</p>
+    <div class="list">${opts.map(([k,l,ft])=>`<button class="li" data-bp="${k}" style="width:100%;text-align:left"><span class="nm"><b>${l}${k===def? " · default" : ""}</b><small>${fmtEl(ft/FT)}</small></span>${S.band===k? '<span style="color:var(--ice);font-weight:700">✓</span>' : ""}</button>`).join("")}</div>`;
+  $("#tipBox").querySelectorAll("[data-bp]").forEach(b=>b.onclick=()=>{ const k = b.dataset.bp; if(k===def) store.del? store.del("band_"+S.mode) : store.set("band_"+S.mode, null); else store.set("band_"+S.mode, k); applyBand(); closeSheet("tipSheet"); render(); });
+  openSheet("tipSheet");
+}
+function setMode(m){ S.mode = m; store.set("mode", m); applyBand(); document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===m)); if(m==="bc") bcAcknowledge(); }
+async function load(loc){
+  syncModeFor(PRESETS.find(p=>p.name===loc.name) || loc);
+  S.loc = loc; store.set("last", loc); S.usedOld = 0; S.selDay = null; S.avyMini = null; S.avyLabel = ""; S.season = null; S.outlook = null;
+  const ref = ((loc.base+loc.top)/2)/FT; // reference elevation (m) = mid-mountain
+  const mem = MEM.get(loc.name);
+  if(mem && Date.now()-mem.t < MEM_TTL){ loadExtras(loc); S.data = mem.data; S.season = mem.data.seasonCache || null; S.outlook = mem.data.outlookCache || null; $("#upd").classList.remove("on"); $("#app").classList.remove("stale"); await libsReady; if(S.loc===loc) render(); return; }
+  const keep = S.shownLoc === loc.name && S.data && $("#app").querySelector("#snowCard");   // refreshing the page you're on: leave it up
+  const snap = keep? null : await getSnap(loc.name); if(S.loc !== loc) return;
+  if(keep) $("#app").classList.add("stale");
+  else if(snap && Date.now()-snap.t < 36*3600e3){ $("#app").innerHTML = snap.html; $("#app").classList.add("stale"); }
+  else $("#app").innerHTML = `<div class="skel" style="height:64px"></div><div class="skel" style="height:230px"></div><div class="skel" style="height:190px"></div><div class="skel" style="height:150px"></div>`;
+  $("#upd").classList.add("on"); if(!keep) S.data = null; updateTop();
+  // fire everything at once; show the forecast once most models are in (6s cap), let stragglers patch in
+  const detPs = MODELS.map(m=>fetchDet(m, loc, ref));
+  const ensPs = ENS.map(m=>fetchEns(m, loc, ref));
+  const TIMEOUT = Symbol("t"), t0 = Date.now(), got = new Array(detPs.length).fill(TIMEOUT); let done = 0;
+  // quorum: show as soon as 5+ models are in (≥1.2s), or whatever has arrived by 3s; all done → show immediately
+  await new Promise(resolve=>{
+    const check = () => { const ok = got.filter(d=>d && d!==TIMEOUT).length, el = Date.now()-t0;
+      const long = got.filter((d,i)=>d && d!==TIMEOUT && MODELS[i].id!=="hrrr").length;   // HRRR only covers 48 h
+      if(done===detPs.length || (ok>=5 && long>=3 && el>=700) || (long>=2 && el>=2500) || (ok>=1 && el>=8000)) resolve(); };
+    detPs.forEach((p,i)=>p.then(d=>{ got[i] = d; done++; check(); }));
+    const iv = setInterval(()=>{ check(); if(done===detPs.length || Date.now()-t0>9000 && got.some(d=>d && d!==TIMEOUT)) clearInterval(iv); }, 150);
+  });
+  let det = got.slice();
+  if(S.loc !== loc) return;
+  if(S.loc !== loc) return;
+  const models = {}; det.forEach((d,i)=>{ if(d && d!==TIMEOUT) models[MODELS[i].id] = d; });
+  const first = Object.values(models).sort((a,b)=>b.time.length-a.time.length)[0];   // models now cover different ranges: use the longest as the timeline
+  $("#upd").classList.remove("on"); $("#app").classList.remove("stale");
+  if(!first && keep){ toast(navigator.onLine===false? "No signal · showing the last forecast" : "Couldn't refresh · showing the last forecast"); return; }
+  if(!first){
+    const limited = S.omLimited && Date.now()-S.omLimited < 120e3, sn = await getSnap(loc.name);
+    const why = limited ? "Open-Meteo, the free weather service Snowline uses, limits how many forecasts one network can ask for in an hour, and this network hit that limit. It resets within the hour, and Snowline will try again on its own." : "Couldn't reach the forecast models. Pull down to try again.";
+    if(sn && Date.now()-sn.t < 36*3600e3){ $("#app").innerHTML = `<div class="callout rain">⏳ <b>Showing the forecast from ${new Date(sn.t).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"})}.</b> ${why}</div>` + sn.html; $("#app").classList.add("stale"); }
+    else $("#app").innerHTML = `<div class="card"><h2>${limited? "Weather service busy" : "No connection"}</h2><div class="muted" style="margin-top:6px">${why}</div></div>`;
+    clearTimeout(S.reloadT); S.reloadT = setTimeout(()=>{ if(S.loc===loc && !S.data) load(loc); }, limited? 10*60e3 : 60e3);
+    return; }
+  S.data = { ref, models, ens: [], ensNames: [], time:first.time, offset:first.offset, tz:first.tz, fetched:new Date(), ensPending:true };
+  MEM.set(loc.name, {t:Date.now(), data:S.data});
+  loadExtras(loc); await libsReady; if(S.loc!==loc) return; render(); saveSnap(loc);
+  if(S.pendingShare){ S.pendingShare = false; setTimeout(()=>openShareSheet(), 600); }
+  const data = S.data;
+  const retry = i => { data.retrying = (data.retrying||0)+1; setTimeout(()=>fetchDet(MODELS[i], loc, ref).then(x=>{ data.retrying--; if(x){ data.models[MODELS[i].id] = x; if(x.time.length > data.time.length) data.time = x.time; data.fetched = new Date(); } if(S.loc===loc) scheduleRender(loc); }), 5000 + i*700); };
+  det.forEach((d,i)=>{ if(d===TIMEOUT) detPs[i].then(x=>{ if(x){ data.models[MODELS[i].id] = x; if(x.time.length > data.time.length) data.time = x.time; scheduleRender(loc); } else retry(i); }); else if(!d) retry(i); });
+  Promise.all(ensPs).then(ens=>{ data.ens = ens.filter(Boolean); data.ensNames = ens.map((e,i)=>e?ENS[i].name:null).filter(Boolean); data.ensPending = false; scheduleRender(loc); });
+}
+// season history is the biggest download (10 winters, hourly), so it loads only when needed
+function ensureSeason(){
+  const loc = S.loc; if(!loc || !S.data) return Promise.resolve();
+  if(S.season && S.season.loc===loc) return Promise.resolve();
+  if(S.seasonP && S.seasonP.loc===loc) return S.seasonP.p;
+  const p = loadSeason(loc, S.data.ref).then(z=>{ if(S.loc!==loc) return; S.season = {...z, loc}; if(S.data) S.data.seasonCache = S.season; updateSeasonSummary(); if($("#seasonPanel")) renderSeason(S.ctx.C); if($("#sb-outlook") && S.open.has("outlook")) renderOutlook(); });
+  S.seasonP = {loc, p}; return p;
+}
+
+/* ================= Compute ================= */
+function bandElev(){ const L=S.loc; const ft = S.band==="base"? L.base : S.band==="mid"? (L.base+L.top)/2 : L.top; return ft/FT; }
+function nowKey(){ const t = new Date(Date.now() + S.data.offset*1000); return t.toISOString().slice(0,13)+":00"; }
+
+function computeAt(e){
+  const D = S.data, ref = D.ref, nk = nowKey();
+  const time = D.time, n = time.length;
+  const nowIdx = Math.max(0, time.findIndex(t=>t>=nk));
+  const ids = Object.keys(D.models).filter(id=>S.enabled[id]);
+  // Tuning from the nearest snow gauge: which models have been right here at each lead time, how wet or dry each runs, and how fluffy the snow really is
+  const cal = S.learnOn ? learned() : null, fix = cal?.slrFix || 1;
+  const leadOf = i => { const dd = (i - nowIdx)/24; return dd <= 1.5 ? 1 : dd <= 4 ? 3 : 5; };
+  const per = {}; // id -> hourly {snow, Te, slr, sl}
+  for(const id of Object.keys(D.models)){
+    const m = D.models[id]; const idx = new Map(m.time.map((t,i)=>[t,i]));
+    per[id] = time.map((t,k)=>{ const i = idx.get(t); if(i==null) return null; const cf = cal?.corr?.[leadOf(k)]?.[id] ?? 1;
+      const v = snowAt(isNum(m.P[i])? m.P[i]*cf : m.P[i], m.T[i], m.FL?.[i], ref, e); if(v && fix!==1){ v.snow *= fix; v.slr *= fix; } return v; });
+  }
+  // consensus hourly
+  const wOf = (id, k) => MODELS.find(m=>m.id===id).w * learnedW(id, leadOf(k));
+  const cons = time.map((t,i)=>{
+    let ws=0, s=0, te=0, sl=0, r=0, P=0, W=0, G=0, ww=0, fr=0, cc=0, cw=0, sw=0, swW=0, rw=0, rwW=0, rh=0, rhW=0, wu=0, wv=0;
+    for(const id of ids){ const v = per[id][i]; if(!v) continue; const w=wOf(id, i); ws+=w; s+=v.snow*w; te+=v.Te*w; sl+=v.sl*w; r+=v.slr*w; fr+=v.frac*w;
+      const raw = rawAt(id, t); if(raw){ P+=raw.P*w; if(isNum(raw.W)){W+=raw.W*w;G+=(isNum(raw.G)?raw.G:raw.W)*w;ww+=w;} if(isNum(raw.CC)){cc+=raw.CC*w;cw+=w;} if(isNum(raw.SW)){sw+=raw.SW*w;swW+=w;} const rr=ridgeWind(raw,e); if(isNum(rr)){rw+=rr*w;rwW+=w;} if(isNum(raw.RH)){rh+=raw.RH*w;rhW+=w;} if(isNum(raw.WD)){ const mag=isNum(raw.W)?Math.max(raw.W,1):1; wu+=Math.sin(raw.WD*Math.PI/180)*mag*w; wv+=Math.cos(raw.WD*Math.PI/180)*mag*w; } }
+    }
+    if(!ws) return null;
+    return { snow:s/ws, Te:te/ws, sl:sl/ws, slr:r/ws, P:P/ws, frac:fr/ws, W: ww? W/ww:null, G: ww? G/ww:null, CC: cw? cc/cw:null, SW: swW? sw/swW:null, RW: rwW? rw/rwW:null, RH: rhW? rh/rhW:null, WD: (wu||wv)? (Math.atan2(wu,wv)*180/Math.PI+360)%360 : null };
+  });
+  // days
+  const startDate = periodOf(time[nowIdx])[0];
+  const days = Array.from({length:15},(_,k)=>dateAdd(startDate,k));
+  const dayIdx = new Map(days.map((d,i)=>[d,i]));
+  const blank = () => days.map(()=>({day:0,night:0,n:0,exp:0}));
+  const modelDays = {}; for(const id of Object.keys(per)) modelDays[id] = blank();
+  const consDays = days.map(()=>({day:0,night:0,n:0,tmax:-99,tmin:99,tmaxD:null,tminN:null,slSum:0,slN:0,slrSum:0,slrW:0,gmax:0}));
+  let past24 = 0, past24n = 0;
+  for(let i=0;i<n;i++){
+    const t = time[i];
+    if(i < nowIdx){ if(i >= nowIdx-24 && cons[i]){ past24 += cons[i].snow; past24n++; } continue; }
+    const [d,part] = periodOf(t); const k = dayIdx.get(d); if(k==null) continue;
+    for(const id of Object.keys(per)){ modelDays[id][k].exp++; const v = per[id][i]; if(v){ modelDays[id][k][part]+=v.snow; modelDays[id][k].n++; } }
+    const c = cons[i]; if(!c) continue; const cd = consDays[k];
+    cd[part]+=c.snow; cd.n++; if(part==="day") cd.tmaxD = cd.tmaxD==null? c.Te : Math.max(cd.tmaxD,c.Te); else cd.tminN = cd.tminN==null? c.Te : Math.min(cd.tminN,c.Te); cd.tmax=Math.max(cd.tmax,c.Te); cd.tmin=Math.min(cd.tmin,c.Te); cd.slSum+=c.sl; cd.slN++;
+    if(c.snow>0.02){ cd.slrSum+=c.slr*c.snow; cd.slrW+=c.snow; }
+    if(isNum(c.G)) cd.gmax=Math.max(cd.gmax,c.G);
+  }
+  // ensemble
+  const ensDays = []; // per member: array of daily totals
+  for(const E of D.ens){
+    for(const mem of E.members){
+      const tot = days.map(()=>0), cnt = days.map(()=>0), totD = days.map(()=>0), totN = days.map(()=>0);
+      E.time.forEach((t,i)=>{ if(t < nk) return; const [d, part] = periodOf(t); const k = dayIdx.get(d); if(k==null) return; const v = snowAt(mem.P[i], mem.T[i], null, ref, e); if(v && fix!==1) v.snow *= fix; if(v){ tot[k]+=v.snow; cnt[k]++; if(part==="day") totD[k]+=v.snow; else totN[k]+=v.snow; } });
+      ensDays.push({tot, cnt, totD, totN});
+    }
+  }
+  // hourly precip chance from ensembles
+  const pop = new Map();
+  for(const E of D.ens){ E.time.forEach((t,i)=>{ if(t < nk) return; let wet=0, n=0; for(const m of E.members){ if(isNum(m.P[i])){ n++; if(m.P[i]>=0.1) wet++; } } const o = pop.get(t) || [0,0]; o[0]+=wet; o[1]+=n; pop.set(t,o); }); }
+  return { time, nowIdx, per, cons, days, modelDays, consDays, ensDays, pop, past24: past24n? past24 : null, ids };
+}
+// raw values lookup cache per model
+const rawCache = new WeakMap();
+function rawAt(id, t){
+  const m = S.data.models[id]; let idx = rawCache.get(m);
+  if(!idx){ idx = new Map(m.time.map((tt,i)=>[tt,i])); rawCache.set(m, idx); }
+  const i = idx.get(t); if(i==null || !isNum(m.P[i])) return null;
+  return { P:m.P[i], W:m.W?.[i], G:m.G?.[i], SD:m.SD?.[i], CC:m.CC?.[i], SW:m.SW?.[i], W8:m.W8?.[i], W7:m.W7?.[i], RH:m.RH?.[i], WD:m.WD?.[i] };
+}
+function windowTotal(daysArr, N, key){ let s=0; for(let k=0;k<N && k<daysArr.length;k++){ s += key? key(daysArr[k]) : daysArr[k]; } return s; }
+function modelWindow(C, id, N){
+  const md = C.modelDays[id]; let s=0;
+  for(let k=0;k<N;k++){ const x=md[k]; if(!x || x.exp===0) continue; if(x.n < x.exp*0.75) return null; s += x.day+x.night; }
+  return s;
+}
+function ensWindowTotals(C, N){ return C.ensDays.filter(m=>m.cnt.slice(0,N).every(c=>c>0)).map(m=>windowTotal(m.tot,N)); }
+function confidence(vals){
+  vals = vals.filter(isNum); if(vals.length<3) return {lvl:"na", label:"—"};
+  const mean = vals.reduce((a,b)=>a+b,0)/vals.length; if(mean < 0.5) return {lvl:"na", label:"Dry"};
+  const sd = Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/vals.length); const cv = sd/mean;
+  return cv < 0.35 ? {lvl:"hi",label:"High conf"} : cv < 0.7 ? {lvl:"md",label:"Med conf"} : {lvl:"lo",label:"Low conf"};
+}
+
+/* ================= Render (OpenSnow-style) ================= */
+const VIEW_TITLE = {favs:"Favorites", finder:"Explore", maps:"Maps", alerts:"Alerts"};
+function updateTop(){
+  const L = S.loc, v = S.view || "forecast";
+  document.body.dataset.view = v;
+  if(v !== "forecast"){ $("#locName").textContent = VIEW_TITLE[v]||"Snowline"; $("#locSub").textContent = ""; favRowRender(); return; }
+  if(!L) return;
+  const bandName = {base:"Base", mid:"Mid", summit:"Summit"}[S.band];
+  $("#locName").textContent = dispName(L.name); $("#ltName").textContent = dispName(L.name); $("#ltName").title = L.name;
+  $("#locSub").textContent = `${bandName} · ${fmtEl(bandElev())}`;
+  // Base · Mid · Summit as one quiet row: each shows its elevation, the sport's default is picked, a tap switches
+  const elv = [["base","Base",L.base],["mid","Mid",(L.base+L.top)/2],["summit","Summit",L.top]];
+  $("#ltSub").innerHTML = `<span class="elv" role="tablist" aria-label="Forecast elevation">${elv.map(([k,l,ft])=>`<button data-band="${k}" class="${S.band===k?"on":""}" role="tab" aria-selected="${S.band===k}"><b>${l}</b> ${fmtEl(ft/FT)}</button>`).join("")}</span><span class="elv-r">${dirURL(L)? `<a class="ic-l" href="${dirURL(L)}" target="_blank" rel="noopener" aria-label="Directions" title="Directions"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg></a>` : ""}${RESORT_SITE[L.name]? `<a class="ic-l" href="${RESORT_SITE[L.name]}" target="_blank" rel="noopener" aria-label="Area website" title="Area website"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></a>` : ""}</span>`;
+  favRowRender();
+  const fav = S.favs.some(f=>f.name===L.name);
+  $("#favBtn").classList.toggle("on", fav); $("#favBtn svg").setAttribute("fill", fav? "currentColor" : "none");
+}
+const renderElevInfo = updateTop, updateFavBtn = updateTop, fillSel = updateTop;
+function destroyCharts(){ Object.values(S.charts).forEach(c=>{ try{c.destroy()}catch(e){} }); S.charts = {}; }
+
+/* ---------- small helpers ---------- */
+const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const compass = deg => isNum(deg) ? COMPASS[Math.round(((deg%360)+360)%360/22.5)%16] : "";
+const PT = { snow:"#5aa2ff", mix:"#b48cff", rain:"#4cd38a", none:"#e8e8ea" };
+function ptype(c){ if(!c || !isNum(c.P) || c.P < 0.05) return "none"; const f = isNum(c.frac)? c.frac : 1; return f >= 0.85 ? "snow" : f <= 0.15 ? "rain" : "mix"; }
+function barColor(inch){ return inch >= 12 ? "#f39a44" : inch >= 6 ? "#a58bff" : "#3d8bfd"; }
+function skyKind(c){ const t = ptype(c); if(t!=="none" && c.P >= 0.1) return t; const cc = c?.CC; if(!isNum(cc)) return "clear"; return cc < 25 ? "clear" : cc < 70 ? "partly" : "cloudy"; }
+const SKY_TEXT = { clear:"Clear", partly:"Partly cloudy", cloudy:"Cloudy", snow:"Snow", rain:"Rain", mix:"Rain & snow" };
+function wxIcon(c, hour, size=26){
+  const k = skyKind(c), night = hour < 7 || hour >= 18;
+  const sun = `<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/>`;
+  const moon = `<path d="M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z"/>`;
+  const cloud = (y=0) => `<path transform="translate(0 ${y})" d="M7 18h10.2a3.8 3.8 0 0 0 .4-7.6A5.6 5.6 0 0 0 6.9 11 3.5 3.5 0 0 0 7 18z"/>`;
+  let body;
+  if(k==="clear") body = night? moon : sun;
+  else if(k==="partly") body = (night? `<path transform="translate(4 -3) scale(.62)" d="M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z"/>` : `<g transform="translate(5 -4) scale(.62)">${sun}</g>`) + cloud(2);
+  else if(k==="cloudy") body = cloud(0);
+  else if(k==="snow") body = cloud(-3) + `<path d="M8 19.5h.01M12 21h.01M16 19.5h.01M10 22.5h.01M14 22.5h.01" stroke-width="2.6"/>`;
+  else if(k==="rain") body = cloud(-3) + `<path d="M8.5 18.5l-1 2.6M12.5 18.5l-1 2.6M16.5 18.5l-1 2.6"/>`;
+  else body = cloud(-3) + `<path d="M8.5 18.5l-1 2.6M16.5 18.5l-1 2.6"/><path d="M12.5 20.5h.01" stroke-width="2.6"/>`;
+  return `<svg class="wx" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+}
+const LETTER = ["S","M","T","W","T","F","S"];
+
+/* ---------- Snow summary bars (inline SVG, OpenSnow style) ---------- */
+function snowBarsSVG(vals, dates, o={}){
+  const n = vals.length, cw = o.cw || 26, H = o.h || 70, top = o.labels ? 44 : 30, w = n*cw;
+  const vv = vals.map(v=>isNum(v)? snowNum(v) : null);
+  const mx = Math.max(imp()? 6 : 15, ...vv.map(v=>v||0));
+  let g = "";
+  const ti = dates.indexOf(localToday()); if(ti>=0) g += `<rect x="${ti*cw+1}" y="${top-8}" width="${cw-2}" height="${H+46}" rx="7" fill="#232327"/>`;
+  [[0,5,"Next 1–5 Days"],[5,10,"Next 6–10 Days"],[10,15,"Next 11–15 Days"]].forEach(([a,b,lab])=>{
+    if(a >= n) return; const bb = Math.min(b,n); const seg = vals.slice(a,bb), tot = seg.reduce((x,y)=>x+(y||0),0);
+    const x1 = a*cw+4, x2 = bb*cw-4, xm = (x1+x2)/2, t = seg.filter(v=>v==null).length*2 > seg.length ? "—" : fmtSnow(tot,0);
+    const rg = o.ranges?.[a/5], rt = t!=="—" && rg && snowNum(rg[1])-snowNum(rg[0]) >= 1 ? ` <tspan class="t-rg">${Math.round(snowNum(rg[0]))}–${Math.round(snowNum(rg[1]))}</tspan>` : "", half = rt? 34 : 16;
+    g += `<text x="${xm}" y="10" class="t-l">${lab}</text><path d="M${x1} 15v6M${x2} 15v6M${x1} 18H${xm-half}M${xm+half} 18H${x2}" class="t-br"/><text x="${xm}" y="22" class="t-tot">${t}${rt}</text>`;
+  });
+  vv.forEach((v,i)=>{
+    const x = i*cw + 5, bw = cw - 10; const val = v||0; const h = Math.max(2, val/mx*H);
+    const inch = vals[i]||0;
+    if(v==null) g += `<text x="${x+bw/2}" y="${top+H-4}" class="t-v" opacity=".5">—</text>`; else
+    g += `<rect x="${x}" y="${top+H-h}" width="${bw}" height="${h}" rx="2" fill="${val<0.05 ? "#e8e8ea" : barColor(inch)}" ${val<0.05?'opacity=".8"':''}/>`;
+    if(o.labels && v!=null){ const lab = v<0.5? "0" : String(Math.round(v)); g += `<text x="${x+bw/2}" y="${top+H-h-4}" class="t-v" ${inch>=12?'fill="#f39a44"':''}>${lab}</text>`; }
+    const d = dates[i]; const wd = new Date(d+"T12:00:00Z").getUTCDay(); const we = wd===0||wd===6;
+    g += `<text x="${i*cw+cw/2}" y="${top+H+15}" class="t-d ${we?"we":""}">${LETTER[wd]}</text><text x="${i*cw+cw/2}" y="${top+H+30}" class="t-d ${we?"we":""}">${+d.slice(8,10)}</text>`;
+  });
+  let hh = top + H + 36;
+  if(o.labels) dates.forEach((d,i)=>{ if(d) g += `<rect data-bd="${d}" x="${i*cw}" y="0" width="${cw}" height="${top+H+60}" fill="transparent" style="cursor:pointer"/>`; });
+  if(o.q){ o.q.forEach((sc,i)=>{ if(!isNum(sc)) return; g += `<rect x="${i*cw+8}" y="${hh+8}" width="${cw-16}" height="5" rx="2.5" fill="${scoreColor(sc)}"/>`; }); hh += 18; }
+  return `<svg class="bars" width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}">${g}</svg>`;
+}
+
+/* Likely range for each 5-day block: the middle 80% of the ensemble runs */
+function bucketRanges(C){
+  return [0,5,10].map(a=>{ const sums = C.ensDays.filter(m=>m.cnt.slice(a,a+5).every(c=>c>0)).map(m=>m.tot.slice(a,a+5).reduce((x,y)=>x+y,0)); if(sums.length < 10) return null; sums.sort((x,y)=>x-y); return [sums[Math.floor(sums.length*.1)], sums[Math.floor(sums.length*.9)]]; });
+}
+function snowSummaryHTML(last24, vals, dates, o={}){
+  const nowLbl = (()=>{ const d = new Date(); return DOW[d.getDay()]+" "+d.getDate()+" "+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}).replace(" ","").toLowerCase(); })();
+  return `<div class="ss"><div class="ss-l"><div class="ss-k">Last 24 Hours</div><div class="ss-big num">${isNum(last24)? fmtSnow(last24,0) : "—"}</div><div class="ss-t">${nowLbl}<br>${o.measured? `<span class="u meas">Measured</span>` : `<span class="u">Estimated</span>`}</div></div>
+    <div class="ss-r">${snowBarsSVG(vals, dates, o)}</div></div>`;
+}
+
+const SECTIONS = [   // the rest live in groups or sheets: hourly (sheet), models (Models & accuracy), elev (Storm & elevation), outlook (sheet)
+  {id:"wax",     title:"Wax", nordic:true},
+  {id:"avy",     title:"Avalanche danger"},
+];
+S.open = new Set(store.get("open", []));
+
+const grp = (id, title, inner) => `<details class="sec gsec" data-sec="${id}" ${S.open.has(id)?"open":""}><summary><span class="ttl">${title}</span><span class="sv" id="sv-${id}"></span></summary><div class="grp-b">${inner}</div></details>`;
+/* Keep each group honest: hide it when nothing inside has content, and list what's inside on the closed row */
+function tidyGroups(){
+  document.querySelectorAll("details.gsec").forEach(g=>{
+    const cards = [...g.querySelectorAll(".grp-b > section.card")].filter(c=> !c.hidden && c.innerHTML.trim());
+    g.hidden = !cards.length;
+    const names = [...new Set(cards.map(c=> (c.dataset.sv || c.querySelector("h2")?.textContent || "").replace(/\s*·.*$/,"").trim()).filter(Boolean))];
+    const sv = g.querySelector(".sv"); if(sv) sv.textContent = names.slice(0,3).join(" · ") + (names.length>3? ` +${names.length-3}` : "");
+  });
+}
+let tidyQ = 0; new MutationObserver(()=>{ if(!tidyQ) tidyQ = requestAnimationFrame(()=>{ tidyQ = 0; tidyGroups(); }); }).observe(document.getElementById("app"), {childList:true, subtree:true, attributes:true, attributeFilter:["hidden"]});
+function render(){
+  if(!S.data) return;
+  if(!render.warmed){ render.warmed = true; warmLibs(); }
+  destroyCharts(); updateTop();
+  const e = bandElev(), C = computeAt(e), SIM = simulate(C), D = S.data;
+  S.ctx = {C, SIM, e}; S.ctx.SIMN = simulate(C, 0); S.ctx.SIMS = simulate(C, 180);
+  const consDaily = C.consDays.map(d=>d.day+d.night);
+  const N = 5, winTot = windowTotal(consDaily, N);
+  const modelTots = Object.keys(D.models).filter(id=>S.enabled[id]).map(id=>modelWindow(C,id,N)).filter(isNum);
+  const conf = confidence(modelTots);
+
+  // callouts (max 2)
+  const callouts = [];
+  const bigDay = consDaily.slice(0,7).reduce((b,v,i)=>v>b.v?{v,i}:b,{v:0,i:0});
+  const rainHrs = C.cons.slice(C.nowIdx, C.nowIdx+24*N).filter(c=>c && c.P>0.3 && c.sl > e).length;
+  if(bigDay.v >= 6) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}.${S.mode==="bc"? "" : " "+firstPowDay(C)}</div>`);
+  if(rainHrs >= 6){
+    const wet = C.cons.map((c,i)=>[c,i]).slice(C.nowIdx, C.nowIdx+24*N).filter(([c,i])=>c && c.P>0.3 && c.sl > e && +C.time[i].slice(11,13) >= 6 && +C.time[i].slice(11,13) <= 18);
+    const byDay = {}; wet.forEach(([c,i])=>{ const d = C.time[i].slice(0,10); byDay[d] = (byDay[d]||0) + 1; });
+    const days = Object.keys(byDay).filter(d=>byDay[d] >= 2).sort();
+    const sls = wet.map(([c])=>c.sl).sort((a,b)=>a-b), slMid = sls[Math.floor(sls.length/2)];
+    const wd = d => d===todayStr()? "today" : d===dateAdd(todayStr(),1)? "tomorrow" : new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"});
+    const dayTxt = days.length >= 4? `on and off for ${days.length} days` : days.length===3? `${wd(days[0])}, ${wd(days[1])} and ${wd(days[2])}` : days.length===2? `${wd(days[0])} and ${wd(days[1])}` : days.length? wd(days[0]) : "";
+    if(days.length) callouts.push(`<div class="callout rain">🌧️ <b>Rain at ${fmtEl(e)}</b> ${dayTxt}.${isNum(slMid) && slMid < (S.loc.top||0)/FT? ` Snow above about ${fmtEl(Math.round(slMid/30.48)*30.48)}.` : ""}</div>`);
+  }
+  const days7 = C.days.slice(0,7);
+  if(!isAlp()){ const cr = days7.filter(d=>crustCruise(C,SIM,d)); if(cr.length) callouts.push(byMode("", `<div class="callout crust">✨ <b>Crust cruising ${cr.map(dow).join(", ")}:</b> skate off-trail from about 7–10am, before the sun softens the crust.</div>`, `<div class="callout crust">🧊 <b>Firm, icy tracks early ${cr.map(dow).join(", ")}:</b> klister for kick before about 10am, or wait for the tracks to soften. Tracks soften by late morning.</div>`)); }
+  else { const corn = days7.filter(d=>at(C,SIM,d,12)?.sim?.key==="corn"); if(corn.length) callouts.push(`<div class="callout">🌽 <b>Corn cycle ${corn.map(dow).join(", ")}:</b> start on east-facing slopes around 10am and follow the sun.</div>`); }
+  const sums = days7.map(d=>daySummary(C,SIM,d));
+  let bestK = -1; sums.forEach((x,k)=>{ if(x && (bestK<0 || x.best.avg > sums[bestK].best.avg)) bestK=k; });
+  // The verdict: is it worth going today (tomorrow, late in the day)? Not shown in Tour mode.
+  let verdict = "", vDay = null;
+  if(S.mode!=="bc"){
+    const hrNow = +C.time[C.nowIdx].slice(11,13), vk = hrNow >= 15 || !(sums[0] && sums[0].best) ? 1 : 0, x = sums[vk], d = days7[vk]; vDay = d;
+    if(x){ const sc = x.best.avg, when = `${hl(x.best.from)}–${hl(x.best.to)}`, lab = x.best.sim.label.toLowerCase(), who = vk? "Tomorrow" : "Today";
+      let rain = 0, gust = 0; for(let h=8; h<=16; h++){ const q = at(C,SIM,d,h); if(q?.c){ if(q.c.P>0.2 && (q.c.frac??1)<0.5) rain += q.c.P; gust = Math.max(gust, q.c.G||0); } }
+      const wet = rain >= 2 && sc < 6.5, gale = gust >= 72 && sc < 6.5;
+      const [lvl, head] = wet? ["skip", `Skip it ${who.toLowerCase()}`] : gale? ["meh", `Windy ${who.toLowerCase()}`] : sc>=8? ["go", `Go! ${who} is epic`] : sc>=6.5? ["go", `Worth it ${who.toLowerCase()}`] : sc>=5? ["ok", `Good day ${who.toLowerCase()}`] : sc>=3.5? ["meh", `Fair ${who.toLowerCase()}`] : ["skip", `Skip it ${who.toLowerCase()}`];
+      const why = wet? `rain at ${fmtEl(e)}` : gale? `gusts to ${fmtWind(gust)} ${windU()}, ${lab}` : `${lab}, best ${when}`;
+      verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}:</b> ${why}</span><span class="v-sc" data-tip="quality" role="button" aria-label="What the ski score means">${scoreChip(sc)}</span></div></div>`; }
+  }
+  if(verdict && bestK>=0 && days7[bestK]!==vDay){ const b = sums[bestK];
+    verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="vs-t">Best this week: <b>${(l=>/\d/.test(l)? new Date(days7[bestK]+"T12:00").toLocaleDateString([], {weekday:"short"}) : l)(dayLabel(days7[bestK]))}</b> ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div></div>`); bestK = -1; }
+  if(bestK>=0 && callouts.length<2 && S.mode!=="bc" && days7[bestK]!==vDay){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout quiet best"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="bt"><b>Best day: ${dayLabel(days7[bestK])}</b> · ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div>`); }
+  S.bestDay = bestK>=0 ? days7[bestK] : null;
+
+  const quality = C.days.map(d=>{ const x = daySummary(C,SIM,d); return x? x.best.avg : null; });
+  const slNow = C.cons[C.nowIdx]?.sl;
+  const LV = learned();
+  const sv = { models: LV? `Tuned to ${LV.station.name} · ${MODELS.find(m=>m.id===LV.best)?.name||""} leads` : `${Object.keys(D.models).length} models · ${conf.label}`, elev:`Snow level ${fmtEl(slNow)}`, outlook:"Weeks 1–5 · season · 6 months", avy:S.avyLabel||"", hourly:"5 days", wax:"" };
+  if(!isAlp()){ const w = wax(SIM[C.nowIdx], C.cons[C.nowIdx]); if(w) sv.wax = S.mode==="classic"? w.kick.split(" (")[0] : w.glide.split(" (")[0] + " glide"; }
+
+  const nIn = Object.keys(D.models).length, longIn = Object.keys(D.models).filter(id=>id!=="hrrr").length;
+  const modelNote = nIn < MODELS.length-2 ? `<div class="callout rain">⏳ <b>${nIn} of ${MODELS.length} models loaded.</b> ${longIn<3? "The forecast past 2 days is incomplete until more arrive." : "The rest are still coming in."}${S.omLimited && Date.now()-S.omLimited<15*60e3? " Open-Meteo, the free weather service, has hit its hourly limit for this network; it resets within the hour." : ""} ${D.retrying? "Retrying now…" : `<a href="#" id="modelRetry">Try again</a>`}</div>` : "";
+  S.shownLoc = S.loc.name;
+  const glance = glanceHTML(C, slNow);
+  $("#app").innerHTML = `
+  ${modelNote}
+  <div id="nwsAlerts"></div><div id="ncStrip"></div>
+  ${(()=>{ const notes = callouts.slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length).replace(/^\s*(\S+?)\s+/, '<span class="vn-i">$1</span>') : h; });
+     return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="rcptStrip"></div>
+  ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
+  <section class="card" id="snowCard">
+    <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+      return old? `<span class="muted upd-at old">No signal · saved ${t2}</span>` : `<span class="muted upd-at">Updated ${t2}</span>`; })()}</div>
+    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
+    ${glance}
+    ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
+    <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
+  </section>
+  ${a2hsHTML()}
+  ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
+  ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
+  <section class="card" id="nowCard"></section>
+  ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="mtnCard"></section>` : ""}
+  ${!isAlp() && S.mode!=="bc"? `<section class="card" id="glideCard"></section>` : ""}
+  <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast${tipI("hourly")}</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
+  <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast${tipI("daily")}</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div><button class="link dl-lr" id="lrOpen">Long range · weeks 1–5 and the season ›</button></section>
+  ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="zoneCard"></section>` : ""}
+  <section class="card" id="camCard"></section>
+  <section class="card" id="fxCard"><div class="card-h"><h2>Snowline Forecaster${tipI("forecaster")}</h2><span class="muted" id="discSrc">from the models</span></div>
+    <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read the full forecast</button></section>
+  <div class="more-h" id="moreH">More for this spot</div>
+  ${grp("g-mtn", "On the mountain", `${isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
+    <section class="card" id="reportCard"></section>
+    ${S.loc && RESORT_CAMS[S.loc.name]?.some(c=>c.id==="mtb-14")? `<section class="card" id="stakeCard"></section>`:""}
+    <section class="card" id="tmCard"></section>
+    ${!isAlp()? `<section class="card" id="openCard"></section>`:""}
+    <section class="card" id="repCard"></section>`)}
+  ${grp("g-plan", "Plan your day", `<section class="card" id="workCard"></section><section class="card" id="roadCard"></section>
+    ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
+  ${grp("g-storm", "Storm & elevation", `<section class="card ms-card"><button class="ms-open ms-in" onclick="openMtnSnow()"><span class="ms-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l6-11 4 7 3-4 5 8z"/><path d="M8 11l1.5-2 1.5 2"/></svg></span><span><b>See it on the mountain</b><small>Forecast snow by elevation, on the map</small></span><span class="ms-go">›</span></button></section><section class="card flk-card" id="flkRow">${flakeHTML(C, e)}</section><section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
+  ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
+  ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds${tipI("models")}</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
+  ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
+  <div class="promise"><b>Free forever · no ads · no account</b><span>Your favorites and settings stay on your phone.</span><a href="/accuracy">How accurate is Snowline? ›</a></div>
+  <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
+
+  const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
+  $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read the full forecast" : "Show less"; };
+  $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
+  const openHourly = () => { openSheet("dhSheet"); renderSection("hourly"); };
+  $("#toDetailed").onclick = openHourly; $("#hourStrip").onclick = e => { if(!e.target.closest("button")) openHourly(); };
+  $("#fbOpen").onclick = openFeedback;
+  $("#lrOpen").onclick = () => { openSheet("lrSheet"); renderSection("outlook"); };
+  const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
+  document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
+
+  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
+  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderReceipt(); }catch(err){}
+  { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
+  if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  if(S.mode==="skate") renderBirkie();
+  const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
+  renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
+  renderReport(); renderStorm(C, SIM, e);
+  S.open.forEach(id=>{ if($("#sb-"+id)) renderSection(id); const g = document.querySelector(`details.gsec[data-sec="${id}"]`); if(g) g.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3))); });
+  if($("#dhSheet").classList.contains("on")) renderSection("hourly");
+  renderAvy(); updateSeasonSummary();
+  if((location.hash||'')==='#maps') initBigMap();
+}
+
+function winSegHTML(){ return `<div class="seg sm" data-winseg>${[3,5,10].map(w=>`<button data-w="${w}" class="${S.win===w?"on":""}">${w}d</button>`).join("")}</div>`; }
+function wireWinSeg(el, again){ el.querySelectorAll("[data-winseg] button").forEach(b=>b.onclick=()=>{ S.win=+b.dataset.w; store.set("win",S.win); again(); }); }
+
+function renderSection(id){
+  const {C, SIM, e} = S.ctx, el = $("#sb-"+id); if(!el) return;
+  if(id==="hourly"){ renderDetailedHourly(C, SIM, el); }
+  if(id==="wax"){ const tab = store.get("waxTab","plan");
+    el.innerHTML = `<div class="seg" id="waxTabs" style="margin-bottom:12px">${[["plan","Plan"],["box","My wax box"],["log","Log"]].map(([k,l])=>`<button data-t="${k}" class="${tab===k?"on":""}">${l}</button>`).join("")}</div><div id="waxPane"></div>`;
+    el.querySelectorAll("#waxTabs button").forEach(b=>b.onclick=()=>{ store.set("waxTab", b.dataset.t); renderSection("wax"); });
+    const pane = $("#waxPane");
+    if(tab==="plan"){ const k = fromKit(C.cons[C.nowIdx], SIM[C.nowIdx]); pane.innerHTML = (k && (k.glide||k.kick)? `<div class="callout" style="margin:0 0 12px">🧰 <b>From your box right now:</b> ${[k.glide? k.glide.name+" (glide)" : "", k.kick? k.kick.name+" ("+k.kick.type+")" : ""].filter(Boolean).join(" + ")}</div>` : waxKit().length? "" : `<div class="muted" style="margin-bottom:10px">Tip: add your waxes under <b>My wax box</b> and the plan picks from what you own.</div>`) + `<div id="waxList"></div>`; renderWax(C, SIM); }
+    else if(tab==="box") renderWaxBox(pane); else renderWaxLog(pane); }
+  if(id==="models"){
+    ["daily","accum","prob"].forEach(k=>{ if(S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
+    el.innerHTML = `<div class="muted" style="margin-bottom:8px">Bars are Snowline's forecast for each day. The thin lines show the realistic low-to-high range.</div><div class="chartbox"><canvas id="cDaily"></canvas></div>
+      <h3>Model by model${tipI("models")}</h3><div class="muted" style="margin-bottom:8px">Each weather model's daily snow at ${fmtEl(e)}. Untick one to leave it out of Snowline's forecast.</div><div class="tablewrap"><table id="mTable"></table></div><div class="modelstatus" id="mStatus"></div>
+      <h3>Running total${tipI("accum")}</h3><div class="muted" style="margin-bottom:8px" id="accumSay">Snow adding up day by day.</div><div class="chartbox"><canvas id="cAccum"></canvas></div>
+      <div class="card-h" style="margin-top:14px"><h3 style="margin:0">Chance of snow${tipI("chance")}</h3>${winSegHTML()}</div><div class="probgrid" id="probs"></div><div class="chartbox" style="height:170px;margin-top:10px"><canvas id="cProb"></canvas></div>`;
+    el.insertAdjacentHTML("beforeend", learnedHTML());
+    renderDailyChart(C); renderModelTable(C); renderAccum(C); renderProbs(C); wireWinSeg(el, ()=>renderSection("models"));
+    const lt=$("#learnTog"); if(lt) lt.onchange=()=>{ S.learnOn=lt.checked; store.set("learnOn",S.learnOn); render(); }; }
+  if(id==="elev"){
+    ["elev","sl"].forEach(k=>{ if(S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
+    el.innerHTML = `<div class="card-h"><h3 style="margin:0">Snow by height${tipI("elevchart")}</h3>${winSegHTML()}</div><p class="sl-say" id="elevSay"></p><div class="chartbox tall"><canvas id="cElev"></canvas></div>
+      <div class="sl-h"><h3>Snow level${tipI("snowlevel")}</h3><div class="seg sm" id="slDays">${[3,5,7].map(d=>`<button data-d="${d}" class="${(S.slDays||5)===d?"on":""}">${d} days</button>`).join("")}</div></div>
+      <p class="sl-say" id="slSay"></p>
+      <div class="chartbox sl-box"><canvas id="cSL"></canvas></div>
+      <div class="legend sl-leg"><span><i class="ln"></i> each weather model</span><span><i class="ln thick"></i> Snowline blend</span><span><i class="dot" style="background:#60a5fa"></i>Snow</span><span><i class="dot" style="background:#a78bfa"></i>Mix</span><span><i class="dot" style="background:#4ade80"></i>Rain</span></div>`;
+    renderElevChart(C); renderSL(C); wireWinSeg(el, ()=>renderSection("elev"));
+    el.querySelectorAll("#slDays button").forEach(b=>b.onclick=()=>{ S.slDays = +b.dataset.d; el.querySelectorAll("#slDays button").forEach(x=>x.classList.toggle("on", x===b)); renderSL(S.ctx.C); }); }
+  if(id==="outlook"){ el.innerHTML = `<div id="lrWeeks"></div><div id="seasonPanel"></div><div id="lrMonths"></div>`; renderSeason(C); ensureSeason(); renderOutlook(); }
+  if(id==="avy"){ renderAvy(); }
+}
+
+/* ---------- Right Now ---------- */
+function renderRightNow(C, SIM, e){
+  const now = SIM[C.nowIdx], c = C.cons[C.nowIdx]; const el = $("#nowCard"); if(!now || !c){ el.remove(); return; }
+  const hr = +C.time[C.nowIdx].slice(11,13), sc = scoreOf(now);
+  const t = todayStr(); const ts = daySummary(C,SIM,t) || daySummary(C,SIM,dateAdd(t,1)); const tsDay = daySummary(C,SIM,t)? "today" : "tomorrow";
+  const lh = liftHold(c.RW, c.G); const W = !isAlp() ? wax(now, c) : null;
+  el.innerHTML = `<div class="card-h" style="margin-bottom:8px"><h2>Right Now</h2><span class="muted">${fmtEl(e)}</span></div>
+    <div class="rn">
+      <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like ${fmtT(now.feels)}</div></div></div>
+      <div class="rn-b"><div class="rn-w num"><span class="arr" style="transform:rotate(${(c.WD||0)+180}deg)">↑</span>${fmtWind(c.W)} <small>${windU()}</small></div><div class="muted">${compass(c.WD)} gusts to ${fmtWind(c.G)}</div></div>
+    </div>
+    <div class="surf-row"><span class="ic">${now.icon}</span><div style="flex:1;min-width:0"><b>${now.label}</b><div class="muted">${descOf(now)}</div></div><div style="text-align:right"><div class="num" style="font-size:26px;color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</div><div class="muted">${MODE_NAME[S.mode]}</div></div></div>
+    <div class="kv">
+      ${ts? `<div class="full"><div class="l">Best window ${tsDay}${tipI("quality")}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
+      ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
+      <div><div class="l">New snow</div><div class="v">${fmtSnow(now.newSnow)}${now.newSnow>0.5? ` · ${now.age<24?"last 24h":Math.round(now.age/24)+"d ago"}`:""}</div></div>
+      ${S.mode==="alpine" && isBach()? `<div><div class="l">Ridge wind</div><div class="v">${fmtWind(c.RW)} ${windU()}</div></div>` : S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span> <span class="muted" style="white-space:nowrap">ridge ${fmtWind(c.RW)} ${windU()}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : `<div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${fmtEl(c.sl)}</div></div>`}
+
+    </div>
+    ${(()=>{ const more = [
+      `${(()=>{ const an = aspectNote(C, todayStr()) || aspectNote(C, dateAdd(todayStr(),1)); return an? `<div class="full"><div class="l">${byMode("Slopes","Sun vs. shade")} ${aspectNote(C, todayStr())? "today":"tomorrow"}</div><div class="v">☀️ ${an.line}</div></div>` : ""; })()}`,
+      `${(()=>{ const cn = coldNote(c, now); return cn? `<div class="full"><div class="l">Dress for it</div><div class="v">🧤 ${cn}</div></div>` : ""; })()}`,
+      `${!isAlp()? (()=>{ const k = fromKit(c, now); return k && (k.glide||k.kick)? `<div class="full"><div class="l">From your wax box</div><div class="v">🧰 ${[k.glide?.name, k.kick?.name].filter(Boolean).join(" + ")}</div></div>` : ""; })() : ""}`,
+      `${!isAlp()? (()=>{ const sg = waxSuggest(c, now); return sg?.text? `<div class="full"><div class="l">Your wax log</div><div class="v">🧠 ${sg.text}</div></div>` : ""; })() : ""}`].join("").trim(); return more? `<details class="more-today"><summary>More for today</summary><div class="kv">${more}</div></details>` : ""; })()}
+`;
+}
+
+/* ---------- Hourly strip ---------- */
+function renderHourStrip(C, SIM){
+  let h = "";
+  for(let i=C.nowIdx; i<Math.min(C.time.length, C.nowIdx+48); i++){
+    const c = C.cons[i]; if(!c) continue; const t = C.time[i], hr = +t.slice(11,13);
+    const pp = C.pop.get(t); const pc = pp && pp[1] ? Math.round(100*pp[0]/pp[1]) : null; const ty = ptype(c);
+    h += `<div class="hc"><div class="hc-t">${i===C.nowIdx?"Now":hl(hr).replace("a","am").replace("p","pm")}</div><div class="hc-d">${i===C.nowIdx || hr===0? dow(t.slice(0,10)) : "&nbsp;"}</div>
+      <div class="hc-p" style="border-color:${pc==null? "transparent" : pc>=20?PT[ty==="none"?"snow":ty]:"#2a2a2e"};color:${pc>=20?PT[ty==="none"?"snow":ty]:"var(--mute)"}">${pc==null? "&nbsp;" : pc+"%"}</div>
+      <div class="hc-i" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${wxIcon(c, hr, 24)}</div><div class="hc-v">${fmtT(c.Te)}</div>
+      ${c.snow>=0.05? `<div class="hc-s">${fmtSnow(c.snow,1)}</div>`:`<div class="hc-s muted">&nbsp;</div>`}
+      <div class="hc-w">${compass(c.WD)}${fmtWind(c.W)}</div></div>`;
+  }
+  $("#hourStrip").innerHTML = h;
+}
+
+/* ---------- Daily list (day / night) ---------- */
+function periodRange(C, k, part){
+  const arr = C.ensDays.filter(m=>m.cnt[k]>0).map(m=> part==="day"? m.totD[k] : m.totN[k]);
+  return arr.length>=5 ? [pct(arr,.25), pct(arr,.75)] : null;
+}
+function rangeText(cons, r){
+  let lo = r? r[0] : cons*0.7, hi = r? r[1] : cons*1.3; lo = Math.min(lo, cons); hi = Math.max(hi, cons);
+  const L = Math.floor(snowNum(lo)), Hh = Math.max(L+1, Math.ceil(snowNum(hi)));
+  if(snowNum(hi) < 0.5) return `0${imp()?'"':' cm'}`;
+  return `${L}–${Hh}${imp()?'"':' cm'}`;
+}
+function renderDailyList(C, SIM){
+  const rows = C.days.map((d,k)=>{
+    const cd = C.consDays[k]; if(!cd.n) return "";
+    const noon = at(C,SIM,d,13), mid = at(C,SIM,dateAdd(d,1),1);
+    const x = k<15 ? daySummary(C,SIM,d) : null;
+    const per = (part) => {
+      const c = part==="day" ? noon?.c : mid?.c; const v = cd[part]; const hrs = [];
+      // temp: high for day, low for night
+      const T = part==="day" ? cd.tmaxD : cd.tminN;
+      const ty = (()=>{ let s=0,r=0; const H = part==="day"? [6,18] : [18,30]; for(let h=H[0]; h<H[1]; h++){ const q = at(C,SIM, h<24? d : dateAdd(d,1), h%24); if(q?.c && q.c.P>0.05){ s+=q.c.P*(q.c.frac??1); r+=q.c.P*(1-(q.c.frac??1)); } } return s+r<0.3? "none" : r>s*1.5? "rain" : s>r*3? "snow" : "mix"; })();
+      const rr = periodRange(C,k,part); const txt = rangeText(v, rr);
+      const pctW = Math.min(100, Math.max(v>=0.05?6:0, snowNum(rr? Math.max(rr[1],v) : v)/(imp()?12:30)*100));
+      const slrP = (()=>{ let a=0,w=0; const H = part==="day"? [6,18] : [18,30]; for(let h=H[0]; h<H[1]; h++){ const q = at(C,SIM, h<24? d : dateAdd(d,1), h%24); if(q?.c && q.c.snow>0.02){ a+=q.c.slr*q.c.snow; w+=q.c.snow; } } return w>0.1? Math.round(a/w)+":1" : "--"; })();
+      return `<div class="dl-r ${part}"><span class="dl-tp num">${fmtT(T)}</span><span class="dl-ic" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${c? wxIcon(c, part==="day"?13:1, 24) : ""}</span>
+        <span class="dl-sc">${part==="day" && x? scoreChip(x.best.avg) : ""}</span><span class="dl-slr">${slrP}</span>
+        <span class="dl-b"><i style="width:${pctW}%;background:${ty==="none"?"#3d8bfd":PT[ty]}"></i><em>${txt}</em></span></div>`;
+    };
+    const one = (()=>{ const c = noon?.c; let s=0,r=0; for(let h=6; h<30; h++){ const q = at(C,SIM, h<24? d : dateAdd(d,1), h%24); if(q?.c && q.c.P>0.05){ s+=q.c.P*(q.c.frac??1); r+=q.c.P*(1-(q.c.frac??1)); } }
+      const ty = s+r<0.3? "none" : r>s*1.5? "rain" : s>r*3? "snow" : "mix";
+      const v = cd.day + cd.night, a = periodRange(C,k,"day"), b = periodRange(C,k,"night"), rr = a && b? [a[0]+b[0], a[1]+b[1]] : null, txt = rangeText(v, rr);
+      const pctW = /^0(\.0)?["″ c]/.test(txt.trim())? 0 : Math.min(100, Math.max(6, snowNum(rr? Math.max(rr[1],v) : v)/(imp()?18:45)*100));
+      return `<div class="dl-r one"><span class="dl-tp num">${fmtT(cd.tmaxD)}<small>${fmtT(cd.tminN)}</small></span><span class="dl-ic" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${c? wxIcon(c, 13, 24) : ""}</span>
+        <span class="dl-sc">${x? scoreChip(x.best.avg) : ""}</span>
+        <span class="dl-b"><i style="width:${pctW}%;background:${ty==="none"?"#3d8bfd":PT[ty]}"></i><em>${txt}</em></span></div>`; })();
+    return `<div class="dl-day ${S.selDay===d?"sel":""} ${k>=7 && !S.allDays? "late":""}" data-d="${d}"><div class="dl-l"><b>${d===todayStr()?"Today":d===dateAdd(todayStr(),1)?"Tmrw":dow(d)}</b><span>${+d.slice(8,10)}</span>${S.bestDay===d?'<span class="star">★</span>':""}</div><div class="dl-p">${one}</div></div>
+      <div class="dl-x" id="dx-${d}">${S.selDay===d? "" : ""}</div>`;
+  }).join("");
+  const nDays = C.days.filter((d,k)=>C.consDays[k].n).length;
+  $("#dailyList").innerHTML = `<div class="dl-h"><span></span><span>High / low</span><span></span><span>Ski</span><span>Snow</span></div>` + rows
+    + (nDays > 7? `<button class="link dl-all" id="dlAll">${S.allDays? "Show 7 days" : `Show all ${nDays} days`}</button>` : "");
+  const da = $("#dlAll"); if(da) da.onclick = () => { S.allDays = !S.allDays; renderDailyList(C, SIM); if(!S.allDays) $("#dailyList").scrollIntoView({block:"nearest"}); };
+  document.querySelectorAll("#dailyList .dl-day").forEach(r=>r.onclick=()=>{ const d=r.dataset.d; const was = S.selDay===d; S.selDay = was? null : d;
+    document.querySelectorAll("#dailyList .dl-x").forEach(x=>x.innerHTML=""); document.querySelectorAll("#dailyList .dl-day").forEach(x=>x.classList.toggle("sel", x.dataset.d===S.selDay));
+    if(!was) renderDayDetail(C, SIM, $("#dx-"+d)); });
+  if(S.selDay && $("#dx-"+S.selDay)) renderDayDetail(C, SIM, $("#dx-"+S.selDay));
+}
+
+function renderDayDetail(C, SIM, el){
+  const d = S.selDay; const k = C.days.indexOf(d); if(!el || !d || k<0) return;
+  const cd = C.consDays[k], x = daySummary(C,SIM,d);
+  const ratio = cd.slrW? cd.slrSum/cd.slrW : null, sl = cd.slN? cd.slSum/cd.slN : null;
+  const conf = confidence(Object.keys(C.modelDays).filter(id=>S.enabled[id]).map(id=>{ const m=C.modelDays[id][k]; return m.n>=m.exp*0.75? m.day+m.night : null; }));
+  const memb = C.ensDays.filter(m=>m.cnt[k]>0).map(m=>m.tot[k]);
+  let mx=0,g=0; for(let h=9;h<=15;h++){ const q=at(C,SIM,d,h); if(q?.c){ mx=Math.max(mx,q.c.RW||0); g=Math.max(g,q.c.G||0);} } const lh = liftHold(mx,g);
+  const w = !isAlp() ? (()=>{ const q=at(C,SIM,d,9); return q?.sim? wax(q.sim,q.c):null; })() : null;
+  el.innerHTML = `<div class="daydetail"><div class="kv">
+    <div><div class="l">Total · confidence</div><div class="v">${fmtSnow(cd.day+cd.night)} <span class="badge b-${conf.lvl}">${conf.label}</span></div></div>
+    <div><div class="l">Odds of 6"+</div><div class="v">${memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length)+"%" : "—"}</div></div>
+    <div><div class="l">Quality</div><div class="v">${ratio? `${ratio>=15?"Light & fluffy":ratio>=11?"Average":"Heavy & dense"} <small class="muted">${Math.round(ratio)}:1</small>${tipI("ratio")}` : "—"}</div></div>
+    <div><div class="l">Max gust</div><div class="v">${fmtWind(cd.gmax)} ${windU()}</div></div>
+    ${S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
+    ${x? `<div class="full"><div class="l">Surface · best window</div><div class="v">${x.am?`AM ${x.am.icon} ${x.am.label}`:""}${x.am&&x.pm?" → ":""}${x.pm?`PM ${x.pm.icon} ${x.pm.label}`:""}<br><b>${hl(x.best.from)}–${hl(x.best.to)}</b> ${scoreChip(x.best.avg)} · ${x.best.sim.light.icon} ${x.best.sim.light.label}</div></div>`:""}
+    ${(()=>{ const an=aspectNote(C,d); return an? `<div class="full"><div class="l">${byMode("Slope aspects","Sun vs. shade")}</div><div class="v">${an.line}</div></div>` : ""; })()}
+    ${w? `<div class="full"><div class="l">Wax at 9am</div><div class="v">Glide: ${w.glide}${S.mode==="classic"?`<br>Kick: ${w.kick}`:""}</div></div>`:""}
+  </div>${hourlyChartHTML(C, SIM, d)}</div>`;
+  wireHourlyChart(C, SIM, el);
+}
+
+/* ---------- Detailed hourly table ---------- */
+function renderDetailedHourly(C, SIM, el){
+  const end = Math.min(C.time.length, C.nowIdx + 24*5); const cols = [];
+  for(let i=C.nowIdx;i<end;i++){ if(C.cons[i] && SIM[i]) cols.push(i); }
+  const days = [...new Set(cols.map(i=>C.time[i].slice(0,10)))];
+  const cell = (i, txt) => { const ty = ptype(C.cons[i]); return `<td style="color:${ty==="none"?"var(--text)":PT[ty]}">${txt}</td>`; };
+  const ROWS = [
+    ["Precip chance", i=>{ const pp=C.pop.get(C.time[i]); return pp&&pp[1]? Math.round(100*pp[0]/pp[1])+"%" : "—"; }],
+    [`Precipitation ${imp()?"in":"mm"}`, i=>{ const p=C.cons[i].P; return imp()? (p/25.4).toFixed(2) : p.toFixed(1); }],
+    [`Snowfall ${imp()?"in":"cm"}`, i=>{ const v=C.cons[i].snow; return imp()? v.toFixed(2) : (v*2.54).toFixed(1); }],
+    ["Snow ratio", i=> C.cons[i].snow>0.01 ? Math.round(C.cons[i].slr)+":1" : "--"],
+    [`Snow level ${imp()?"ft":"m"}`, i=>{ const sl=Math.max(0,C.cons[i].sl); return imp()? (Math.round(sl*FT/100)*100).toLocaleString() : Math.round(sl/10)*10; }],
+    ["Weather", i=> wxIcon(C.cons[i], +C.time[i].slice(11,13), 20)],
+    [`Temperature °${imp()?"F":"C"}`, i=> fmtT(C.cons[i].Te).replace("°","")],
+    [`Feels like °${imp()?"F":"C"}`, i=> fmtT(SIM[i].feels).replace("°","")],
+    ["Humidity %", i=> isNum(C.cons[i].RH)? Math.round(C.cons[i].RH) : "—"],
+    [`Wind ${windU()}`, i=> compass(C.cons[i].WD)+fmtWind(C.cons[i].W)],
+    [`Gust ${windU()}`, i=> fmtWind(C.cons[i].G)],
+    ["Cloud cover %", i=> isNum(C.cons[i].CC)? Math.round(C.cons[i].CC) : "—"],
+    [`${MODE_NAME[S.mode]} score`, i=> scoreChip(scoreOf(SIM[i]))],
+    ["Surface", i=> `<span title="${SIM[i].label}">${SIM[i].icon}</span>`],
+  ];
+  el.innerHTML = `<div class="jump"><span class="muted">Jump to:</span>${days.map((d,j)=>`<button data-j="${d}">${j===0?"Now":dow(d)}</button>`).join("")}</div>
+    <div class="dh" id="dhWrap"><table><thead><tr><th class="m"></th>${cols.map(i=>{ const t=C.time[i], hr=+t.slice(11,13); return `<th data-day="${t.slice(0,10)}" data-hr="${hr}">${hl(hr).replace("a","am").replace("p","pm")}<br><span>${dow(t.slice(0,10))}</span></th>`; }).join("")}</tr></thead>
+    <tbody>${ROWS.map(([lab,f])=>`<tr><td class="m">${lab}</td>${cols.map(i=>lab==="Weather"||lab.endsWith("score")||lab==="Surface"? `<td>${f(i)}</td>` : cell(i, f(i))).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="legend"><span class="muted">Precip type:</span><span><i class="dot" style="background:${PT.snow}"></i> Snow</span><span><i class="dot" style="background:${PT.mix}"></i> Snow/rain</span><span><i class="dot" style="background:${PT.rain}"></i> Rain</span><span><i class="dot" style="background:${PT.none}"></i> None</span></div>`;
+  el.querySelectorAll(".jump button").forEach(b=>b.onclick=()=>{ const wrap=$("#dhWrap"); const th = b.dataset.j===days[0] ? wrap.querySelector("th[data-day]") : (wrap.querySelector(`th[data-day="${b.dataset.j}"][data-hr="6"]`) || wrap.querySelector(`th[data-day="${b.dataset.j}"]`)); if(th) wrap.scrollTo({left: th.offsetLeft - wrap.querySelector("th.m").offsetWidth, behavior:"smooth"}); });
+}
+
+function renderWax(C, SIM){
+  const el = $("#waxList"); if(!el) return;
+  el.innerHTML = C.days.slice(0,4).map(d=>{
+    const rows = [9,14].map(hh=>{ const x=at(C,SIM,d,hh); if(!x || x.i < C.nowIdx || !x.sim) return ""; const w=wax(x.sim,x.c);
+      return `<div class="waxrow"><div class="t">${hl(hh)}</div><div>${x.sim.icon} ${x.sim.label} · ${fmtT(x.c.Te)} · <b style="color:${speedColor(w.speed)}">${w.speed}</b><br><span class="muted">Glide</span> ${w.glide}, ${w.structure}${S.mode==="classic"?`<br><span class="muted">Kick</span> ${w.kick}`:""}</div></div>`; }).join("");
+    return rows? `<div class="waxday"><div class="hd"><b>${dayLabel(d)}</b></div>${rows}</div>` : "";
+  }).join("") + `<div class="muted">Calls come from the forecast air temperature and the modeled snow surface. Always test on the snow.</div>`;
+}
+
+function updateSeasonSummary(){
+  const el = $("#sv-outlook"); if(!el) return;
+  if(!S.season || S.season.loc!==S.loc){ el.textContent = "Weeks 1–5 · season · 6 months"; return; }
+  const Z = seasonCalc(bandElev()); if(!Z){ el.textContent=""; return; }
+  el.textContent = `${fmtSnow(Z.toDate,0)} so far${isNum(Z.pctNormal)? " · "+Z.pctNormal+"% of normal":""}`;
+}
+
+/* ---------- Favorites ---------- */
+const SHORT_NAMES = {"Mt. Bachelor, OR":"Mt. Bachelor","Mt. Bachelor Nordic Center, OR":"Bachelor Nordic","Meissner Nordic (Bend), OR":"Meissner","Elk Lake Resort (Nordic), OR":"Elk Lake"};
+function dispName(n){ return SHORT_NAMES[n] || String(n||"").replace(/,\s*[A-Z]{2}$/,""); }
+const DEFAULT_FAVS = ["Mt. Bachelor, OR","Mt. Bachelor Nordic Center, OR","Meissner Nordic (Bend), OR","Hoodoo, OR"];
+async function renderFavs(force){
+  const el = $("#view-favs");
+  const list = S.favs.length ? S.favs : DEFAULT_FAVS.map(n=>PRESETS.find(p=>p.name===n)).filter(Boolean);
+  if(!S.finder || force) el.innerHTML = `<div class="vh"><h1>Favorites</h1></div>${list.map(()=>`<div class="skel" style="height:170px"></div>`).join("")}`;
+  let F; try{ F = await loadFinder(force); }catch(e){ el.innerHTML = `<div class="vh"><h1>Favorites</h1></div><div class="card err">Couldn't load forecasts. Try again in a minute.</div>`; return; }
+  const byName = new Map(F.rows.map(r=>[r.spot.name, r]));
+  el.innerHTML = `<div class="vh"><h1>Favorites</h1>${S.favs.length? `<span class="row" style="gap:14px;flex-wrap:nowrap"><button class="link" id="favShare">Share</button><button class="link" id="favEdit">${S.favEdit?"Done":"Edit"}</button></span>`:""}</div>
+    ${a2hsHTML()}
+    ${S.favs.length? "" : `<div class="callout">Tap ☆ on any forecast to add it here. Until then, here are some spots near Bend.</div>`}
+    ${weekendHTML(list, F.rows)}
+    <div class="seg scroll fav-views" id="favViews">${FAV_VIEWS.map(([k,l])=>`<button data-fv="${k}" class="${(S.favView||"snow")===k?"on":""}">${l}</button>`).join("")}</div>
+    ${list.map(sp=>{ const r = byName.get(sp.name); if(!r) return "";
+      return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${sp.name}</b><div class="muted">${Math.round(sp.top).toLocaleString()} ft summit · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
+        ${(S.favView && S.favView!=="snow" && favBodyHTML(S.favView, sp, r)) || snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</div>`; }).join("")}
+    <div class="muted" style="text-align:center;margin:10px 0">Summit forecasts · Open-Meteo best-match blend through Snowline's snow model</div>`;
+  el.querySelectorAll("#wkSeg button").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); S.wkDay = b.dataset.d; renderFavs(); });
+  el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ if(S.favEdit) return; const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
+  const fe=$("#favEdit"); if(fe) fe.onclick = () => { S.favEdit=!S.favEdit; renderFavs(); };
+  const fs=$("#favShare"); if(fs) fs.onclick = () => shareFavs();
+  el.querySelectorAll("[data-fv]").forEach(b=>b.onclick=async()=>{ S.favView=b.dataset.fv; store.set("favView", S.favView); renderFavs(); const v=S.favView; await prepFavView(v, list); if(S.favView===v && (location.hash||"")==="#favs") renderFavs(); });
+  wireCamStars(el, ()=>renderFavs());
+  if(!S.favPrepped && S.favView && S.favView!=="snow"){ S.favPrepped=true; prepFavView(S.favView, list).then(()=>{ if((location.hash||"")==="#favs") renderFavs(); }); }
+  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const n=decodeURIComponent(b.dataset.rm); S.favs=S.favs.filter(f=>f.name!==n); store.set("favs",S.favs); if(!S.favs.length) S.favEdit=false; updateTop(); renderFavs(); });
+  el.querySelectorAll("[data-up]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const n=decodeURIComponent(b.dataset.up); const i=S.favs.findIndex(f=>f.name===n); if(i>0){ const [x]=S.favs.splice(i,1); S.favs.splice(i-1,0,x); store.set("favs",S.favs); renderFavs(); } });
+}
+
+function firstPowDay(C){
+  for(let k=0;k<Math.min(7,C.days.length);k++){ const fresh = C.consDays[k].night; if(fresh >= 4 && k+1<C.days.length) return byMode(`Best first chair: <b>${dow(C.days[k+1])} morning</b> (${fmtSnow(fresh)} overnight).`, `Fresh snow on the trails <b>${dow(C.days[k+1])} morning</b> (${fmtSnow(fresh)} overnight); best once it's groomed.`); }
+  return "";
+}
+function powderScore(C,k){
+  const fresh = C.consDays[k-1]? C.consDays[k-1].night : 0; const dayS = C.consDays[k].day;
+  const cd = C.consDays[k-1]||C.consDays[k]; const ratio = cd.slrW? cd.slrSum/cd.slrW : 10;
+  let s = fresh*0.7 + dayS*0.35 + (ratio>14?1:ratio<9?-1:0) - (C.consDays[k].gmax>65?2:C.consDays[k].gmax>45?1:0);
+  return clamp(Math.round(s),0,10);
+}
+function renderDisc(C, e, winTot, lo, hi, modelTots, SIM){
+  const N = S.win, D = S.data, L = S.loc;
+  const daily = C.consDays.map(d=>d.day+d.night);
+  const parts = [];
+  if(SIM){ const keys = C.days.slice(0,Math.min(N,7)).map(d=>[at(C,SIM,d,10)?.sim, d]).filter(x=>x[0]);
+    var dayChips = keys.map(([s,d])=>{ const x = daySummary(C,SIM,d), sc = x? x.best.avg : null;
+      return `<div class="fx-d" style="--q:${scoreColor(sc)}"><b>${d===todayStr()? "Today" : dow(d)}</b><span class="fx-i">${s.icon}</span><small>${s.label}</small></div>`; }).join("");
+    if(keys.length) parts.push(`<p><b>How it'll ski:</b> surfaces are modeled hour by hour from new snow, wind, sun, melt-freeze and rain at ${fmtEl(e)}. ${byMode("Shaded north aspects will stay colder and drier than the model shows, and sunny south aspects will soften sooner.", "Open, sunny stretches will soften sooner than shaded trail in the trees.")}</p>`); }
+  // storm detection
+  const storms = []; let cur=null;
+  for(let k=0;k<daily.length;k++){ if(daily[k]>=1){ if(!cur) cur={s:k,e:k,tot:0}; cur.e=k; cur.tot+=daily[k]; } else if(cur){ storms.push(cur); cur=null; } }
+  if(cur) storms.push(cur);
+  const conf = confidence(modelTots);
+  if(winTot < 0.5){
+    const nextStorm = storms.find(s=>s.s>=N);
+    parts.push(`<p><b>Dry stretch.</b> Models show little or no snow at ${fmtEl(e)} over the next ${N} days. ${nextStorm? `The next real chance shows up around <b>${dow(C.days[nextStorm.s])} ${md(C.days[nextStorm.s])}</b>, with about ${fmtSnow(nextStorm.tot)} in the consensus. That's far enough out that confidence is low.` : `Nothing significant shows up through the end of the 15-day window.`}</p>`);
+  } else {
+    const s0 = storms[0];
+    if(s0) parts.push(`<p><b>${s0.e>s0.s? `${dow(C.days[s0.s])}–${dow(C.days[s0.e])}`: dow(C.days[s0.s])+" "+md(C.days[s0.s])}:</b> the consensus brings about <b>${fmtSnow(s0.tot)}</b> to ${fmtEl(e)}. The ${N}-day consensus is ${fmtSnow(winTot)}, with a likely range of ${fmtSnow(lo)}–${fmtSnow(hi)}. ${conf.lvl==="hi"?"The models agree closely, so this is a solid forecast.":conf.lvl==="md"?"The models agree on the overall picture but differ on amounts.":"The models disagree a lot. Expect this forecast to change."}</p>`);
+    // model extremes
+    const ranked = Object.keys(D.models).filter(id=>S.enabled[id]).map(id=>({id, v:modelWindow(C,id,N)})).filter(x=>isNum(x.v)).sort((a,b)=>b.v-a.v);
+    if(ranked.length>=3){ const nm = id=>MODELS.find(m=>m.id===id).name; parts.push(`<p><b>Model check:</b> ${nm(ranked[0].id)} is the most aggressive at ${fmtSnow(ranked[0].v)}; ${nm(ranked.at(-1).id)} is the lightest at ${fmtSnow(ranked.at(-1).v)}. ${D.models.ecmwf && isNum(modelWindow(C,"ecmwf",N))? `The ECMWF, usually the most skillful global model, has ${fmtSnow(modelWindow(C,"ecmwf",N))}.`:""}</p>`); }
+    // snow level
+    const slArr = C.cons.slice(C.nowIdx, C.nowIdx+24*N).filter(c=>c && c.P>0.25).map(c=>c.sl);
+    if(slArr.length){ const sMin=Math.min(...slArr), sMax=Math.max(...slArr);
+      const baseM=L.base/FT, topM=L.top/FT;
+      let msg = `While it's precipitating, snow levels range from ${fmtEl(sMin)} to ${fmtEl(sMax)}. `;
+      if(sMax > topM) msg += byMode(`At times the rain line goes above the summit, so expect rain on the whole mountain during the warm part of the storm.`, `At times the rain line goes above the highest trails, so expect rain on the whole trail system during the warm part of the storm.`);
+      else if(sMax > baseM) msg += byMode(`At times the rain line climbs above the base, so lower runs may get wet while the upper mountain stays white.`, `At times the rain line climbs above the trailhead, so lower trails may get wet while higher loops stay white.`);
+      else msg += byMode(`It stays below the base, so it's all snow top to bottom.`, `It stays below the trailhead, so it's all snow on the trails.`);
+      parts.push(`<p><b>Snow level:</b> ${msg}</p>`);
+    }
+    // quality
+    const totW = C.consDays.slice(0,N).reduce((a,d)=>a+d.slrW,0), totR = C.consDays.slice(0,N).reduce((a,d)=>a+d.slrSum,0);
+    if(totW>0.5){ const r = totR/totW; parts.push(`<p><b>Snow quality:</b> the average snow-to-liquid ratio is about ${Math.round(r)}:1. ${byMode(
+      r>=15?"Expect light, cold smoke that skis deep.":r>=11?"Expect a fairly average density that skis well.":"Expect dense, heavy snow (Cascade concrete). Good for the base, but it'll be work on the legs.",
+      r>=15?"Light, dry snow: soft and slow until it's groomed, then fast corduroy.":r>=11?"Average density: it should groom up into firm, fast lanes.":"Dense, wet snow: slow and sticky until it's groomed and sets up.",
+      r>=15?"Light, dry snow: great kick in fresh tracks, with slower glide until they're set.":r>=11?"Average density: classic tracks should set nicely after grooming.":"Dense, wet snow: an icing risk for kick wax; think klister or skin skis.")}</p>`); }
+  }
+  const windy = C.consDays.slice(0,N).map((d,k)=>({k,g:d.gmax})).filter(x=>x.g>55);
+  if(windy.length) parts.push(`<p><b>Wind:</b> gusts above ${imp()?"35 mph":"55 km/h"} at the model's 10 m level on ${windy.map(x=>dow(C.days[x.k])).join(", ")}. ${S.mode==="bc"? "Strong wind moves snow onto lee slopes near ridgelines and strips windward ones." : byMode("Upper lifts could go on wind hold, and exposed terrain will get wind-affected.", "Expect drifting in open sections and filled-in tracks; sheltered trails will ski best.")}</p>`);
+  // long-range
+  const lr = windowTotal(daily.slice(N), 15-N);
+  if(N<10) parts.push(`<p><b>Further out (days ${N+1}–15):</b> the consensus adds about ${fmtSnow(lr)}. ${lr>12?"The pattern looks active.":lr>3?"There are some chances.":"It looks quiet."} Don't trust long-range amounts much; use the 10-day view and the ensembles for the trend.</p>`);
+  // headline, written from the same numbers
+  let head;
+  if(winTot < 0.5){ const nx = storms.find(s=>s.s>=N); head = nx? `Dry for now; snow returns around ${dow(C.days[nx.s])}` : `Dry stretch: little snow in the next ${N} days`; }
+  else { const s0 = storms[0]; head = s0? `${fmtSnow(s0.tot)} ${s0.e>s0.s? `${dow(C.days[s0.s])}–${dow(C.days[s0.e])}` : dow(C.days[s0.s])}, ${fmtSnow(winTot)} over ${N} days` : `${fmtSnow(winTot)} over the next ${N} days`; }
+  if(S.mode==="bc") parts.push(`<p class="bc-alert">⚠️ This write-up describes weather only. It does not assess avalanche danger or recommend where or whether to go. Read the avalanche center's forecast.</p>`);
+  const s0 = storms[0], next = winTot < 0.5? storms.find(s=>s.s>=N) : s0;
+  const stat = (v, l) => `<div class="fx-s"><b class="num">${v}</b><small>${l}</small></div>`;
+  const stats = winTot < 0.5
+    ? stat("Dry", `next ${N} days`) + (next? stat(fmtSnow(next.tot,0), `${dow(C.days[next.s])} ${md(C.days[next.s])}`) : "")
+    : (()=>{ const big = daily.slice(0,N).reduce((b,v,k)=>v>b.v? {v,k} : b, {v:0,k:0});
+        const first = next? stat(fmtSnow(next.tot, next.tot<10?1:0), next.e>next.s? `${dow(C.days[next.s])}–${dow(C.days[next.e])}` : dow(C.days[next.s])) : "";
+        const same = next && Math.abs(next.tot - winTot) < 0.3;   // one storm is the whole window: show its biggest day instead of repeating the total
+        return first + (same? (next.e>next.s? stat(fmtSnow(big.v, big.v<10?1:0), `biggest day · ${dow(C.days[big.k])}`) : "") : stat(fmtSnow(winTot, winTot<10?1:0), `next ${N} days`)); })();
+  $("#disc").innerHTML = `<div class="fx-stats">${stats}<span class="badge b-${conf.lvl} fx-c">${conf.label}</span></div>
+    ${typeof dayChips!=="undefined" && dayChips? `<div class="fx-k">How it'll ski · ${MODE_NAME[S.mode]}</div><div class="fx-days">${dayChips}</div>` : ""}
+    <div class="fx-more">${parts.join("")}</div>`;
+}
+
+const chartBase = () => ({
+  responsive:true, maintainAspectRatio:false, animation:false,
+  plugins:{ legend:{position:"bottom",labels:{color:"#8b9cba",boxWidth:8,boxHeight:8,usePointStyle:true,padding:12,font:{size:11}}}, tooltip:{mode:"index",intersect:false, callbacks:{ label: it => { const v = it.parsed?.x!=null && it.chart.options.indexAxis==="y"? it.parsed.x : it.parsed?.y; return ` ${it.dataset.label}: ${isNum(v)? (Math.abs(v)>=10? Math.round(v) : Math.round(v*10)/10).toLocaleString() : "—"}`; } }} },
+  scales:{ x:{ticks:{color:"#8b9cba",font:{size:10},maxRotation:0,autoSkipPadding:6},grid:{display:false}}, y:{ticks:{color:"#8b9cba",font:{size:10},maxTicksLimit:5},grid:{color:"#1a2540"},border:{display:false},beginAtZero:true} }
+});
+
+function renderDailyChart(C){
+  const labels = C.days.map((d,k)=>d===todayStr()?"Today":dow(d));
+  const day = C.consDays.map(d=>snowNum(d.day)), night = C.consDays.map(d=>snowNum(d.night));
+  const p10=[],p50=[],p90=[];
+  C.days.forEach((d,k)=>{ const v=C.ensDays.filter(m=>m.cnt[k]>0).map(m=>snowNum(m.tot[k])); p10.push(v.length?pct(v,.1):null); p50.push(v.length?pct(v,.5):null); p90.push(v.length?pct(v,.9):null); });
+  const whisk = { id:"whisk", afterDatasetsDraw(ch){ const {ctx, scales:{x,y}} = ch; ctx.save(); ctx.strokeStyle="#a78bfa"; ctx.lineWidth=1.5;
+    p10.forEach((lo,i)=>{ if(lo==null) return; const xx=x.getPixelForValue(i); const y1=y.getPixelForValue(lo), y2=y.getPixelForValue(p90[i]); ctx.beginPath(); ctx.moveTo(xx,y1); ctx.lineTo(xx,y2); ctx.moveTo(xx-4,y1); ctx.lineTo(xx+4,y1); ctx.moveTo(xx-4,y2); ctx.lineTo(xx+4,y2); ctx.stroke(); }); ctx.restore(); } };
+  const o = chartBase(); o.scales.x.stacked = true; o.scales.y.stacked = true; o.scales.y.title={display:true,text:imp()?"inches":"cm",color:"#8fa1bf"};
+  S.charts.daily = new Chart($("#cDaily"), { type:"bar", data:{ labels, datasets:[
+    {label:"Day (6a–6p)", data:day, backgroundColor:"#38bdf8", stack:"s", borderRadius:3},
+    {label:"Night (6p–6a)", data:night, backgroundColor:"#6366f1", stack:"s", borderRadius:3},
+    {label:"Middle of all runs", type:"line", data:p50, showLine:false, pointBackgroundColor:"#a78bfa", pointRadius:3, stack:"e"}
+  ]}, options:o, plugins:[whisk] });
+}
+
+function renderModelTable(C){
+  const D = S.data, days = C.days.slice(0,10);
+  let h = `<tr><th class="m">Model</th>${days.map((d,k)=>`<th>${k===0?"Today":dow(d)}<br>${md(d)}</th>`).join("")}<th>5-day</th><th>10-day</th></tr>`;
+  for(const m of MODELS){
+    const has = !!D.models[m.id];
+    const row = days.map((d,k)=>{ if(!has) return `<td>—</td>`; const x=C.modelDays[m.id][k]; if(x.n < x.exp*0.75) return `<td>—</td>`; const v=x.day+x.night; return `<td><span class="cell" style="background:${snowColor(v)}">${v<0.1?"0":fmtSnow(v).replace('"','')}</span></td>`; }).join("");
+    const t5 = has? modelWindow(C,m.id,5):null, t10 = has? modelWindow(C,m.id,10):null;
+    h += `<tr class="${S.enabled[m.id]&&has?'':'off'}"><td class="m"><label class="chip"><input type="checkbox" data-m="${m.id}" ${S.enabled[m.id]?'checked':''} ${has?'':'disabled'}><span class="dot" style="background:${m.c}"></span>${m.name}</label></td>${row}<td><b>${has&&isNum(t5)?fmtSnow(t5):'—'}</b></td><td><b>${has&&isNum(t10)?fmtSnow(t10):'—'}</b></td></tr>`;
+  }
+  const cd = C.consDays;
+  h += `<tr class="cons"><td class="m">Snowline</td>${days.map((d,k)=>{const v=cd[k].day+cd[k].night; return `<td><span class="cell" style="background:${snowColor(v)}">${v<0.1?"0":fmtSnow(v).replace('"','')}</span></td>`}).join("")}<td>${fmtSnow(windowTotal(cd.map(x=>x.day+x.night),5))}</td><td>${fmtSnow(windowTotal(cd.map(x=>x.day+x.night),10))}</td></tr>`;
+  $("#mTable").innerHTML = h;
+  const missing = MODELS.filter(m=>!D.models[m.id]).map(m=>m.name);
+  $("#mStatus").textContent = missing.length? `Not available for this location: ${missing.join(", ")} (HRRR and NBM cover the US only).` : "All models loaded.";
+  $("#mTable").querySelectorAll("input[data-m]").forEach(cb=>cb.onchange=()=>{ S.enabled[cb.dataset.m]=cb.checked; store.set("enabled",S.enabled); render(); });
+}
+
+function renderAccum(C){
+  const D=S.data; const start=C.nowIdx, end=Math.min(C.time.length, start+24*10);
+  const labels = C.time.slice(start,end).map(t=>t.slice(11,13)==="00"? dow(t.slice(0,10)) : "");
+  const ds = MODELS.filter(m=>D.models[m.id]).map(m=>{ let s=0; const arr=[]; for(let i=start;i<end;i++){ const v=C.per[m.id][i]; if(v){ s+=v.snow; arr.push(snowNum(s)); } else arr.push(null); } return {label:m.name, data:arr, borderColor:m.c, borderWidth:S.enabled[m.id]?1.6:0.6, pointRadius:0, spanGaps:false, borderDash:S.enabled[m.id]?[]:[3,3]}; });
+  ds.forEach(d=>{ d.borderWidth = 1.2; d.borderColor = "rgba(148,163,184,.45)"; d.pointRadius = 0; });
+  let s=0; ds.push({label:"Snowline forecast", data:C.cons.slice(start,end).map(c=>{ if(c) s+=c.snow; return snowNum(s); }), borderColor:"#7dd3fc", borderWidth:3.5, pointRadius:0});
+  { const tot = ds[ds.length-1].data.filter(isNum).pop() || 0, u = imp()? '"' : " cm"; let half = null; ds[ds.length-1].data.forEach((v,i)=>{ if(half==null && v >= tot/2 && tot > 0.5) half = i; });
+    const el = $("#accumSay"); if(el) el.textContent = tot < 0.5? "Little or no snow adding up over the next 10 days." : `About ${Math.round(tot*10)/10 >= 3? Math.round(tot) : Math.round(tot*10)/10}${u} over the next 10 days${half!=null && labels[half]!==undefined? `, half of it by ${dow(C.time[start+half].slice(0,10))}` : ""}. Thin gray lines are the individual models.`; }
+  const o = chartBase(); o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.grid.display=false; o.plugins.tooltip.enabled=false; o.plugins.legend = {display:false};
+  S.charts.accum = new Chart($("#cAccum"), {type:"line", data:{labels, datasets:ds}, options:o});
+}
+
+function renderProbs(C){
+  const thr = imp()? [1,6,12,24] : [3,15,30,60]; // display units
+  const tot5 = ensWindowTotals(C, Math.min(S.win,10)).map(snowNum);
+  const unit = imp()? '"' : " cm";
+  $("#probs").innerHTML = tot5.length? thr.map(t=>{ const p=Math.round(100*tot5.filter(v=>v>=t).length/tot5.length); return `<div class="prob"><div class="k">≥ ${t}${unit} in ${S.win} days</div><div class="v">${p}%</div><div class="bar"><i style="width:${p}%"></i></div></div>`; }).join("") : `<div class="sub">The odds aren't available for this spot right now. Check back in a bit.</div>`;
+  { const box = $("#cProb")?.parentElement; if(box) box.style.display = C.ensDays.length? "" : "none"; }
+  if(!C.ensDays.length) return;
+  const labels = C.days.map((d,k)=>k===0?"Today":dow(d));
+  const mk = (t,col)=>({label:`≥${t}${unit}`, data:C.days.map((d,k)=>{ const v=C.ensDays.filter(m=>m.cnt[k]>0).map(m=>snowNum(m.tot[k])); return v.length? Math.round(100*v.filter(x=>x>=t).length/v.length):null; }), borderColor:col, backgroundColor:col+"33", fill:true, pointRadius:2, tension:.3});
+  const o = chartBase(); o.scales.y.max=100; o.scales.y.ticks.callback=v=>v+"%";
+  S.charts.prob = new Chart($("#cProb"), {type:"line", data:{labels, datasets:[mk(thr[0],"#38bdf8"), mk(thr[1],"#a78bfa"), mk(thr[2],"#f472b6")]}, options:o});
+}
+
+function renderElevChart(C0){
+  const L=S.loc, N=S.win, D=S.data;
+  const loFt = Math.max(0, L.base - 2000), hiFt = L.top + 1000, steps = 18;
+  const levels = Array.from({length:steps+1},(_,i)=>loFt + (hiFt-loFt)*i/steps);
+  const cons=[], mn=[], mx=[];
+  for(const ft of levels){
+    const C = computeAt(ft/FT);
+    cons.push(snowNum(windowTotal(C.consDays.map(d=>d.day+d.night), N)));
+    const v = Object.keys(D.models).filter(id=>S.enabled[id]).map(id=>modelWindow(C,id,N)).filter(isNum).map(snowNum);
+    mn.push(v.length?Math.min(...v):null); mx.push(v.length?Math.max(...v):null);
+  }
+  const yl = levels.map(ft=> imp()? Math.round(ft/100)*100 : Math.round(ft/FT/10)*10);
+  const marks = {id:"marks", afterDatasetsDraw(ch){ const {ctx, chartArea:a, scales:{y}} = ch; ctx.save(); ctx.font="11px Inter"; ctx.setLineDash([4,4]);
+    [[L.base,"Base"],[L.top,"Summit"],[bandElev()*FT,"▶ You"]].forEach(([ft,lab],i)=>{ const v = imp()? ft : ft/FT; const yy=y.getPixelForValue(v); if(yy<a.top||yy>a.bottom) return; ctx.strokeStyle=i===2?"#fbbf24":"#8fa1bf"; ctx.beginPath(); ctx.moveTo(a.left,yy); ctx.lineTo(a.right,yy); ctx.stroke(); ctx.fillStyle=ctx.strokeStyle; ctx.fillText(lab, a.right-48, yy-4); }); ctx.restore(); }};
+  const o = chartBase();
+  o.indexAxis = "y";
+  o.scales = { y:{type:"linear", min:imp()?loFt:loFt/FT, max:imp()?hiFt:hiFt/FT, ticks:{color:"#8fa1bf",callback:v=>v.toLocaleString()+(imp()?" ft":" m")}, grid:{color:"#1a2540"}},
+               x:{beginAtZero:true, ticks:{color:"#8fa1bf"}, grid:{color:"#1a2540"}, title:{display:true,text:`${N}-day snow (${imp()?"in":"cm"})`,color:"#8fa1bf"}} };
+  o.plugins.tooltip = {mode:"nearest", intersect:false, axis:"y", callbacks:{ title: it => `${Math.round(it[0].parsed.y).toLocaleString()} ${imp()? "ft" : "m"}`, label: it => ` ${it.dataset.label}: ${fmtSnow(imp()? it.parsed.x : it.parsed.x/2.54, 0)}` }};
+  const pts = arr => arr.map((v,i)=>({x:v, y: imp()? levels[i] : levels[i]/FT}));
+  S.charts.elev = new Chart($("#cElev"), {type:"line", data:{datasets:[
+    {label:"Highest model", data:pts(mx), borderColor:"transparent", backgroundColor:"rgba(125,211,252,.15)", pointRadius:0, fill:"+1"},
+    {label:"Lowest model", data:pts(mn), borderColor:"transparent", pointRadius:0, fill:false},
+    {label:"Snowline forecast", data:pts(cons), borderColor:"#7dd3fc", borderWidth:3, pointRadius:2, fill:false, tension:.3}
+  ]}, options:{...o, plugins:{...o.plugins, legend:{...(o.plugins.legend||{}), labels:{...(o.plugins.legend?.labels||{}), filter: it => it.text === "Snowline forecast"}}}}, plugins:[marks]});
+  { const near = ft => { let k = 0; levels.forEach((l,i)=>{ if(Math.abs(l-ft) < Math.abs(levels[k]-ft)) k = i; }); return cons[k]; }, u = imp()? '"' : " cm", f = v => (v < 1? (Math.round(v*10)/10) : Math.round(v)) + u;
+    const el = $("#elevSay"); if(el) el.textContent = `Next ${N} days: about ${f(near(L.top))} at the summit, ${f(near(bandElev()*FT))} where you are, and ${f(near(L.base))} at the base.`; }
+}
+
+function renderSL(C){
+  try{ S.charts.sl?.destroy?.(); }catch(e){}
+  const L = S.loc, D = S.data, days = S.slDays || 5, start = C.nowIdx, end = Math.min(C.time.length, start + 24*days);
+  const slice = C.cons.slice(start, end), times = C.time.slice(start, end);
+  const conv = m => imp()? m*FT : m, unit = imp()? "ft" : "m";
+  // one snow-level line per weather model (freezing level less ~1,000 ft, same as the blend)
+  const ids = Object.keys(D.models).filter(id=>S.enabled[id]);
+  const lines = ids.map(id=>{ const m = D.models[id], ix = new Map(m.time.map((t,i)=>[t,i]));
+    return {id, data: times.map(t=>{ const i = ix.get(t); const fl = i==null? null : m.FL?.[i]; return isNum(fl) && fl > 0? conv(fl - 300) : null; })}; })
+    .filter(l=>l.data.filter(v=>v!=null).length > 12);
+  const blend = slice.map(c=>c && isNum(c.sl)? conv(c.sl) : null);
+  const base = conv(L.base/FT), top = conv(L.top/FT);
+  const all = lines.flatMap(l=>l.data).concat(blend).filter(isNum);
+  const lo = Math.min(base - conv(500), ...all.map(v=>v)), hi = Math.max(top + conv(600), ...all);
+  const yMin = Math.max(0, Math.floor(lo/1000)*1000), yMax = Math.ceil(hi/1000)*1000;
+  // where the models disagree most while it's actually precipitating
+  let worst = null;
+  times.forEach((t,k)=>{ const c = slice[k]; if(!c || (c.P||0) < 0.3) return; const v = lines.map(l=>l.data[k]).filter(isNum); if(v.length < 3) return;
+    v.sort((a,b)=>a-b); const s = v[Math.floor(v.length*0.85)] - v[Math.floor(v.length*0.15)]; if(!worst || s > worst.s) worst = {k, s, lo: v[Math.floor(v.length*0.15)], hi: v[Math.floor(v.length*0.85)]}; });
+  const wet = times.map((t,k)=>[t,slice[k]]).filter(([t,c])=>c && (c.P||0) >= 0.3);
+  const rainBase = wet.filter(([t,c])=>conv(c.sl) > base), rainTop = wet.filter(([t,c])=>conv(c.sl) > top);
+  const r10 = v => Math.round(v/(imp()? 100 : 50))*(imp()? 100 : 50), f = v => r10(v).toLocaleString()+" "+unit;
+  const when = t => `${dow(t.slice(0,10))} ${+t.slice(11,13) < 12? "morning" : +t.slice(11,13) < 17? "afternoon" : "night"}`;
+  let say = !wet.length? "Dry stretch: no rain or snow to speak of." :
+    !rainBase.length? "Snow to the base whenever it's precipitating." :
+    rainTop.length? `Rain reaches the summit at times, first ${when(rainTop[0][0])}.` :
+    `Rain at the base at times (first ${when(rainBase[0][0])}); snow up top.`;
+  if(worst && worst.s >= conv(450)) say += ` Models split most ${when(times[worst.k])}: ${f(worst.lo)} to ${f(worst.hi)}.`;
+  else if(wet.length) say += " The models mostly agree.";
+  $("#slSay") && ($("#slSay").textContent = say);
+  const labels = times.map(t=>t.slice(11,13)==="12"? dow(t.slice(0,10)) : "");
+  const o = chartBase();
+  o.scales.x.ticks.autoSkip = false; o.scales.x.ticks.maxRotation = 0; o.scales.x.ticks.font = {size:11, weight:"600"}; o.scales.x.ticks.color = "#c9d4e3";
+  o.scales.x.grid = {display:true, drawTicks:false, color: ctx => times[ctx.index]?.slice(11,13)==="00"? "#22304f" : "transparent"};
+  o.plugins.legend = {display:false};
+  o.plugins.tooltip.filter = it => it.dataset.label === "Snowline blend" || it.dataset.label === "Precip";
+  o.plugins.tooltip.callbacks = { title: it => { const t = times[it[0].dataIndex]; return t? `${dow(t.slice(0,10))} ${hl(+t.slice(11,13))}` : ""; },
+    label: it => it.dataset.label==="Precip"? ` ${["Snow","Mix","Rain"][it.dataset.kind[it.dataIndex]]} ${it.parsed.y.toFixed(imp()? 2 : 1)}${imp()? '"' : " mm"}/hr` : ` Snow level ${f(it.parsed.y)}` };
+  o.scales.y = {position:"left", min:yMin, max:yMax, ticks:{color:"#8fa1bf", maxTicksLimit:7, callback:v=>imp()? (v/1000)+"k" : Math.round(v).toLocaleString()}, grid:{color:"#1a2540"}};
+  o.scales.y2 = {position:"right", beginAtZero:true, max: Math.max(0.15, ...slice.map(c=>c? (imp()? c.P/25.4 : c.P) : 0))*3.2, display:false};
+  const kind = slice.map(c=>!c? 2 : (c.frac??(conv(c.sl) < conv(bandElev())? 1 : 0)) >= 0.85? 0 : (c.frac??0) <= 0.15? 2 : 1);
+  const kc = ["#60a5fa","#a78bfa","#4ade80"];
+  // Summit / Base labels drawn on the chart, like a trail map
+  const tags = {id:"sltags", afterDatasetsDraw(ch){ const g = ch.ctx, y = ch.scales.y, x0 = ch.chartArea.left;
+    [["Summit", top], ["Base", base]].forEach(([t,v])=>{ const py = y.getPixelForValue(v); if(py < ch.chartArea.top || py > ch.chartArea.bottom) return;
+      g.save(); g.font = "700 10.5px Inter, system-ui, sans-serif"; const w = g.measureText(t).width + 10; g.fillStyle = "#0b0b0d"; g.strokeStyle = "#e6edf7"; g.lineWidth = 1;
+      g.beginPath(); g.roundRect? g.roundRect(x0+2, py-8, w, 16, 4) : g.rect(x0+2, py-8, w, 16); g.fill(); g.stroke(); g.fillStyle = "#e6edf7"; g.fillText(t, x0+7, py+4); g.restore(); });
+    g.save(); g.font = "700 11px Inter, system-ui, sans-serif"; g.fillStyle = "rgba(147,197,253,.75)"; g.fillText("Snow", ch.chartArea.right - 36, ch.chartArea.top + 14); g.fillStyle = "rgba(74,222,128,.75)"; g.fillText("Rain", ch.chartArea.right - 34, Math.min(y.getPixelForValue(yMin) - 40, (y.getPixelForValue(base) + y.getPixelForValue(yMin))/2)); g.restore(); }};
+  S.charts.sl = new Chart($("#cSL"), {plugins:[tags], data:{labels, datasets:[
+    {type:"line", label:"_snowzone", data:blend, borderWidth:0, pointRadius:0, fill:"end", backgroundColor:"rgba(59,130,246,.13)", yAxisID:"y", tension:.35},
+    {type:"line", label:"_rainzone", data:blend, borderWidth:0, pointRadius:0, fill:"start", backgroundColor:"rgba(74,222,128,.08)", yAxisID:"y", tension:.35},
+    ...lines.map(l=>({type:"line", label:"_"+l.id, data:l.data, borderColor:"rgba(125,211,252,.32)", borderWidth:1.2, pointRadius:0, yAxisID:"y", tension:.35, spanGaps:true})),
+    {type:"line", label:"Snowline blend", data:blend, borderColor:"#93c5fd", borderWidth:3.5, pointRadius:0, yAxisID:"y", tension:.35},
+    {type:"line", label:"_summit", data:times.map(()=>top), borderColor:"rgba(230,237,247,.85)", borderWidth:1.5, pointRadius:0, yAxisID:"y"},
+    {type:"line", label:"_base", data:times.map(()=>base), borderColor:"rgba(230,237,247,.85)", borderWidth:1.5, pointRadius:0, yAxisID:"y"},
+    {type:"bar", label:"Precip", kind, data:slice.map(c=>c? (imp()? c.P/25.4 : c.P) : null), backgroundColor:kind.map(k=>kc[k]), yAxisID:"y2", barPercentage:1, categoryPercentage:.9}
+  ]}, options:o});
+}
+
+function renderHourly(C, SIM){
+  const alp = isAlp();
+  let h = `<tr><th class="m">Time</th><th>Ski</th><th>Temp</th><th>Snow</th><th>Sky</th><th>Wind</th>${alp?"<th>Ridge</th>":""}</tr>`;
+  const end = Math.min(C.time.length, C.nowIdx + 24*(S.hrDays||5)); let lastDay = "";
+  for(let i=C.nowIdx;i<end;i+=3){
+    let s=0, ok=false;
+    for(let j=i;j<i+3 && j<end;j++){ const c=C.cons[j]; if(!c) continue; ok=true; s+=c.snow; }
+    const c=C.cons[i], sim=SIM[i]; if(!ok || !c || !sim) continue;
+    const t=C.time[i], d=t.slice(0,10), hr=+t.slice(11,13);
+    if(d!==lastDay){ h += `<tr><td class="m" colspan="${alp?7:6}" style="color:var(--mute);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding-top:12px">${dayLabel(d)}</td></tr>`; lastDay=d; }
+    h += `<tr><td class="m">${hl(hr)}</td><td>${sim.icon} ${scoreChip(scoreOf(sim))}</td><td>${fmtT(c.Te)}<span class="muted"> ${fmtT(sim.feels)}</span></td><td><span class="cell" style="background:${snowColor(s*2)}">${s<0.05?"–":fmtSnow(s,1)}</span></td><td>${sim.light.icon}</td><td>${fmtWind(c.W)}<span class="muted">/${fmtWind(c.G)}</span></td>${alp?`<td>${fmtWind(c.RW)}</td>`:""}</tr>`;
+  }
+  $("#hTable").innerHTML = h;
+}
+
+/* ================= Ski surface model ================= */
+const SURF = {
+  rain:    {label:"Wet / raining",          icon:"🌧", a:1,   s:1,   c:1,   d:"Rain on snow: soaked and slow. Only go if it's snowing higher up.", sk:"Rain on the trails: wet, slow tracks and soft skate lanes. Only worth it if it's snowing higher up.", cl:"Rain on the trails: wet, slow tracks. Wet klister or skin skis if you go."},
+  slush:   {label:"Slush",                  icon:"💧", a:3,   s:2,   c:2,   d:"Warm, saturated snow that's grabby and slow. Go early before it turns to mashed potatoes.", sk:"Saturated snow: slow and grabby. Ski early before the lanes break down; warm wax and coarse structure.", cl:"Saturated snow: slow and grabby, and the tracks break down fast. Universal or wet klister; ski early."},
+  corn:    {label:"Corn",                   icon:"🌽", a:7.5, s:5,   c:4,   d:"A melt-freeze surface softening in the sun. Smooth, edgeable spring snow, but the good window is short.", sk:"A softening crust: fast early, then slow and mushy. Ski it before late morning.", cl:"A softening crust: icy tracks early, mushy later. Klister for kick; best in the late morning window."},
+  soft:    {label:"Soft / wet",             icon:"💦", a:4,   s:4,   c:3,   d:"The surface is above freezing. Heavy and sticky, worst on sunny aspects.", sk:"Above freezing: soft, sticky lanes, slowest on sunny stretches. Warm glide wax.", cl:"Above freezing: soft, sticky tracks, slowest on sunny stretches. Klister for kick."},
+  ice:     {label:"Ice / rain crust",       icon:"🧊", a:1.5, s:4.5, c:2.5, d:"Rain or meltwater refroze into a hard crust. Keep your edges sharp and stick to groomed runs.", sk:"Refrozen and icy: very fast but hard to hold an edge. Careful on downhill corners.", cl:"Refrozen, icy tracks: fast glide, hard kick. Blue (ice) klister and careful on the descents."},
+  firm:    {label:"Firm / refrozen",        icon:"🪨", a:3,   s:7.5, c:4.5, d:"A melt-freeze crust. Chattery until the sun softens it, then it turns to corn.", sk:"A melt-freeze crust: fast and stable. Great for skating, and often supportive off-trail early in the day.", cl:"A melt-freeze crust: fast but icy in the tracks. Klister or klister binder for kick until it softens."},
+  powder:  {label:"Powder",                 icon:"❄️", a:7,   s:4,   c:6,   d:"Light, dry new snow. The good stuff.", sk:"Light, dry new snow: soft and slow until it's groomed, then excellent.", cl:"Light, dry new snow: easy kick in fresh tracks, slower glide until the tracks are set."},
+  heavy:   {label:"Heavy new snow",         icon:"🌨", a:5, s:3.5, c:5.5, d:"Dense new snow with a lot of water in it. Supportive but tiring.", sk:"Dense, wet new snow: slow and draggy until it's groomed and sets up.", cl:"Dense, wet new snow: slow, with an icing risk for kick wax. Better once it's groomed."},
+  fresh:   {label:"Fresh snow",             icon:"🌨", a:6.3,   s:5,   c:7,   d:"Medium-density new snow over the base. Skis well everywhere.", sk:"New snow over the base: soft lanes until they're groomed, then fast corduroy.", cl:"New snow over the base: classic tracks set nicely once groomed, with easy kick."},
+  wind:    {label:"Wind-affected",          icon:"🌬", a:4.5, s:5.5, c:5,   d:"New snow moved by the wind: scoured, crusty or drifted. Look for sheltered trees and lee pockets.", sk:"Wind-blown new snow: drifts across open sections. Sheltered, tree-lined trails ski best.", cl:"Wind-blown new snow: drifted and filled-in tracks in the open. Sheltered trails ski best."},
+  damp:    {label:"Heat-affected new snow", icon:"🌤", a:5,   s:4.5, c:4,   d:"New snow that got warmed. Sticky on sunny aspects, still decent on shaded ones.", sk:"New snow that got warmed: sticky in the sun, better in the shade.", cl:"New snow that got warmed: sticky in the sun and an icing risk for kick wax. Better in the shade."},
+  packed:  {label:"Packed powder",          icon:"🎿", a:6, s:8,   c:8,   d:"Settled, dry snow. Great groomer conditions, fast and consistent.", sk:"Settled, dry snow: firm, fast and consistent. Ideal skating conditions.", cl:"Settled, dry snow: firm, consistent tracks with reliable kick. Ideal classic conditions."},
+  cold:    {label:"Cold packed",            icon:"🥶", a:5.5, s:6,   c:7.5, d:"Very cold, dry snow. Squeaky and grippy, but glide is slow (dry friction).", sk:"Very cold, dry snow: squeaky and slow to glide (dry friction). Cold wax, fine structure.", cl:"Very cold, dry snow: great grip for kick but slow glide. Cold (green/polar) wax."},
+  softpack:{label:"Soft packed",            icon:"🎿", a:6.2,   s:6.5, c:7.5, d:"A few inches of settled new snow over a firm base. Forgiving and fun.", sk:"A few inches of settled snow over a firm base: forgiving, a little slower than packed.", cl:"A few inches of settled snow over a firm base: good kick, slightly slower glide."},
+};
+const MODE_KEY = {alpine:"a", skate:"s", classic:"c"};
+const byMode = (a, sk, cl) => isAlp() ? a : S.mode==="skate" ? sk : (cl ?? sk);
+const MODE_NAME = {alpine:"Alpine", skate:"Skate", classic:"Classic", bc:"Backcountry"};
+const isAlp = () => S.mode==="alpine" || S.mode==="bc";   // backcountry skis like alpine (no grooming, no wax), without lifts
+function windChill(T, V){ if(!isNum(T)) return null; if(!isNum(V) || T>10 || V<4.8) return T; const v=Math.pow(V,0.16); return 13.12+0.6215*T-11.37*v+0.3965*T*v; }
+function lightOf(c){ const cc = c.CC; if(!isNum(cc)) return {k:"?",icon:"",label:"—"}; if(c.snow>0.08) return {k:"storm",icon:"🌨",label:"Storm"}; if(cc<25) return {k:"blue",icon:"☀️",label:"Bluebird"}; if(cc<65) return {k:"part",icon:"⛅",label:"Partly sunny"}; return {k:"flat",icon:"☁️",label:"Flat light"}; }
+
+function simulate(C, aspect){
+  const out = new Array(C.time.length).fill(null);
+  const st = {snowSinceWind:0, newSnow:0, age:999, slrAcc:0, slrW:0, wet:false, coldH:0, refrozen:false, rainOn:false, rainCrust:false, windH:0, windAff:false, corn:false, damp:false, lastSnow24:[]};
+  for(let i=0;i<C.time.length;i++){
+    const c = C.cons[i]; if(!c){ out[i] = i? out[i-1] : null; continue; }
+    const liquid = Math.max(0, c.P*(1 - (isNum(c.frac)?c.frac:1)));
+    if(c.snow >= 0.1){
+      st.newSnow += c.snow; st.age = 0; st.snowSinceWind += c.snow;
+      if(st.windAff && st.snowSinceWind >= 3 && (!isNum(c.G) || c.G < 40)){ st.windAff=false; st.windH=0; } st.slrAcc += c.slr*c.snow; st.slrW += c.snow;
+      if(c.snow >= 0.3){ st.rainCrust=false; st.refrozen=false; st.corn=false; st.rainOn=false; st.damp=false; if(liquid<0.2) st.wet=false; }
+    } else st.age++;
+    st.newSnow *= st.age > 72 ? 0.97 : 0.996;           // settlement
+    if(st.newSnow < 0.3){ st.newSnow=0; st.slrAcc=0; st.slrW=0; st.windH=0; st.windAff=false; st.damp=false; }
+    const sun = aspect==null ? (isNum(c.SW) ? c.SW : 0) : aspectSun(C, i, c, aspect);
+    const melting = c.Te > 0.5 || (c.Te > -1 && sun > 500) || liquid > 0.2;
+    if(melting){
+      if(st.refrozen && liquid <= 0.2) st.corn = true;
+      st.wet = true; st.refrozen = false; st.coldH = 0;
+      if(liquid > 0.2) st.rainOn = true;
+      if(st.newSnow > 0) st.damp = true;
+    } else if(c.Te < -1.5){
+      st.coldH++;
+      if(st.wet && st.coldH >= 3){ st.wet=false; st.refrozen=true; if(st.rainOn){ st.rainCrust=true; st.rainOn=false; } }
+    }
+    if(isNum(c.G) && c.G > 50 && st.newSnow > 0.5 && st.age < 72){ st.windH++; if(st.windH >= 3 && !st.windAff){ st.windAff = true; st.snowSinceWind = 0; } }
+    const slrAvg = st.slrW ? st.slrAcc/st.slrW : 10;
+    out[i] = classify(st, c, liquid, slrAvg);
+  }
+  return out;
+}
+function classify(st, c, liquid, slrAvg){
+  let key;
+  if(liquid > 0.3) key = "rain";
+  else if(st.wet){ key = (c.Te > 3 && st.age > 12) ? "slush" : st.corn ? "corn" : (st.newSnow >= 1 && st.age < 48) ? "damp" : "soft"; }
+  else if(st.rainCrust && st.newSnow < 2) key = "ice";
+  else if(st.newSnow >= 2 && st.age < 48 && !(st.refrozen && st.damp)) key = st.windAff ? "wind" : st.damp ? "damp" : slrAvg >= 13 ? "powder" : slrAvg < 9.5 ? "heavy" : "fresh";
+  else if(st.refrozen) key = "firm";
+  else if(st.newSnow >= 1) key = "softpack";
+  else key = c.Te < -12 ? "cold" : "packed";
+  const S0 = SURF[key], light = lightOf(c), G = c.G;
+  let a = S0.a, s = S0.s, cl = S0.c;
+  if(["powder","fresh","heavy","softpack","wind"].includes(key)) a += Math.min(2.6, st.newSnow/4.5) * (st.age<=12? 1 : st.age<=30? 0.7 : 0.4);
+  if(light.k==="flat") a -= 0.75; else if(light.k==="storm") a -= 0.25; else if(light.k==="blue") a += 0.4;
+  if(isNum(G)){ if(G > 70) a -= 2; else if(G > 50) a -= 1; if(G > 50){ s -= 0.5; cl -= 0.5; } }
+  if(c.Te < -20) { a -= 1; cl -= 1; }
+  if(c.Te >= -12 && c.Te <= -3) s += 0.5;
+  if(c.Te < -18) s -= 1.5;
+  if(c.snow > 0.2){ s -= 1.5; cl -= 0.5; }
+  if(key==="fresh" && st.newSnow>=4){ s -= 0.5; }
+  const r = x => Math.round(clamp(x,0,10)*10)/10;
+  return { key, ...S0, a:r(a), s:r(s), c:r(cl), light, newSnow:st.newSnow, age:st.age, slrAvg, Te:c.Te, feels:windChill(c.Te, c.W), G };
+}
+const descOf = sim => sim ? byMode(sim.d, sim.sk || sim.d, sim.cl || sim.sk || sim.d) : "";
+const scoreOf = sim => sim ? sim[MODE_KEY[S.mode]] : null;
+function scoreColor(v){ if(!isNum(v)) return "#22304f"; if(v>=8) return "#a78bfa"; if(v>=6.5) return "#38bdf8"; if(v>=5) return "#86efac"; if(v>=3.5) return "#fde68a"; return "#fca5a5"; }
+const scoreChip = v => `<span class="sc" style="background:${scoreColor(v)}">${isNum(v)?v.toFixed(1):"—"}</span>`;
+const hl = h => h===0?"12a":h<12?h+"a":h===12?"12p":(h-12)+"p";
+const todayStr = () => nowKey().slice(0,10);
+const dayLabel = d => d===todayStr()? "Today" : d===dateAdd(todayStr(),1)? "Tomorrow" : dow(d)+" "+md(d);
+function idxOf(C){ if(!C._idx) C._idx = new Map(C.time.map((t,i)=>[t,i])); return C._idx; }
+const at = (C, SIM, d, h) => { const i = idxOf(C).get(`${d}T${String(h).padStart(2,"0")}:00`); return i==null? null : {i, sim:SIM[i], c:C.cons[i]}; };
+function daySummary(C, SIM, d){
+  const hrs = [];
+  for(let h=8; h<=16; h++){ const x = at(C,SIM,d,h); if(x && x.i >= C.nowIdx && x.sim) hrs.push({h, s:scoreOf(x.sim), sim:x.sim}); }
+  if(!hrs.length) return null;
+  let best = null;
+  for(let j=0;j<hrs.length;j++){ const w = hrs.slice(j,j+3); const avg = w.reduce((a,b)=>a+b.s,0)/w.length; if(!best || avg > best.avg + 0.05) best = {avg, from:w[0].h, to:w.at(-1).h+1, sim:w[0].sim}; }
+  const am = at(C,SIM,d,9)?.sim, pm = at(C,SIM,d,14)?.sim;
+  return { best, am: (at(C,SIM,d,9)?.i >= C.nowIdx ? am : null), pm, hrs, peak: Math.max(...hrs.map(x=>x.s)) };
+}
+function crustCruise(C, SIM, d){
+  const am = at(C,SIM,d,8); if(!am || !am.sim || am.sim.key!=="firm") return false;
+  const prev = dateAdd(d,-1); let pmax=-99, nmin=99;
+  for(let h=10;h<=17;h++){ const x=at(C,SIM,prev,h); if(x?.c) pmax=Math.max(pmax,x.c.Te); }
+  for(let h=20;h<=31;h++){ const dd = h<24?prev:d, hh=h%24; const x=at(C,SIM,dd,hh); if(x?.c) nmin=Math.min(nmin,x.c.Te); }
+  return pmax > 1 && nmin < -4 && isNum(am.c.CC) && am.c.CC < 50;
+}
+
+/* ================= Wax ================= */
+function wax(sim, c){
+  if(!sim || !c) return null;
+  const T = c.Te, snowT = Math.min(T, 0), k = sim.key;
+  const glide = snowT <= -12 ? "Cold (−12°C & colder)" : snowT <= -5 ? "Mid-cold (−12 to −5°C)" : snowT <= -1 ? "Mid (−5 to −1°C)" : T <= 2 ? "Warm (−1 to +2°C)" : "Wet / very warm (+2°C & up)";
+  const structure = (T > 0 || ["slush","soft","corn","rain"].includes(k)) ? "coarse structure" : snowT < -10 ? "fine structure" : "medium structure";
+  let kick;
+  if(k==="rain") kick = "Wet klister, or skin skis";
+  else if(k==="ice") kick = "Blue (ice) klister";
+  else if(k==="firm") kick = T > 0 ? "Violet / universal klister" : "Blue klister, or klister binder + hard wax";
+  else if(["corn","slush","soft"].includes(k)) kick = "Red / universal (wet) klister";
+  else if(T < -15) kick = "Polar / extra-green hard wax";
+  else if(T < -8) kick = "Green hard wax";
+  else if(T < -3) kick = sim.age > 120 ? "Extra blue over binder (old snow)" : "Blue hard wax";
+  else if(T < -1) kick = "Violet hard wax";
+  else if(T <= 1) kick = sim.newSnow > 0.5 ? "Red / yellow wet hard wax (icing risk; skins are safer)" : "Klister-wax combo or skins";
+  else kick = "Universal klister";
+  let speed, why;
+  if(["firm","packed","ice"].includes(k) && T >= -14 && T <= -1){ speed = "Fast"; why = "firm, dry and in the sweet-spot temperature range"; }
+  else if(T < -15){ speed = "Slow"; why = "very cold snow is sandpapery (dry friction)"; }
+  else if(["powder","heavy","fresh","damp"].includes(k)){ speed = "Slow"; why = "new snow is soft until it's groomed and set"; }
+  else if(["slush","soft","rain"].includes(k)){ speed = "Slow"; why = "wet suction"; }
+  else { speed = "Medium"; why = "decent glide"; }
+  return { glide, structure, kick, speed, why };
+}
+const speedColor = s => s==="Fast" ? "#86efac" : s==="Slow" ? "#fca5a5" : "#fde68a";
+
+const BIRKIE = { date:"2027-02-27", start:new Date("2027-02-27T08:00:00-06:00"), loc:"Birkie Trail (Cable, WI)" };
+/* ================= Season history ================= */
+function seasonStartYear(){ const t = todayStr(); const y=+t.slice(0,4), m=+t.slice(5,7); return m >= 9 ? y : y-1; }
+const SEASON_DAYS = 243; // Oct 1 → May 31
+function seasonIdx(dateStr, sy){ return Math.round((Date.parse(dateStr+"T12:00:00Z") - Date.parse(`${sy}-10-01T12:00:00Z`))/864e5); }
+async function loadSeason(loc, ref){
+  const sy = seasonStartYear(), today = todayStr(), yest = dateAdd(today,-1), eraEnd = dateAdd(today,-6);
+  const base = `latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&timezone=auto`;
+  const cur = yest >= `${sy}-10-01` ? getJSON(`https://historical-forecast-api.open-meteo.com/v1/forecast?${base}&hourly=temperature_2m,precipitation,freezing_level_height&start_date=${sy}-10-01&end_date=${yest}`).catch(()=>null) : Promise.resolve(null);
+  const hist = getJSON(`https://archive-api.open-meteo.com/v1/archive?${base}&hourly=temperature_2m,precipitation&start_date=${sy-10}-10-01&end_date=${eraEnd}`).catch(()=>null);
+  const [c, h] = await Promise.all([cur, hist]);
+  return { sy, ref, cur: c?.hourly || null, hist: h?.hourly || null, eraEnd };
+}
+function dailySnow(H, e, ref){ // -> Map(date -> inches)
+  const out = new Map(); if(!H) return out;
+  const P = getVar(H,"precipitation"), T = getVar(H,"temperature_2m"), FL = H.freezing_level_height ? getVar(H,"freezing_level_height") : null;
+  H.time.forEach((t,i)=>{ const v = snowAt(P[i], T[i], FL?.[i], ref, e); if(!v) return; const d=t.slice(0,10); out.set(d, (out.get(d)||0) + v.snow); });
+  return out;
+}
+function seasonCalc(e){
+  const Z = S.season; if(!Z) return null;
+  const sy = Z.sy, today = todayStr();
+  const curD = dailySnow(Z.cur, e, Z.ref), histD = dailySnow(Z.hist, e, Z.ref);
+  const series = y => { const arr = new Array(SEASON_DAYS).fill(null); let cum=0, any=false;
+    for(let k=0;k<SEASON_DAYS;k++){ const d = dateAdd(`${y}-10-01`, k); const src = (y===sy && Z.cur) ? curD : histD; if(!src.has(d)) { if(any && d < today && y!==sy) arr[k]=cum; continue; } any=true; cum += src.get(d); arr[k] = cum; }
+    return arr; };
+  const past = []; for(let y=sy-10; y<sy; y++){ const s = series(y); if(s.some(isNum)) past.push({y, s}); }
+  const current = series(sy);
+  const idxToday = Math.min(SEASON_DAYS-1, seasonIdx(today, sy) - 1);
+  const lastCur = (()=>{ for(let k=Math.min(idxToday,SEASON_DAYS-1);k>=0;k--) if(isNum(current[k])) return k; return -1; })();
+  const toDate = lastCur>=0 ? current[lastCur] : 0;
+  // % of normal: ERA5 vs ERA5 at the same day index (bias-consistent)
+  const eraCur = (()=>{ let cum=0, k=-1; for(let j=0;j<SEASON_DAYS;j++){ const d=dateAdd(`${sy}-10-01`,j); if(d > Z.eraEnd) break; if(histD.has(d)){ cum+=histD.get(d); k=j; } } return {cum,k}; })();
+  const pastAt = k => past.map(p=>p.s[k]).filter(isNum);
+  const normAtEra = eraCur.k>=0 ? pct(pastAt(eraCur.k), .5) : null;
+  const pctNormal = (normAtEra && normAtEra > 0.5) ? Math.round(100*eraCur.cum/normAtEra) : null;
+  const median = Array.from({length:SEASON_DAYS},(_,k)=>{ const v=pastAt(k); return v.length>=3? pct(v,.5):null; });
+  const fullTotals = past.map(p=>({y:p.y, total:p.s[SEASON_DAYS-1] ?? Math.max(...p.s.filter(isNum)), atDate: lastCur>=0? p.s[lastCur]:null}));
+  const normalFull = pct(fullTotals.map(x=>x.total).filter(isNum), .5);
+  // season stats from current
+  const curDays = [...curD.entries()].filter(([d])=>d >= `${sy}-10-01`);
+  const big = curDays.reduce((b,[d,v])=>v>b.v?{d,v}:b,{d:null,v:0});
+  const days6 = curDays.filter(([,v])=>v>=6).length;
+  const rank = eraCur.k>=0 ? 1 + past.filter(p=>isNum(p.s[eraCur.k]) && p.s[eraCur.k] > eraCur.cum).length : null;
+  return { sy, past, current, median, lastCur, toDate, pctNormal, normalFull, fullTotals, big, days6, rank, idxToday };
+}
+function renderSeason(C){
+  const el = $("#seasonPanel"); if(!el) return;
+  if(S.charts.season){ S.charts.season.destroy(); delete S.charts.season; }
+  if(!S.season || S.season.loc !== S.loc){ el.innerHTML = `<div class="loading"><div class="spin"></div>Loading 10 winters of history…</div>`; ensureSeason(); return; }
+  const e = bandElev(), Z = seasonCalc(e);
+  if(!Z || (!S.season.cur && !S.season.hist)){ el.innerHTML = `<div class="muted">Season history isn't available for this spot right now.</div>`; return; }
+  const consDaily = C.consDays.map(d=>d.day+d.night);
+  const next10 = windowTotal(consDaily, 10);
+  const proj = Z.toDate + next10;
+  const label = y => `${y}–${String(y+1).slice(2)}`;
+  el.innerHTML = `<div class="muted" style="margin-bottom:10px">${label(Z.sy)} season · Since Oct 1, modeled at ${fmtEl(e)} with the same snow model as the forecast. Past winters come from ERA5 reanalysis, which tends to run low in the mountains, so % of normal and rank compare ERA5 against ERA5.</div>
+    <div class="statgrid">
+      <div class="stat big"><div class="k">Season to date</div><div class="v">${fmtSnow(Z.toDate,0)}</div><div class="r">+${fmtSnow(next10,0)} forecast next 10 days → ${fmtSnow(proj,0)}</div></div>
+      <div class="stat"><div class="k">% of normal</div><div class="v" style="color:${!isNum(Z.pctNormal)?'var(--text)':Z.pctNormal>=100?'#86efac':Z.pctNormal>=70?'#fde68a':'#fca5a5'}">${isNum(Z.pctNormal)? Z.pctNormal+"%":"—"}</div><div class="r">vs. the 10-season median to date</div></div>
+      <div class="stat"><div class="k">Normal full season</div><div class="v">${fmtSnow(Z.normalFull,0)}</div><div class="r">median Oct–May total</div></div>
+      <div class="stat"><div class="k">Biggest day</div><div class="v">${Z.big.d? fmtSnow(Z.big.v,0):"—"}</div><div class="r">${Z.big.d? dow(Z.big.d)+" "+md(Z.big.d):""} · ${Z.days6} day${Z.days6===1?"":"s"} ≥ 6"${isNum(Z.rank)?` · ranks #${Z.rank} of ${Z.fullTotals.length+1} to date`:""}</div></div>
+    </div>
+    <div class="chartbox tall" style="margin-top:12px"><canvas id="cSeason"></canvas></div>
+    <div class="tablewrap" style="margin-top:10px"><table id="sTable"></table></div>`;
+  const labels = Array.from({length:SEASON_DAYS},(_,k)=>{ const d=dateAdd(`${Z.sy}-10-01`,k); return d.slice(8,10)==="01"? ["Oct","Nov","Dec","Jan","Feb","Mar","Apr","May"][(+d.slice(5,7)+2)%12] : ""; });
+  const fc = new Array(SEASON_DAYS).fill(null);
+  if(Z.lastCur>=0){ let cum=Z.toDate; fc[Z.lastCur]=snowNum(cum); for(let k=0;k<10;k++){ const j=Z.lastCur+1+k; if(j>=SEASON_DAYS) break; cum += consDaily[k]||0; fc[j]=snowNum(cum); } }
+  const ds = Z.past.map(p=>({label:label(p.y), data:p.s.map(v=>isNum(v)?snowNum(v):null), borderColor:"rgba(143,161,191,.28)", borderWidth:1, pointRadius:0}));
+  ds.push({label:"Median", data:Z.median.map(v=>isNum(v)?snowNum(v):null), borderColor:"#e6edf7", borderDash:[6,4], borderWidth:1.6, pointRadius:0});
+  ds.push({label:"This season", data:Z.current.map(v=>isNum(v)?snowNum(v):null), borderColor:"#38bdf8", borderWidth:3, pointRadius:0});
+  ds.push({label:"+ forecast", data:fc, borderColor:"#a78bfa", borderDash:[4,3], borderWidth:3, pointRadius:0});
+  const o = chartBase(); o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.grid.display=false;
+  o.plugins.legend.labels.filter = it => ["Median","This season","+ forecast"].includes(it.text);
+  o.plugins.tooltip = {enabled:false};
+  o.scales.y.title={display:true,text:imp()?"cumulative inches":"cumulative cm",color:"#8fa1bf"};
+  S.charts.season = new Chart($("#cSeason"), {type:"line", data:{labels, datasets:ds}, options:o});
+  const rows = [...Z.fullTotals].sort((a,b)=>b.y-a.y);
+  $("#sTable").innerHTML = `<tr><th class="m">Season</th><th>By ${md(todayStr())}</th><th>Full season</th></tr>
+    <tr class="cons"><td class="m">${label(Z.sy)} (now)</td><td>${fmtSnow(Z.toDate,0)}</td><td>${fmtSnow(proj,0)} with forecast</td></tr>` +
+    rows.map(r=>`<tr><td class="m">${label(r.y)}</td><td>${fmtSnow(r.atDate,0)}</td><td><span class="cell" style="background:${r.total>=Z.normalFull*1.2?'#3b2a77':r.total<=Z.normalFull*0.8?'#3a1f1f':'transparent'}">${fmtSnow(r.total,0)}</span></td></tr>`).join("");
+}
+
+/* ================= Views / tabs ================= */
+const VIEWS = ["forecast","favs","maps","alerts"];
+function showView(){
+  let v = (location.hash||"").slice(1); if(v==="finder"){ history.replaceState(null,"","#maps"); v = "maps"; } if(!VIEWS.includes(v)) v = "forecast";
+  if(v==="maps" && !(window.L && window.L.map)){ needMap().then(showView, ()=>toast("Couldn't load the map. Check your connection.")); return; }
+  VIEWS.forEach(x=>{ const el=$("#view-"+x); if(el) el.style.display = x===v? "" : "none"; });
+  document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===v));
+  if(S.view && S.view !== v){ saveSpot(); S.prevView = S.view; }
+  const same = S.view === v; S.view = v; updateTop(); if(v!=="forecast") fallSet(0); else if(!same) fallFromForecast(); if(!same && !restoreSpot(v)) window.scrollTo(0,0);
+  const ve = $("#view-"+v); if(ve){ ve.classList.remove("enter"); void ve.offsetWidth; ve.classList.add("enter"); }
+  if(v==="maps"){ initBigMap(); renderFinder(); }
+  if(v==="favs") renderFavs();
+  if(v==="alerts") renderAlerts();
+}
+window.addEventListener("hashchange", showView);
+
+/* ================= Ridgetop wind ================= */
+function ridgeWind(raw, e){ // free-air wind interpolated by elevation (850 hPa ≈ 1,500 m, 700 hPa ≈ 3,000 m)
+  const a = raw?.W8, b = raw?.W7; if(!isNum(a) && !isNum(b)) return null;
+  if(!isNum(b)) return a; if(!isNum(a)) return b;
+  const f = clamp((e-1500)/1500, 0, 1); return a + (b-a)*f;
+}
+function liftHold(rw, g){ const v = Math.max(isNum(rw)?rw:0, isNum(g)?g*0.9:0); return v >= 72 ? {k:"lo", label:"Holds likely"} : v >= 50 ? {k:"md", label:"Holds possible"} : {k:"hi", label:"Lifts OK"}; }
+
+/* ================= Powder Finder ================= */
+function regionOf(name){
+  if(PRESETS.find(p=>p.name===name)?.bc) return ["Backcountry", regionOf2(name)];
+  if(/Nordic|Trails|Lodge|XC|Birkie/i.test(name)) return ["Nordic", regionOf2(name)];
+  return [regionOf2(name)];
+}
+function regionOf2(name){ const st = (name.match(/,\s*([A-Z]{2})\)?$/)||[])[1] || (name.match(/\(.*,\s*([A-Z]{2})\)/)||[])[1];
+  if(st==="OR") return "Oregon"; if(st==="WA"||st==="BC") return "Washington & BC"; if(["WI","MN","MI"].includes(st)) return "Midwest"; return "Other"; }
+function finderSpots(){ const seen = new Set(); return [...S.favs, ...PRESETS].filter(p=>{ if(seen.has(p.name)) return false; seen.add(p.name); return true; }); }
+async function loadFinder(force){
+  if(S.finder && !force && Date.now()-S.finder.at < 30*60e3) return S.finder;
+  const spots = finderSpots();
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${spots.map(s=>s.lat).join(",")}&longitude=${spots.map(s=>s.lon).join(",")}&elevation=${spots.map(s=>(s.top/FT).toFixed(0)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height,cloud_cover,wind_speed_10m,wind_direction_10m&timezone=auto&past_days=1&forecast_days=16`;
+  let j = await getJSON(url); if(!Array.isArray(j)) j = [j];
+  const rows = spots.map((sp,i)=>{
+    const r = j[i]; if(!r) return null; const H = r.hourly, ref = sp.top/FT;
+    const nk = new Date(Date.now() + r.utc_offset_seconds*1000).toISOString().slice(0,13)+":00";
+    const i0 = Math.max(0, H.time.findIndex(t=>t>=nk));
+    const sum = (hrs, e) => { let s=0; for(let k=i0;k<i0+hrs && k<H.time.length;k++){ const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, e); if(v) s+=v.snow; } return s; };
+    const daily = {}; for(let k=i0;k<H.time.length;k++){ const [d]=periodOf(H.time[k]); const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, ref); if(v) daily[d]=(daily[d]||0)+v.snow; }
+    const peak = Object.entries(daily).reduce((b,[d,v])=>v>b.v?{d,v}:b,{d:null,v:0});
+    const d0 = periodOf(H.time[i0])[0]; const dates15 = Array.from({length:15},(_,k)=>dateAdd(d0,k)); const days15 = dates15.map(d=>daily[d]||0);
+    let last24 = 0; for(let k=Math.max(0,i0-24); k<i0; k++){ const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, ref); if(v) last24+=v.snow; }
+    const dnMap = {}; for(let k=i0;k<H.time.length;k++){ const [d,part]=periodOf(H.time[k]); const x = dnMap[d] ||= {d, day:0, night:0, hi:-99, lo:99, cc:0, n:0, wmax:0, rain:0}; const v=snowAt(H.precipitation[k], H.temperature_2m[k], H.freezing_level_height?.[k], ref, ref); if(v) x[part]+=v.snow;
+      const T=H.temperature_2m[k], h=+H.time[k].slice(11,13); if(isNum(T)){ if(h>=6&&h<18) x.hi=Math.max(x.hi,T); else x.lo=Math.min(x.lo,T); } if(isNum(H.cloud_cover?.[k])){ x.cc+=H.cloud_cover[k]; x.n++; }
+      if(h>=8 && h<=16){ if(isNum(H.wind_speed_10m?.[k])) x.wmax=Math.max(x.wmax, H.wind_speed_10m[k]); if(!v && H.precipitation[k]>0.2) x.rain+=H.precipitation[k]; } }
+    const dn = dates15.slice(0,7).map(d=>dnMap[d]).filter(Boolean).map(x=>({...x, cc:x.n? x.cc/x.n : 50, hi:x.hi>-90? x.hi : x.lo, lo:x.lo<90? x.lo : x.hi}));
+    const now = { T:H.temperature_2m[i0], W:H.wind_speed_10m?.[i0], WD:H.wind_direction_10m?.[i0], CC:H.cloud_cover?.[i0], P:H.precipitation[i0] };
+    return { dn, now, spot:sp, days15, dates15, last24, h24:sum(24,ref), d3:sum(72,ref), d5:sum(120,ref), d10:sum(240,ref), b5:sum(120, sp.base/FT), peak, regions:regionOf(sp.name) };
+  }).filter(Boolean);
+  S.finder = { at:Date.now(), rows };
+  return S.finder;
+}
+async function renderFinder(force){
+  const el = $("#view-finder");
+  if(!S.finder || force) el.innerHTML = `<div class="card"><h2>Powder Finder</h2><div class="loading"><div class="spin"></div>Checking ${finderSpots().length} spots…</div></div>`;
+  let F; try{ F = await loadFinder(force); }catch(e){ el.innerHTML = `<div class="card"><h2>Powder Finder</h2><div class="err" style="margin-top:8px">Couldn't load the Powder Finder. Pull to refresh in a minute.</div></div>`; return; }
+  const reg = S.finderRegion || "All", sortK = S.finderSort || "d5";
+  const regions = ["All","Oregon","Washington & BC","Nordic","Backcountry"];
+  const W = {h24:"24h", d3:"3d", d5:"5d", d10:"10d"};
+  const rows = F.rows.filter(r=>reg==="All"||r.regions.includes(reg)).sort((a,b)=>b[sortK]-a[sortK]);
+  el.innerHTML = `<div class="card">
+    <div class="card-h"><h2>Powder Finder</h2><button class="link" id="fRefresh" style="padding:0">Refresh</button></div><div class="muted" style="margin:-4px 0 10px">Every resort and Nordic area, ranked by forecast snow</div>
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg sm" id="sortSeg">${Object.entries(W).map(([k,l])=>`<button data-s="${k}" class="${k===sortK?'on':''}">${l}</button>`).join("")}</div><span class="muted">summit snow</span></div>
+    <div class="seg sm scroll" id="regSeg">${regions.map(r=>`<button data-r="${r}" class="${r===reg?'on':''}">${r}</button>`).join("")}</div>
+    <div class="list" style="margin-top:6px">${rows.map((r,i)=>`<button class="li" data-n="${encodeURIComponent(r.spot.name)}"><span class="rk">${i+1}</span><span class="nm"><b>${S.favs.some(f=>f.name===r.spot.name)?"★ ":""}${r.spot.name}</b><small>${r.peak.d&&r.peak.v>=0.5? `Peak ${dow(r.peak.d)} ${fmtSnow(r.peak.v)} · `:""}10d ${fmtSnow(r.d10)}</small></span><span class="spark">${miniBars(r.days15.slice(0,10))}</span><span class="num" style="font-size:20px;min-width:52px;text-align:right;color:${r[sortK]>=6?'var(--deep)':r[sortK]>=1?'var(--ice)':'var(--mute)'}">${fmtSnow(r[sortK])}</span></button>`).join("")}</div>
+    <div class="muted" style="margin-top:10px">Ranked using the Open-Meteo best-match model run through Snowline's snow model. Updated ${new Date(F.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}. Tap a spot for the full multi-model forecast.</div></div>`;
+  el.querySelectorAll("#regSeg button").forEach(b=>b.onclick=()=>{ S.finderRegion=b.dataset.r; renderFinder(); });
+  el.querySelectorAll("#sortSeg button").forEach(b=>b.onclick=()=>{ S.finderSort=b.dataset.s; renderFinder(); });
+  el.querySelectorAll("[data-n]").forEach(tr=>tr.onclick=()=>{ const sp = finderSpots().find(s=>s.name===decodeURIComponent(tr.dataset.n)); location.hash="forecast"; load(sp); });
+  $("#fRefresh").onclick = () => renderFinder(true);
+}
+
+/* ================= Alerts ================= */
+function alertRules(){ return store.get("alerts", []); }
+// "Powder alert" switch turns the any-favorite rules on or off; rules for a specific spot stay as they are
+function activeRules(){ const off = store.get("powderOn", true) === false; return alertRules().filter(r=> !(off && r.spot==="*favs")); }
+async function checkAlerts(){
+  if(!activeRules().length){ $("#alertBanner").innerHTML=""; return; }
+  try{ const F = await loadFinder(); const hits = evalAlerts(F);
+    document.querySelector('#tabs a[data-v="alerts"]').classList.toggle("has", hits.length>0);
+    $("#alertBanner").innerHTML = hits.length? `<div class="al-strip">${hits.slice(0,3).map(h=>{ const here = S.loc && h.x.spot.name===S.loc.name;
+        return `<button data-alspot="${encodeURIComponent(h.x.spot.name)}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round"><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 003.4 0"/></svg><span><b>${here? "Here" : esc(h.x.spot.name.replace(/, [A-Z]{2}$/,""))}</b> ${fmtSnow(h.v,0)} in ${h.w}</span>${here? "" : "<i>›</i>"}</button>`; }).join("")}</div>` : "";
+    $("#alertBanner").querySelectorAll("[data-alspot]").forEach(b=>b.onclick=()=>{ const n = decodeURIComponent(b.dataset.alspot); if(S.loc?.name===n){ location.hash="alerts"; return; } const sp = [...S.favs,...PRESETS].find(x=>x.name===n); if(sp){ scrollTo(0,0); load(sp); } });
+  }catch(e){}
+}
+/* ================= Avalanche ================= */
+async function loadAvy(){
+  if(S.avy) return S.avy;
+  try{ S.avy = await getJSON("https://api.avalanche.org/v2/public/products/map-layer"); }catch(e){ S.avy = {features:[], failed:true}; }
+  return S.avy;
+}
+function inRing(x, y, ring){ let inside=false; for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const [xi,yi]=ring[i],[xj,yj]=ring[j]; if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
+function inGeom(lon, lat, g){ if(!g) return false; const polys = g.type==="Polygon"? [g.coordinates] : g.type==="MultiPolygon"? g.coordinates : []; return polys.some(p=>inRing(lon,lat,p[0]) && !p.slice(1).some(h=>inRing(lon,lat,h))); }
+const AVY = {1:["Low","#50b848"],2:["Moderate","#fff200"],3:["Considerable","#f7941e"],4:["High","#ed1c24"],5:["Extreme","#231f20"]};
+/* ================= Maps ================= */
+let bigMap, gridLayer, radarLayers = [], radarTimer, avyLayer, mapLegend;
+function initBigMap(){
+  if(!bigMap){
+    bigMap = L.map("bigmap", {zoomControl:true, maxZoom:15}).setView([S.loc?.lat||44, S.loc?.lon||-121.6], 9);
+    bigMapChrome();
+    $("#gridGo").onclick = () => drawGrid(true);
+    bigMap.on("click", e=>{ openPicker(e.latlng.lat, e.latlng.lng, "Custom spot", null); });
+    bigMap.on("zoomend", ()=>applyBackcountry()); bigMap.on("moveend", ()=>{ if(document.querySelector('#mapLayers [data-l="lyCams"]')?.classList.contains("on")) showCams(); if(document.querySelector('#mapLayers [data-l="lySnotel"]')?.classList.contains("on")) showSnotel(); });
+  }
+  setTimeout(()=>bigMap.invalidateSize(), 60);
+  document.querySelectorAll("#mapWin button").forEach(b=>b.classList.toggle("on", +b.dataset.w===S.win));
+  if(S.loc && (!S.mapFor || S.mapFor !== S.loc)){ bigMap.setView([S.loc.lat, S.loc.lon], 9); S.mapFor = S.loc; drawGrid(); }
+  applyLayers();
+}
+function applyLayers(){
+  const on = id => !!document.querySelector(`#mapLayers [data-l="${id}"]`)?.classList.contains("on");
+  if(gridLayer){ on("lyGrid") ? gridLayer.addTo(bigMap) : gridLayer.remove(); }
+  on("lyRadar") ? startRadar() : stopRadar();
+  on("lyAvy") ? showAvy() : (avyLayer && avyLayer.remove());
+  on("lySnotel") ? showSnotel() : (snotelLayer && snotelLayer.remove());
+  on("lyPowder") ? showPowder() : (powderLayer && powderLayer.remove());
+  on("lyCams") ? showCams() : (camLayer && camLayer.remove());
+  on("lySat") ? startSat() : stopSat();
+  on("lyFcRadar") ? startFcRadar() : stopFcRadar();
+  applyBackcountry();
+}
+
+/* ---------- Big map: Topo / Satellite basemap and full screen ---------- */
+function bigMapChrome(){
+  const layers = { dark: L.layerGroup([L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, attribution:"Esri, USGS"}), L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, opacity:.55}), L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, pane:"labelsTop"})]),
+    topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15, attribution:"© OpenStreetMap, SRTM | © OpenTopoMap"}),
+    sat: L.layerGroup([L.tileLayer(SAT_TILES,{maxZoom:15, attribution:SAT_ATTR}), L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:15, opacity:.9})]) };
+  if(!bigMap.getPane("labelsTop")){ bigMap.createPane("labelsTop"); bigMap.getPane("labelsTop").style.zIndex = 450; bigMap.getPane("labelsTop").style.pointerEvents = "none"; }
+  let cur = store.get("bigBase2","dark"); if(!layers[cur]) cur="dark"; layers[cur].addTo(bigMap);
+  const Base = L.Control.extend({ onAdd(){ const d=L.DomUtil.create("div","map-base"); L.DomEvent.disableClickPropagation(d);
+    d.innerHTML=[["dark","Dark"],["topo","Topo"],["sat","Satellite"]].map(([k,l])=>`<button type="button" data-b="${k}">${l}</button>`).join("");
+    const paint=()=>d.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.b===cur));   // toggle classes only: replacing the buttons would let the tap fall through to the map
+    d.querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(b.dataset.b===cur) return; bigMap.removeLayer(layers[cur]); cur=b.dataset.b; store.set("bigBase2",cur); layers[cur].addTo(bigMap); (layers[cur].eachLayer? layers[cur].eachLayer(x=>x.bringToBack()) : layers[cur].bringToBack()); paint(); });
+    paint(); return d; } });
+  new Base({position:"topright"}).addTo(bigMap);
+  const Fs = L.Control.extend({ onAdd(){ const b=L.DomUtil.create("button","map-fsb"); b.type="button"; b.setAttribute("aria-label","Full screen map"); b.textContent="⤢"; L.DomEvent.disableClickPropagation(b);
+    b.onclick=()=>{ const w=$("#mapWrap"), on=w.classList.toggle("full"); b.textContent = on? "✕" : "⤢"; document.body.style.overflow = on? "hidden" : ""; setTimeout(()=>{ bigMap.invalidateSize(); },80); }; return b; } });
+  new Fs({position:"topright"}).addTo(bigMap);
+}
+/* ---------- Big map: smooth snow field with a timeline you can scrub or play ---------- */
+const SNOW_STOPS = [[0.1,[125,211,252]],[1,[56,189,248]],[3,[29,111,176]],[6,[79,70,229]],[12,[124,58,237]],[24,[192,38,211]],[36,[244,63,94]],[60,[251,191,36]]];
+function snowRGBA(v){ if(!isNum(v) || v < 0.1) return null; let i=0; while(i<SNOW_STOPS.length-1 && v >= SNOW_STOPS[i+1][0]) i++;
+  const [a,ca]=SNOW_STOPS[i], nx=SNOW_STOPS[i+1]; let c=ca; if(nx){ const t=(v-a)/(nx[0]-a); c=ca.map((x,k)=>Math.round(x+(nx[1][k]-x)*t)); }
+  return [...c, Math.round(255*Math.min(.78, .3 + .48*Math.min(1, v/1.5)))]; }
+function snowLegendHTML(){ const unit = imp()? '"' : "cm"; const ticks=[1,3,6,12,24,36,60];
+  return `<div class="sbar"><div class="sbar-g" style="background:linear-gradient(90deg,${SNOW_STOPS.map((s,i)=>`rgb(${s[1].join(",")}) ${Math.round(i/(SNOW_STOPS.length-1)*100)}%`).join(",")})"></div><div class="sbar-t">${["in",...ticks].map((t,i)=>`<span style="left:${i? Math.round((SNOW_STOPS.findIndex(s=>s[0]===t))/(SNOW_STOPS.length-1)*100) : 0}%">${i? (imp()? t : Math.round(t*2.54)) : (imp()? "in":"cm")}</span>`).join("")}</div></div>`; }
+let snowField = null, snowFieldCanvas = null; S.tl = { mode:"fc", h:120, playing:false, timer:null };
+function fieldImage(G, valOf){
+  const N = G.N, sc = 12, W = (N-1)*sc+1; const cv = snowFieldCanvas ||= document.createElement("canvas"); cv.width=W; cv.height=W;
+  const g = cv.getContext("2d"), img = g.createImageData(W, W), D = img.data;
+  const vals = G.pts.map((_,i)=>valOf(i));
+  for(let y=0;y<W;y++){ const fy=y/sc, iy=Math.min(N-2,Math.floor(fy)), ty=fy-iy;
+    for(let x=0;x<W;x++){ const fx=x/sc, ix=Math.min(N-2,Math.floor(fx)), tx=fx-ix;
+      // row 0 of the canvas is the north edge
+      const r0=(N-1-iy), r1=(N-2-iy); const a=vals[r0*N+ix], b=vals[r0*N+ix+1], c=vals[r1*N+ix], d=vals[r1*N+ix+1];
+      const v = (a*(1-tx)+b*tx)*(1-ty) + (c*(1-tx)+d*tx)*ty; const col = snowRGBA(v); if(!col) continue; const o=(y*W+x)*4; D[o]=col[0]; D[o+1]=col[1]; D[o+2]=col[2]; D[o+3]=col[3]; } }
+  g.putImageData(img,0,0); return cv.toDataURL("image/png");
+}
+function tlTotals(G, h){ return G.pts.map((_,i)=>{ const s=G.snow[i]; if(S.tl.mode==="past"){ let t=0; for(let k=Math.max(0,G.i0-24);k<G.i0;k++) t+=s[k]||0; return t; } let t=0; for(let k=G.i0;k<G.i0+h && k<s.length;k++) t+=s[k]||0; return t; }); }
+function paintField(){
+  const G = S.grid; if(!G || !bigMap) return; const tot = tlTotals(G, S.tl.h);
+  const url = fieldImage(G, i=>tot[i]);
+  const b = [[G.lat0, G.lon0],[G.lat0 + (G.N-1)*G.step, G.lon0 + (G.N-1)*G.step*1.35]];
+  if(!snowField){ snowField = L.imageOverlay(url, b, {opacity:1, interactive:false, className:"snowfield"}); }
+  else { snowField.setUrl(url); snowField.setBounds(L.latLngBounds(b)); }
+  if(document.querySelector('#mapLayers [data-l="lyGrid"]')?.classList.contains("on")) snowField.addTo(bigMap);
+  gridLayer = snowField;
+  const mx = Math.max(...tot), t = G.times[Math.min(G.times.length-1, G.i0 + S.tl.h)];
+  const lab = $("#tlLabel"); if(lab) lab.innerHTML = S.tl.mode==="past"
+    ? `<b>Snowfall, last 24 hours</b> <span class="u">Estimated</span><small>From the model's last 24 hours · up to ${fmtSnow(mx)}</small>`
+    : `<b>Forecast total snowfall</b><small>Now to ${t? `${dow(t.slice(0,10))} ${md(t.slice(0,10))} ${hl(+t.slice(11,13))}`:"—"} · up to ${fmtSnow(mx)}</small>`;
+  const sl = $("#tlSlider"); if(sl){ sl.max = G.maxH; if(+sl.value !== S.tl.h) sl.value = S.tl.h; }
+  const lg = $("#tlLegend"); if(lg && lg.dataset.u !== S.units){ lg.innerHTML = snowLegendHTML(); lg.dataset.u = S.units; }
+  document.querySelectorAll("#mapWin button").forEach(b=>b.classList.toggle("on", S.tl.mode==="fc" && +b.dataset.w*24===S.tl.h));
+}
+function tlStop(){ if(S.tl.playing) S.tl.paused = true; S.tl.playing=false; clearInterval(S.tl.timer); const p=$("#tlPlay"); if(p) p.innerHTML = PLAY_SVG; }
+const PLAY_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>`, PAUSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+function tlPlay(){ if(S.tl.playing) return tlStop(); if(!S.grid) return; if(S.tl.mode==="past") setTlMode("fc");
+  const max = S.grid.maxH; if(!S.tl.paused || S.tl.h >= max) S.tl.h = 3; S.tl.paused = false; S.tl.playing = true; $("#tlPlay").innerHTML = PAUSE_SVG;
+  S.tl.timer = setInterval(()=>{ S.tl.h = Math.min(max, S.tl.h + 6); paintField(); if(S.tl.h >= max) tlStop(); }, 180); }
+function setTlMode(m){ S.tl.mode = m; document.querySelectorAll("#tlMode button").forEach(b=>b.classList.toggle("on", b.dataset.m===m)); const tl=$("#tlRow"); if(tl) tl.classList.toggle("dim", m==="past"); paintField(); }
+function wireTimeline(){
+  const sl = $("#tlSlider"); if(!sl || sl.dataset.w) return; sl.dataset.w = 1;
+  sl.oninput = ()=>{ tlStop(); S.tl.paused = false; if(S.tl.mode!=="fc") setTlMode("fc"); S.tl.h = +sl.value; paintField(); };
+  $("#tlPlay").onclick = tlPlay;
+  $("#tlBack").onclick = ()=>{ tlStop(); S.tl.h = Math.max(3, S.tl.h - 24); paintField(); };
+  $("#tlFwd").onclick = ()=>{ tlStop(); S.tl.h = Math.min(S.grid?.maxH||240, S.tl.h + 24); paintField(); };
+  document.querySelectorAll("#tlMode button").forEach(b=>b.onclick=()=>{ tlStop(); setTlMode(b.dataset.m); });
+}
+async function drawGrid(){
+  if(!S.loc || !bigMap) return; tlStop();
+  const bnd = bigMap.getBounds(), c = bigMap.getCenter(); const N = 11;
+  const span = Math.min(3.2, Math.max(0.5, Math.max(bnd.getNorth()-bnd.getSouth(), (bnd.getEast()-bnd.getWest())/1.35) * 1.1));
+  const step = span/(N-1); const lat0 = c.lat - span/2, lon0 = c.lng - span*1.35/2;
+  const pts = []; for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([lat0 + a*step, lon0 + b*step*1.35]);
+  const gk = [lat0.toFixed(2), lon0.toFixed(2), span.toFixed(2), new Date().toISOString().slice(0,13)].join(",");
+  if(S.gridCache?.k === gk){ S.grid = S.gridCache.g; paintField(); wireTimeline(); applyLayers(); return; }
+  $("#mapStatus").textContent = "Modeling the snow map…";
+  try{
+    let j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&past_days=1&forecast_days=10`);
+    if(!Array.isArray(j)) j=[j];
+    const H0 = j[0].hourly; const nk = new Date(Date.now()+j[0].utc_offset_seconds*1000).toISOString().slice(0,13)+":00"; const i0 = Math.max(0, H0.time.findIndex(t=>t>=nk));
+    const snow = j.map(r=>{ const H=r.hourly, ref=r.elevation; return H.time.map((_,k)=>{ const v=snowAt(H.precipitation[k],H.temperature_2m[k],H.freezing_level_height?.[k],ref,ref); return v? v.snow : 0; }); });
+    S.grid = { N, step, lat0, lon0, pts, snow, times:H0.time, i0, maxH: Math.min(240, H0.time.length - i0 - 1) }; S.gridCache = {k:gk, g:S.grid};
+    S.tl.h = Math.min(S.grid.maxH, S.tl.h || S.win*24);
+    paintField(); wireTimeline();
+    $("#mapStatus").textContent = "Each point is modeled at its real elevation. Move the map, then tap Model this view.";
+    applyLayers();
+  }catch(e){ console.warn("snow map", e); $("#mapStatus").textContent = S.omLimited? "The free weather service has hit its hourly limit for this network. Try the snow map again later." : "Couldn't load the snow map."; }
+}
+
+async function startRadar(){
+  if(radarTimer) return;
+  try{
+    const j = await getJSON("https://api.rainviewer.com/public/weather-maps.json");
+    const frames = [...(j.radar?.past||[]), ...(j.radar?.nowcast||[])].slice(-12);
+    if(!frames.length) throw 0;
+    radarLayers = frames.map(f=>L.tileLayer(`${j.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`, {opacity:0, maxNativeZoom:7, maxZoom:15, attribution:"Radar © RainViewer"}).addTo(bigMap));
+    let k = 0;
+    radarTimer = setInterval(()=>{ radarLayers.forEach((l,i)=>l.setOpacity(i===k? .7 : 0)); const t = new Date(frames[k].time*1000); $("#radarTime").textContent = "Radar " + t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); k = (k+1) % radarLayers.length; }, 600);
+  }catch(e){ $("#radarTime").textContent = "Radar unavailable"; }
+}
+function stopRadar(){ clearInterval(radarTimer); radarTimer=null; radarLayers.forEach(l=>l.remove()); radarLayers=[]; const t=$("#radarTime"); if(t) t.textContent=""; }
+async function showAvy(){
+  const A = await loadAvy(); if(avyLayer) avyLayer.remove();
+  avyLayer = L.geoJSON(A, { style: f => ({ color:"#0b1220", weight:1, fillColor:(AVY[+f.properties.danger_level]||[0,"#555"])[1], fillOpacity:.35 }),
+    onEachFeature:(f,l)=>l.bindPopup(`<b>${f.properties.name}</b><br>${f.properties.center||""}<br>${(AVY[+f.properties.danger_level]||["No rating"])[0]}${f.properties.link?`<br><a href="${f.properties.link}" target="_blank">Forecast</a>`:""}`) }).addTo(bigMap);
+}
+
+/* ================= Extended outlook ================= */
+async function loadOutlook(loc){
+  const ref = ((loc.base+loc.top)/2)/FT; const base = `latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&timezone=auto`;
+  const extU = m => `https://ensemble-api.open-meteo.com/v1/ensemble?${base}&hourly=temperature_2m,precipitation&models=${m}&forecast_days=35`;
+  const ext = getJSON(extU("gfs05")).catch(()=>getJSON(extU("gfs_seamless"))).catch(()=>null);
+  const seas = getJSON(`https://seasonal-api.open-meteo.com/v1/seasonal?${base}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&forecast_days=183`)
+    .catch(()=>getJSON(`https://seasonal-api.open-meteo.com/v1/seasonal?${base}&six_hourly=temperature_2m,precipitation&forecast_days=183`).catch(()=>null));
+  const [e, s] = await Promise.all([ext, seas]);
+  return { loc, ref, ext: e?.hourly || null, seas: s ? (s.daily ? {kind:"daily", d:s.daily} : s.six_hourly ? {kind:"6h", d:s.six_hourly} : null) : null };
+}
+function membersOf(H, name){ return Object.keys(H).filter(k=>k===name || k.startsWith(name+"_")).map(k=>H[k]).filter(a=>Array.isArray(a) && a.some(isNum)); }
+async function renderOutlook(){
+  let el = $("#lrWeeks") || $("#view-outlook"); if(!S.loc) return;
+  if(!S.data){ el.innerHTML = `<div class="card"><h2>Extended outlook</h2><div class="loading"><div class="spin"></div>Loading…</div></div>`; return; }
+  if(!S.outlook || S.outlook.loc !== S.loc){
+    el.innerHTML = `<div class="panel"><h2>Extended outlook</h2><div class="loading"><div class="spin"></div>Loading the 35-day ensemble and seasonal models…</div></div>`;
+    const L0 = S.loc; const o = await loadOutlook(L0); if(S.loc !== L0) return; S.outlook = o; if(S.data) S.data.outlookCache = o; el = $("#lrWeeks") || $("#view-outlook"); if(!el) return;
+  }
+  if(S.charts.week){ S.charts.week.destroy(); } if(S.charts.month){ S.charts.month.destroy(); }
+  ensureSeason();
+  const O = S.outlook, e = bandElev(), today = todayStr();
+  // weekly from GFS ensemble (35d)
+  let weekHTML = `<div class="sub">The 35-day ensemble isn't available right now.</div>`, weeks = [];
+  if(O.ext){
+    const H = O.ext, P = Object.keys(H).filter(k=>k.startsWith("precipitation"));
+    const mem = P.map(k=>({P:H[k], T:H["temperature_2m"+k.slice("precipitation".length)]})).filter(m=>m.T);
+    for(let w=0; w<5; w++){
+      const a = dateAdd(today, w*7), b = dateAdd(today, w*7+7);
+      const tots = mem.map(m=>{ let s=0, n=0; H.time.forEach((t,i)=>{ const d=t.slice(0,10); if(d>=a && d<b){ const v=snowAt(m.P[i], m.T[i], null, O.ref, e); if(v){ s+=v.snow; n++; } } }); return n>100? s : null; }).filter(isNum);
+      if(!tots.length) continue;
+      // normal from ERA5 history for the same calendar window
+      let norm = null; const Z = S.season && S.season.loc===S.loc ? S.season : null;
+      if(Z?.hist){ const hd = dailySnow(Z.hist, e, Z.ref); const yrs=[]; for(let y=Z.sy-10;y<Z.sy;y++){ let s=0,n=0; for(let k=0;k<7;k++){ const d0 = dateAdd(a,k), d = (+d0.slice(0,4) + (y - Z.sy)) + d0.slice(4); if(hd.has(d)){ s+=hd.get(d); n++; } } if(n>=6) yrs.push(s); } if(yrs.length>=5) norm = pct(yrs,.5); }
+      weeks.push({w, a, lo:pct(tots,.1), med:pct(tots,.5), hi:pct(tots,.9), p6:Math.round(100*tots.filter(v=>v>=6).length/tots.length), norm, n:tots.length});
+    }
+    weekHTML = `<div class="tablewrap"><table><tr><th class="m">Week of</th><th>Snow</th><th>6"+ odds</th><th>vs normal</th></tr>${weeks.map(x=>{ const r = isNum(x.norm)&&x.norm>0.3 ? x.med/x.norm : null; const sig = r==null? "—" : (r>=1.3? "🟣 " : r<=0.7? "🟠 " : "⚪ ") + Math.round(r*100)+"%";
+      return `<tr><td class="m"><b>${x.w===0?"This week":x.w===1?"Next week":dow(x.a)+" "+md(x.a)}</b></td><td><b>${fmtSnow(x.med)}</b><div class="muted">${fmtSnow(x.lo)}–${fmtSnow(x.hi)}</div></td><td>${x.p6}%</td><td>${sig}</td></tr>`; }).join("")}</table></div>
+      <div class="muted" style="margin-top:8px">Normal is the 10-winter median for the same week. Treat weeks 3–5 as a trend (stormy or dry), not as amounts.</div>`;
+  }
+  // seasonal monthly
+  let monthHTML = `<div class="sub">Seasonal model data isn't available right now.</div>`; let months = [];
+  if(O.seas){
+    const D = O.seas.d, t = D.time; const isD = O.seas.kind==="daily";
+    const tmx = isD? membersOf(D,"temperature_2m_max") : membersOf(D,"temperature_2m"), tmn = isD? membersOf(D,"temperature_2m_min") : null, pr = isD? membersOf(D,"precipitation_sum") : membersOf(D,"precipitation");
+    const byM = {};
+    t.forEach((tt,i)=>{ const m = tt.slice(0,7); if(m < today.slice(0,7)) return; const o = byM[m] ||= {T:[], P:0, n:0};
+      const tv = tmx.map((a,k)=> isD ? (a[i] + (tmn[k]?.[i] ?? a[i]))/2 : a[i]).filter(isNum); const pv = pr.map(a=>a[i]).filter(isNum);
+      if(tv.length) o.T.push(tv.reduce((x,y)=>x+y,0)/tv.length); if(pv.length){ o.P += pv.reduce((x,y)=>x+y,0)/pv.length; o.n++; } });
+    // climatology from ERA5 history
+    const Z = S.season && S.season.loc===S.loc ? S.season : null; const clim = {};
+    if(Z?.hist){ const H = Z.hist; H.time.forEach((tt,i)=>{ const mm = tt.slice(5,7), y = tt.slice(0,4); const c = clim[mm] ||= {T:0,Tn:0,P:{}}; if(isNum(H.temperature_2m[i])){ c.T+=H.temperature_2m[i]; c.Tn++; } if(isNum(H.precipitation[i])) c.P[y]=(c.P[y]||0)+H.precipitation[i]; }); }
+    months = Object.entries(byM).slice(0,6).map(([m,o])=>{ const c = clim[m.slice(5,7)]; const Tm = o.T.length? o.T.reduce((a,b)=>a+b,0)/o.T.length : null;
+      const Tc = c && c.Tn ? c.T/c.Tn - LAPSE*0 : null; const Pc = c ? pct(Object.values(c.P),.5) : null;
+      const dim = new Date(Date.UTC(+m.slice(0,4), +m.slice(5,7), 0)).getUTCDate(); const Pm = o.n ? o.P * (isD? dim/o.n : dim*4/o.n) : null;
+      return {m, Tm, Tc, Pm, Pc}; });
+    const MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    monthHTML = `<div class="tablewrap"><table><tr><th class="m">Month</th><th>Temp</th><th>Precip</th><th>Snow lean</th></tr>${months.map(x=>{ const dT = isNum(x.Tm)&&isNum(x.Tc)? x.Tm-x.Tc : null; const pP = isNum(x.Pm)&&isNum(x.Pc)&&x.Pc>5? Math.round(100*x.Pm/x.Pc) : null;
+      const lean = dT==null||pP==null ? "—" : (pP>=110 && dT<=0.5) ? "❄️ Good" : (pP<=85 || dT>=1.5) ? "🟠 Poor" : "⚪ Neutral";
+      return `<tr><td class="m"><b>${MN[+x.m.slice(5,7)-1]}</b></td><td>${dT==null?"—":(dT>0?"+":"")+(imp()? (dT*9/5).toFixed(1)+"°" : dT.toFixed(1)+"°")}</td><td>${pP==null?"—":pP+"%"}</td><td>${lean}</td></tr>`; }).join("")}</table></div>
+      <div class="muted" style="margin-top:8px">Seasonal model vs. this spot's 10-winter normal. Treat ±1° and ±10% as noise; this is a lean, not a forecast.</div>`;
+  }
+  el.innerHTML = `<div class="card"><h2>Next 5 weeks</h2><div class="sub">${fmtEl(e)} · GFS 35-day ensemble</div>${weekHTML}
+     ${weeks.length? `<div class="chartbox" style="height:220px;margin-top:12px"><canvas id="cWeek"></canvas></div>`:""}</div>`;
+  const mh = `<div class="card"><h2>Next 6 months</h2><div class="sub">Is the winter leaning cold and stormy, or warm and dry?</div>${monthHTML}</div>`; const mb = $("#lrMonths"); if(mb) mb.innerHTML = mh; else el.insertAdjacentHTML("beforeend", mh);
+  if(weeks.length){ const o = chartBase(); const lab = weeks.map(x=>md(x.a));
+    S.charts.week = new Chart($("#cWeek"), {type:"bar", data:{labels:lab, datasets:[
+      {label:"Median", data:weeks.map(x=>snowNum(x.med)), backgroundColor:"#38bdf8", borderRadius:4},
+      {label:"90th pct", data:weeks.map(x=>snowNum(x.hi)), backgroundColor:"rgba(167,139,250,.35)", borderRadius:4},
+      {type:"line", label:"Normal", data:weeks.map(x=>isNum(x.norm)?snowNum(x.norm):null), borderColor:"#e6edf7", borderDash:[5,4], pointRadius:3}
+    ]}, options:o}); }
+}
+
+
+/* ================= Polish helpers ================= */
+// The last good forecast page for each spot, kept in Cache Storage (the old localStorage copy outgrew its ~5 MB limit
+// and silently stopped saving). Shown instantly on open while fresh data loads.
+const SNAP_CACHE = "snowline-snaps", snapKey = n => "/__snap/" + encodeURIComponent(n);
+const SNAPS = new Map();   // in-memory copy so a spot opens with zero wait
+function saveSnap(loc){ if(S.data && Object.keys(S.data.models).filter(id=>id!=="hrrr").length < 4) return;   // only keep complete forecasts as the fallback copy
+  const html = $("#app").innerHTML, s = {t: Date.now(), html}; SNAPS.set(loc.name, s);
+  try{ caches.open(SNAP_CACHE).then(async c=>{ await c.put(snapKey(loc.name), new Response(html, {headers:{"content-type":"text/html","x-at":String(s.t)}}));
+    const keys = await c.keys(); if(keys.length > 8){ const ages = await Promise.all(keys.map(async k=>[k, +((await c.match(k))?.headers.get("x-at"))||0])); ages.sort((a,b)=>a[1]-b[1]).slice(0, keys.length-8).forEach(([k])=>c.delete(k)); } }).catch(()=>{}); }catch(e){} }
+async function getSnap(name){ if(SNAPS.has(name)) return SNAPS.get(name);
+  try{ const c = await caches.open(SNAP_CACHE), r = await c.match(snapKey(name)); if(r){ const s = {t: +r.headers.get("x-at")||0, html: await r.text()}; SNAPS.set(name, s); return s; } }catch(e){} return null; }
+try{ localStorage.removeItem("snowline_snap"); }catch(e){}   // free the space the old copies took
+(async()=>{ try{ const c = await caches.open(SNAP_CACHE); for(const k of await c.keys()){ const r = await c.match(k); if(r) SNAPS.set(decodeURIComponent(new URL(k.url).pathname.slice(8)), {t:+r.headers.get("x-at")||0, html: await r.text()}); } }catch(e){} })();
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
+/* A new version was saved in the background: offer it without interrupting. */
+if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e=>{ if(e.data?.type!=="app-updated" || document.querySelector(".upd-bar")) return;
+  const b = document.createElement("button"); b.className = "upd-bar"; b.innerHTML = `<b>Snowline was updated</b><span>Tap to refresh</span>`; b.onclick = ()=>location.reload();
+  document.body.appendChild(b); setTimeout(()=>b.classList.add("on"), 30); });
+const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+function miniBars(vals){ const w=4, gap=2, H=18; const mx=Math.max(4,...vals); return `<svg width="${vals.length*(w+gap)}" height="${H}" viewBox="0 0 ${vals.length*(w+gap)} ${H}">${vals.map((v,i)=>{ const h=Math.max(1.5, v/mx*H); return `<rect x="${i*(w+gap)}" y="${H-h}" width="${w}" height="${h}" rx="1" fill="${v<0.05?'#3a3a3e':barColor(v)}"/>`; }).join("")}</svg>`; }
+function a2hsHTML(){
+  if(APP.standalone){   // opened from the Home Screen: once, point to snow alerts if they're off
+    if(store.get("pushOn") || store.get("hiAlerts")) return "";
+    return `<div class="callout tip ih" id="a2hs"><span class="ih-ic">🔔</span><div><b>Get a heads-up when snow is coming</b><br><span class="muted">Plus a short morning brief on snow days.</span><br><button class="link ih-go" onclick="store.set('hiAlerts',1);location.hash='alerts'">Turn on snow alerts</button></div><button class="ih-x" aria-label="Dismiss" onclick="store.set('hiAlerts',1);this.parentElement.remove()">✕</button></div>`; }
+  if(!APP.mobile || (store.get("visits",0) < 2 && !S.favs.length) || Date.now() < store.get("a2hsSnooze",0)) return "";
+  return `<div class="callout tip ih" id="a2hs"><img src="/icon-192.png" alt="" width="40" height="40"><div><b>Add Snowline to your Home Screen</b><br><span class="muted">Opens like an app, one tap to your spots.</span><br><button class="link ih-go" onclick="openInstall()">Show me how</button></div><button class="ih-x" aria-label="Not now" onclick="store.set('a2hsSnooze',Date.now()+21*864e5);this.parentElement.remove()">✕</button></div>`;
+}
+async function refreshView(){ S.freshAsk = Date.now() + 30e3; const v=S.view||"forecast"; if(v==="forecast" && S.loc){ MEM.delete(S.loc.name); await load(S.loc); } else if(v==="favs") await renderFavs(true); else if(v==="finder") await renderFinder(true); else if(v==="maps") await drawGrid(); }
+// scroll: compact title + auto-hide controls
+(function(){ let lastY=0; addEventListener("scroll",()=>{ const y=scrollY; $("#top").classList.toggle("scrolled", y>44);
+  const c=$("#ctrl"); if(c){ if(y>lastY+6 && y>220) c.classList.add("hide"); else if(y<lastY-6 || y<160) c.classList.remove("hide"); } lastY=y; }, {passive:true}); })();
+// pull to refresh
+(function(){ let y0=null, dy=0; const ind=$("#ptr");
+  addEventListener("touchstart",e=>{ if(scrollY<=0 && !document.querySelector(".sheet.on") && !e.target.closest("#bigmap,.ss-r,.hs,.dh,.tablewrap")){ y0=e.touches[0].clientY; dy=0; } else y0=null; },{passive:true});
+  addEventListener("touchmove",e=>{ if(y0==null) return; dy=e.touches[0].clientY-y0; if(dy>0){ const h=Math.min(84,dy*.45); ind.style.height=h+"px"; ind.classList.toggle("ready",h>=64); } },{passive:true});
+  addEventListener("touchend",()=>{ if(y0==null) return; const ready=ind.classList.contains("ready"); ind.classList.remove("ready"); y0=null;
+    if(ready){ ind.classList.add("busy"); ind.style.height="56px"; refreshView().catch(()=>{}).finally(()=>{ ind.classList.remove("busy"); ind.style.height="0"; }); } else ind.style.height="0"; });
+})();
+
+/* ================= NEXT-LEVEL: shared ================= */
+const API = "/api";
+async function api(path, opts){ const r = await fetch(API+path, opts); if(!r.ok && r.status!==200) { const e = new Error(r.status); e.status=r.status; try{ e.body = await r.json(); }catch(_){} throw e; } return r.json(); }
+S.disc = {}; S.learnOn = store.get("learnOn", true);
+const SNOTEL_MAX_KM = 30;
+
+/* ---------- Sun geometry & slope aspects ---------- */
+function sunPos(date, lat, lon){
+  const rad=Math.PI/180, d=(date.getTime() - Date.UTC(2000,0,1,12))/864e5;
+  const g=(357.529+0.98560028*d)*rad, q=280.459+0.98564736*d;
+  const Lm=(q+1.915*Math.sin(g)+0.020*Math.sin(2*g))*rad, ec=(23.439-0.00000036*d)*rad;
+  const ra=Math.atan2(Math.cos(ec)*Math.sin(Lm), Math.cos(Lm)), dec=Math.asin(Math.sin(ec)*Math.sin(Lm));
+  const gmst=((18.697374558+24.06570982441908*d)%24+24)%24; const H=(gmst*15+lon)*rad-ra, la=lat*rad;
+  const elev=Math.asin(Math.sin(la)*Math.sin(dec)+Math.cos(la)*Math.cos(dec)*Math.cos(H));
+  const az=Math.atan2(-Math.sin(H), Math.tan(dec)*Math.cos(la)-Math.sin(la)*Math.cos(H));
+  return {elev, az:(az+2*Math.PI)%(2*Math.PI)};
+}
+function aspectFactor(sun, aspectDeg, slopeDeg=30){
+  if(sun.elev<=0.03) return 0; const rad=Math.PI/180, s=slopeDeg*rad, a=aspectDeg*rad;
+  const cosi=Math.cos(s)*Math.sin(sun.elev)+Math.sin(s)*Math.cos(sun.elev)*Math.cos(sun.az-a);
+  return Math.min(3, Math.max(0,cosi)/Math.max(0.08,Math.sin(sun.elev)));
+}
+// solar input on a 30° slope of the given aspect, relative to flat ground
+function aspectSun(C, i, c, aspect){
+  const sw = isNum(c.SW)? c.SW : 0; if(aspect==null || !sw) return sw;
+  const t = new Date(Date.parse(C.time[i]+":00Z") - S.data.offset*1000);
+  const sp = sunPos(t, S.loc.lat, S.loc.lon); const dir = 0.1 + 0.8*(1 - (isNum(c.CC)? c.CC : 50)/100);
+  return sw*((1-dir) + dir*aspectFactor(sp, aspect));
+}
+const WETK = new Set(["corn","soft","slush","damp","rain"]);
+function aspectNote(C, d){
+  const N = S.ctx.SIMN, So = S.ctx.SIMS; if(!N || !So) return null;
+  let sWet=null, nWet=null, sAM=null, nAM=null;
+  for(let h=7; h<=16; h++){ const q=at(C,So,d,h), r=at(C,N,d,h); if(!q?.sim||!r?.sim) continue;
+    if(h===8){ sAM=q.sim; nAM=r.sim; }
+    if(sWet==null && WETK.has(q.sim.key)) sWet={h, sim:q.sim}; if(nWet==null && WETK.has(r.sim.key)) nWet={h, sim:r.sim}; }
+  if(!sAM) return null;
+  const nordic = !isAlp();
+  const sTxt = sWet ? (nordic? `Sunny stretches soften by ${hl(sWet.h)}` : `South faces ${sWet.sim.key==="corn"?"turn to corn":"soften"} by ${hl(sWet.h)}`) : (nordic? `Sunny stretches stay ${sAM.key==="firm"?"firm":"dry"}` : `South faces stay ${sAM.key==="firm"?"firm":"dry"}`);
+  const dryN = ["powder","fresh","softpack","packed","cold","heavy","wind"].includes(nAM.key);
+  const nTxt = nWet ? (nordic? `shaded trail softens by ${hl(nWet.h)}` : `north softens by ${hl(nWet.h)}`) : (dryN? (nordic? "shaded trail stays dry and fast" : "north stays dry and cold") : `${nordic? "shaded trail" : "north"} stays ${nAM.label.toLowerCase()}`);
+  return { line: `${sTxt}; ${nTxt}.`, sAM, nAM, sWet, nWet };
+}
+
+/* ---------- Storm timeline ---------- */
+function findStorms(C){
+  const out=[]; let cur=null, gap=0;
+  for(let i=C.nowIdx;i<C.time.length;i++){
+    const c=C.cons[i]; const s=c? c.snow : 0, wet = c && c.P>=0.3;
+    if(s>=0.05 || wet){ if(!cur) cur={a:i,b:i,tot:0,rainMm:0,peak:{v:0,i}}; cur.b=i; cur.tot+=s; cur.rainMm += c? Math.max(0,(1-(c.frac??1))*c.P) : 0; if(s>cur.peak.v) cur.peak={v:s,i}; gap=0; }
+    else if(cur){ if(++gap>6){ out.push(cur); cur=null; gap=0; } }
+  }
+  if(cur) out.push(cur);
+  return out.filter(x=>x.tot>=2);
+}
+const tLabel = (C,i) => { const t=C.time[i]; return `${dow(t.slice(0,10))} ${hl(+t.slice(11,13))}`; };
+function renderStorm(C, SIM, e){
+  const el = $("#stormCard"); if(!el) return;
+  const st = findStorms(C)[0]; if(!st){ el.remove(); return; }
+  const a0 = Math.max(C.nowIdx, st.a-3), b0 = Math.min(C.time.length-1, st.b+3);
+  let dayHrs=0, dayTot=0, slMin=Infinity, slMax=-Infinity, slrA=0, slrW=0, maxG=0;
+  for(let i=st.a;i<=st.b;i++){ const c=C.cons[i]; if(!c) continue; const h=+C.time[i].slice(11,13);
+    if(h>=9 && h<16 && c.snow>=0.2){ dayHrs++; dayTot+=c.snow; }
+    if(c.P>0.2){ slMin=Math.min(slMin,c.sl); slMax=Math.max(slMax,c.sl); }
+    if(c.snow>0.02){ slrA+=c.slr*c.snow; slrW+=c.snow; } if(isNum(c.G)) maxG=Math.max(maxG,c.G); }
+  const endD = C.time[st.b].slice(0,10), endH = +C.time[st.b].slice(11,13);
+  const after = endH < 7 ? endD : dateAdd(endD,1);
+  const ratio = slrW? slrA/slrW : 10;
+  const verdict = S.mode==="bc"
+    ? `<b>Snow ends around ${tLabel(C,st.b)}.</b> New snow${maxG>=50? " and strong wind" : ""} add weight to the snowpack, and avalanche danger often rises during and after storms. Check the avalanche center's forecast for each day you plan to go.`
+    : isAlp()
+    ? (dayHrs>=3 && maxG<70
+      ? `<b>Ski the storm:</b> about ${fmtSnow(dayTot)} falls during lift hours, ${ratio>=13?"light and deep":"heavier and supportive"}. Then hit the <b>morning after</b> on ${dow(after)}.`
+      : `<b>Wait for the morning after:</b> most of it falls ${dayHrs? "outside lift hours" : "overnight"}${maxG>=70? " with strong winds" : ""}. First chair ${dow(after)} is the call.`)
+    : (dayHrs>=3
+      ? `<b>Expect soft, slow trails while it snows</b> (about ${fmtSnow(dayTot)} during the day)${maxG>=60? ", with wind drifting the open sections" : ""}. The best ${S.mode==="skate"? "skating" : "classic skiing"} is <b>${dow(after)}</b>, once the trails are groomed.`
+      : `<b>Most of it falls overnight.</b> ${dow(after)} morning should bring fresh snow on the trails; it skis best once it's groomed${S.mode==="classic"? " and the tracks are set" : ""}.`);
+  const rainNote = st.rainMm > 3 ? ` · <span style="color:${PT.rain}">some rain at this elevation</span>` : "";
+  el.innerHTML = `<div class="card-h"><h2>Storm Timeline${tipI("storm")}</h2><span class="muted">${fmtEl(e)}</span></div>
+    <div class="storm-h"><div><div class="muted">Next storm</div><b>${tLabel(C,st.a)} → ${tLabel(C,st.b)}</b></div><div style="text-align:right"><div class="num" style="font-size:30px;color:var(--ice)">${fmtSnow(st.tot)}</div><div class="muted">storm total</div></div></div>
+    <div class="kv" style="margin:10px 0">
+      <div><div class="l">Peak rate</div><div class="v">${fmtSnow(st.peak.v,1)}/hr · ${tLabel(C,st.peak.i)}</div></div>
+      <div><div class="l">Quality</div><div class="v">${ratio>=15?"Light & fluffy":ratio>=11?"Average":"Heavy & dense"} <small class="muted">${Math.round(ratio)}:1</small>${tipI("ratio")}</div></div>
+      <div><div class="l">Wind</div><div class="v">gusts to ${fmtWind(maxG)} ${windU()}</div></div>
+    </div>
+    <div class="callout" style="margin:0 0 12px">${verdict}${rainNote}</div>
+    <div class="mtn-wrap"><svg id="mtnSvg" viewBox="0 0 340 170" width="100%"></svg></div>
+    <div class="row" style="flex-wrap:nowrap;gap:10px;margin-top:6px"><button class="ibtn" id="stormPlay" aria-label="Play">▶</button><input type="range" id="stormRange" min="${a0}" max="${b0}" value="${st.a}" style="flex:1"></div>
+    <div class="chartbox" style="height:170px;margin-top:8px"><canvas id="cStorm"></canvas></div>`;
+  const L0=S.loc, lo=Math.min(L0.base-1500, isFinite(slMin)? slMin*FT-500 : L0.base-1500), hi=Math.max(L0.top+800, isFinite(slMax)? slMax*FT+500 : L0.top+800);
+  const yOf = ft => 150 - (ft-lo)/(hi-lo)*130;
+  let acc = 0; const accAt = {}; for(let i=a0;i<=b0;i++){ acc += C.cons[i]?.snow||0; accAt[i]=acc; }
+  const draw = (i) => {
+    const c = C.cons[i]; if(!c) return; const slFt = Math.max(lo, Math.min(hi, c.sl*FT)), y = yOf(slFt);
+    const peakY = yOf(L0.top), baseY = yOf(L0.base), meY = yOf(bandElev()*FT); const ty = ptype(c);
+    const flakes = c.snow>=0.05 ? Array.from({length:Math.min(40, Math.round(c.snow*30)+4)},(_,k)=>`<circle cx="${(k*53+i*17)%340}" cy="${(k*37+i*29)%Math.max(10,y)}" r="1.6" fill="${y<peakY? PT.rain : "#fff"}" opacity=".8"/>`).join("") : "";
+    $("#mtnSvg").innerHTML = `
+      <defs><clipPath id="mclip"><path d="M0 160 L60 ${baseY} L120 ${yOf((L0.base+L0.top)/2)} L175 ${peakY} L230 ${yOf((L0.base+L0.top)/2+300)} L290 ${baseY} L340 160 Z"/></clipPath>
+      <linearGradient id="mg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3d63"/><stop offset="1" stop-color="#151b2c"/></linearGradient></defs>
+      <rect width="340" height="170" fill="#0c0f18" rx="10"/>${flakes}
+      <path d="M0 160 L60 ${baseY} L120 ${yOf((L0.base+L0.top)/2)} L175 ${peakY} L230 ${yOf((L0.base+L0.top)/2+300)} L290 ${baseY} L340 160 Z" fill="url(#mg)"/>
+      <rect x="0" y="0" width="340" height="${y}" fill="#f1f6ff" opacity=".92" clip-path="url(#mclip)"/>
+      <line x1="0" x2="340" y1="${y}" y2="${y}" stroke="${PT.mix}" stroke-dasharray="5 4" stroke-width="1.5"/>
+      <text x="6" y="${Math.max(12,y-4)}" fill="${PT.mix}" font-size="10" font-weight="700">snow level ${fmtEl(c.sl)}</text>
+      <line x1="150" x2="200" y1="${meY}" y2="${meY}" stroke="#ffcc4d" stroke-width="2"/><text x="204" y="${meY+3}" fill="#ffcc4d" font-size="10">you</text>
+      <text x="334" y="16" text-anchor="end" fill="#fff" font-size="12" font-weight="700">${tLabel(C,i)}</text>
+      <text x="334" y="30" text-anchor="end" fill="${ty==="none"?"#9aa":PT[ty]}" font-size="11">${c.snow>=0.05? fmtSnow(c.snow,1)+"/hr" : ty==="rain"? "rain" : "—"} · ${fmtT(c.Te)}</text>
+      <text x="334" y="44" text-anchor="end" fill="#9fb3d4" font-size="10.5">${fmtSnow(accAt[i]||0)} so far</text>`;
+  };
+  const rng=$("#stormRange"); rng.oninput=()=>draw(+rng.value); draw(+rng.value);
+  let timer=null; $("#stormPlay").onclick=()=>{ if(timer){ clearInterval(timer); timer=null; $("#stormPlay").textContent="▶"; return; }
+    $("#stormPlay").textContent="❚❚"; if(+rng.value>=b0) rng.value=a0; timer=setInterval(()=>{ let v=+rng.value+1; if(v>b0){ clearInterval(timer); timer=null; $("#stormPlay").textContent="▶"; return; } rng.value=v; draw(v); }, 140); };
+  // rate + snow level chart
+  const idx=[]; for(let i=a0;i<=b0;i++) idx.push(i);
+  const o = chartBase(); o.plugins.legend.display=false; o.scales.x.ticks.autoSkip=false;
+  o.scales.y.title={display:true,text:imp()?"in/hr":"cm/hr",color:"#8b9cba"};
+  o.scales.y2={position:"right",grid:{display:false},ticks:{color:"#b48cff",font:{size:10},maxTicksLimit:4,callback:v=>imp()? Math.round(v/100)/10+"k" : v},title:{display:true,text:"snow lvl",color:"#b48cff"}};
+  S.charts.storm = new Chart($("#cStorm"), {data:{labels:idx.map(i=>{ const h=+C.time[i].slice(11,13); return h===0? dow(C.time[i].slice(0,10)) : h%6===0? hl(h) : ""; }), datasets:[
+    {type:"bar", data:idx.map(i=>snowNum(C.cons[i]?.snow||0)), backgroundColor:idx.map(i=>{ const t=ptype(C.cons[i]); return t==="none"? "#3d8bfd" : PT[t]; }), yAxisID:"y", borderRadius:2},
+    {type:"line", data:idx.map(i=> C.cons[i]? (imp()? C.cons[i].sl*FT : C.cons[i].sl) : null), borderColor:"#b48cff", borderWidth:1.6, pointRadius:0, yAxisID:"y2", tension:.3}
+  ]}, options:o});
+}
+
+/* ---------- Extras: measured snow, resort/grooming report, learned blend, avalanche detail ---------- */
+S.extras = {};
+function extrasFor(loc){ return S.extras[loc.name] ||= {}; }
+function loadExtras(loc){
+  const X = extrasFor(loc); if(X.started && Date.now()-X.started < 15*60e3) return; X.started = Date.now();
+  const q = `lat=${loc.lat.toFixed(4)}&lon=${loc.lon.toFixed(4)}`;
+  const done = () => { if(S.loc===loc && S.data) scheduleRender(loc); };
+  api(`/obs?${q}`).then(r=>{ X.obs=r; done(); }).catch(()=>{});
+  if(loc.name==="Meissner Nordic (Bend), OR") api("/meissner").then(r=>{ X.mx=r; if(S.loc===loc) renderMeissner(); }).catch(()=>{ X.mx={stations:[]}; if(S.loc===loc) renderMeissner(); });
+  api(`/season?${q}`).then(r=>{ X.season=r; if(S.loc===loc) renderSeasonCard(); }).catch(()=>{});
+  api(`/verify?${q}`).then(r=>{ X.verify=r; done(); if(S.loc===loc) try{ renderReceipt(); }catch(err){} setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
+  api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
+  api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
+  api(`/nws?${q}`).then(r=>{ X.nws=r; if(S.loc===loc){ renderNwsAlerts(); renderAFD(); } }).catch(()=>{});
+  if(GROOM_SPOTS.includes(loc.name)) api(`/groom?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.groom=r; if(S.loc===loc) renderGroom(); }).catch(()=>{});
+  if(loc.bc || PRESETS.find(p=>p.name===loc.name)?.bc || S.mode==="bc") loadAvyObs(loc);
+}
+function nearObs(){ const X = S.loc && S.extras[S.loc.name]; const st = X?.obs?.stations?.[0]; return st && st.km <= SNOTEL_MAX_KM ? st : null; }
+function learned(){ const X = S.loc && S.extras[S.loc.name]; const v = X?.verify; return v && v.status==="ok" ? v : null; }
+function learnedW(id, L=1){ const v = learned(); return S.learnOn && v ? (v.wLead?.[L]?.[id] ?? v.weights?.[id] ?? 1) : 1; }
+
+function renderReport(){
+  const el = $("#reportCard"); if(!el) return;
+  const X = S.extras[S.loc.name] || {}; const st = X.obs?.stations || []; const rep = X.report || {};
+  const blocks = [];
+  if(st.length){
+    const s = st[0], mi = Math.round(s.km*0.621*10)/10;
+    const dens = s.density ? `${s.density}% water · ${s.density<8?"light, dry":s.density<12?"average":"dense, wet"}` : "—";
+    const hist = (s.hist||[]).filter(h=>isNum(h.depth));
+    const spark = hist.length>2 ? (()=>{ const mx=Math.max(...hist.map(h=>h.depth),1), mn=Math.min(...hist.map(h=>h.depth)); const W=120,H=28; return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="#5aa2ff" stroke-width="2" points="${hist.map((h,i)=>`${i*W/(hist.length-1)},${H-2-(h.depth-mn)/Math.max(1,mx-mn)*(H-6)}`).join(" ")}"/></svg>`; })() : "";
+    blocks.push(`<div class="rep"><div class="rep-h"><b>Live snow</b>${provChip("meas")}</div><div class="muted" style="margin:-4px 0 8px">SNOTEL · ${s.name} · ${mi} mi · ${Math.round(s.elevFt).toLocaleString()} ft</div>
+      <div class="kv k3">
+        <div><div class="l">New 24h</div><div class="v num">${isNum(s.new24)? fmtSnow(s.new24) : "—"}</div></div>
+        <div><div class="l">New 72h</div><div class="v num">${isNum(s.new72)? fmtSnow(s.new72) : "—"}</div></div>
+        <div><div class="l">Snow depth</div><div class="v num">${isNum(s.depth)? fmtSnow(s.depth,0) : "—"}</div></div>
+        <div><div class="l">Snow water</div><div class="v num">${isNum(s.swe)? (imp()? s.swe.toFixed(1)+'"' : (s.swe*2.54).toFixed(0)+" cm") : "—"}</div></div>
+        <div><div class="l">New-snow density</div><div class="v">${dens}</div></div>
+        <div><div class="l">Air temp</div><div class="v">${isNum(s.tempF)? (imp()? Math.round(s.tempF)+"°" : Math.round((s.tempF-32)*5/9)+"°") : "—"}</div></div>
+      </div>${spark? `<div class="row" style="margin-top:8px;gap:8px"><span class="muted">Depth, last week</span>${spark}</div>`:""}
+      ${stationChartSVG(s)}${nearbyStationsHTML(st)}<div class="muted" style="margin-top:6px">Station is ${s.elevFt < S.loc.top - 800 ? "below the summit, so expect more up high" : "near this elevation"} · updated ${s.updated? String(s.updated).slice(5,16).replace("-","/") : "—"}</div></div>`);
+  }
+  const R = rep.resort;
+  if(R && !R.error && (R.base!=null || R.comment)){
+    blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b><span>${provChip("rep", R.date||"")}${statusPill(rep)}</span></div>
+      <div class="kv k3">
+        ${R.new24!=null? `<div><div class="l">24h reported</div><div class="v num">${fmtSnow(R.new24)}</div></div>`:""}
+        ${R.base!=null? `<div><div class="l">Base</div><div class="v num">${fmtSnow(R.base,0)}</div></div>`:""}
+        ${R.summit!=null? `<div><div class="l">Summit</div><div class="v num">${fmtSnow(R.summit,0)}</div></div>`:""}
+        ${R.lifts && S.mode==="alpine"? `<div><div class="l">Lifts</div><div class="v">${R.liftsOpen}/${R.lifts}</div></div>`:""}
+        ${R.runs && isAlp()? `<div><div class="l">Runs</div><div class="v">${R.runsOpen}/${R.runs}</div></div>`:""}
+      </div>${R.comment? `<p class="clamp3 muted" style="margin:8px 0 0">${R.comment}</p>`:""}
+      <a class="muted" href="${R.url}" target="_blank" rel="noopener">${R.source} ↗</a></div>`);
+  } else if(R && R.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b></div><a href="${R.url}" target="_blank" rel="noopener">Open the latest resort report ↗</a></div>`);
+  const G = !isAlp() ? rep.grooming : null;
+  if(G) blocks.push(`<a class="li" href="${G.url}" target="_blank" rel="noopener"><span class="nm"><b>Nordic grooming report</b><small>Today's grooming on ${G.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
+  const cl = "";
+  if(!blocks.length && !cl){ el.remove(); return; }
+  el.innerHTML = `<div class="card-h"><h2>Snow Report</h2><span class="muted">observed</span></div>${blocks.join("")}${cl}`; wireCamLinks();
+}
+
+function learnedHTML(){
+  const v = learned(); const X = S.extras[S.loc.name]||{};
+  if(!v){ const st = X.verify?.status; return `<h3>How models score here</h3><div class="muted">${st==="no-station"? "No SNOTEL station nearby, so Snowline uses its default model weights." : st==="too-dry" || st==="insufficient-obs"? "Not enough recent storms to score the models yet. Learning starts with the next storm." : "Scoring models against nearby measurements…"}</div>`; }
+  const rows = Object.entries(v.scores).sort((a,b)=>a[1].mae-b[1].mae);
+  const nm = id => MODELS.find(m=>m.id===id)?.name || id;
+  return `<div class="card-h" style="margin-top:14px"><h3 style="margin:0">How models score here</h3><label class="chip"><input type="checkbox" id="learnTog" ${S.learnOn?"checked":""}> Use learned blend</label></div>
+    <div class="muted" style="margin-bottom:8px">Each model's next-day forecast vs. what ${v.station.name} SNOTEL measured, over the last ${v.days} days (${v.wetDays} wet). Better scores get more weight in the blend.</div>
+    <div class="tablewrap"><table><tr><th class="m">Model</th><th>Avg miss</th><th>vs. others</th><th>Weight</th></tr>
+    ${(()=>{ const mb = pct(rows.map(r=>r[1].bias),.5)||1; return rows.map(([id,s],k)=>{ const rb = s.bias/mb; return `<tr><td class="m">${k===0?"🏆 ":""}${nm(id)}</td><td>${(imp()? (s.mae/25.4).toFixed(2)+'"' : s.mae.toFixed(1)+" mm")}</td><td>${rb>1.15? `<span style="color:#f39a44">${Math.round((rb-1)*100)}% wetter</span>` : rb<0.87? `<span style="color:#5aa2ff">${Math.round((1-rb)*100)}% drier</span>` : "typical"}</td><td><b>×${(v.weights[id]||1).toFixed(2)}</b></td></tr>`; }).join(""); })()}</table></div><div class="muted" style="margin-top:6px">Bias is relative to the other models. Snow gauges under-catch, so every model looks wet in absolute terms.</div>`;
+}
+
+/* ---------- forecast facts (used by the Tour card and share text) ---------- */
+function buildFacts(C, SIM, e){
+  const days = C.days.slice(0,7).map((d,k)=>{ const cd=C.consDays[k]; const x=daySummary(C,SIM,d); const memb=C.ensDays.filter(m=>m.cnt[k]>0).map(m=>m.tot[k]);
+    return { day: dayLabel(d), snow: fmtSnow(cd.day+cd.night), dayPart: fmtSnow(cd.day), night: fmtSnow(cd.night), high: fmtT(cd.tmaxD), low: fmtT(cd.tminN),
+      snowLevel: cd.slN? fmtEl(cd.slSum/cd.slN) : null, snowRatio: cd.slrW? Math.round(cd.slrSum/cd.slrW)+":1" : null,
+      chance6in: memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length)+"%" : null, gustMax: fmtWind(cd.gmax)+" "+windU(),
+      ski: x? { score: +x.best.avg.toFixed(1), best: `${hl(x.best.from)}-${hl(x.best.to)}`, am: x.am?.label, pm: x.pm?.label, sky: x.best.sim.light.label } : null,
+      aspects: aspectNote(C,d)?.line || null }; });
+  const st = findStorms(C)[0]; const ob = nearObs(); const v = learned(); const X = S.extras[S.loc.name]||{};
+  const consDaily = C.consDays.map(d=>d.day+d.night); const ensT = ensWindowTotals(C,5);
+  return { elevation: fmtEl(e), units: imp()? "inches/°F" : "cm/°C", next5: fmtSnow(windowTotal(consDaily,5)), next10: fmtSnow(windowTotal(consDaily,10)),
+    range5: ensT.length? `${fmtSnow(pct(ensT,.1))}-${fmtSnow(pct(ensT,.9))}` : null, days,
+    storm: st? { start: tLabel(C,st.a), end: tLabel(C,st.b), total: fmtSnow(st.tot), peak: `${fmtSnow(st.peak.v,1)}/hr ${tLabel(C,st.peak.i)}` } : null,
+    measured: ob? { station: ob.name, last24: fmtSnow(ob.new24||0), depth: isNum(ob.depth)? fmtSnow(ob.depth,0) : null } : null,
+    bestModel: v? MODELS.find(m=>m.id===v.best)?.name : null, nowSurface: SIM[C.nowIdx]?.label,
+    avalancheDanger: X.avy?.zone?.danger || null, mode: S.mode, modeDescription: S.mode==="bc"? "backcountry ski touring: climbing on skins with no lifts, in or near avalanche terrain" : byMode("alpine (downhill) skiing at a resort", "skate (nordic cross-country) skiing on groomed trails", "classic (nordic cross-country) skiing in set tracks") };
+}
+
+
+
+
+function qualityExplainHTML(){
+  const m = S.mode==="skate"? "skate skiing" : S.mode==="classic"? "classic skiing" : S.mode==="bc"? "touring" : "alpine skiing";
+  const likes = S.mode==="skate"? "Firm, fast, packed snow scores highest. Fresh unpacked snow, slush and very cold, slow-gliding snow score lower."
+    : S.mode==="classic"? "Packed snow and settled new snow with easy grip score highest. Ice, slush and rain score lowest."
+    : "Fresh powder scores highest, more so the deeper and newer it is. Packed groomers are good; ice, slush and rain score lowest.";
+  return `<p><b>A 0–10 score for how the snow should ski for ${m}</b>, from the forecast at the elevation you picked. Each color is that day's best 3 hours between 8am and 5pm.</p>
+    <p>Snowline plays the weather forward hour by hour (new snow, settling, melting and refreezing, rain, wind) to guess the surface: powder, packed, corn, crust, slush and so on. Each surface has a starting score for your mode. ${likes}</p>
+    <p>Then it adjusts for <b>wind</b> (gusts over 30 mph knock it down), <b>light</b> (sun helps, flat light hurts alpine), <b>cold</b> (below about −4°F hurts) and <b>snow falling</b> (slows skating).</p>
+    <p class="muted">Epic 8+ · Great 6.5+ · Good 5+ · Fair 3.5+ · Poor below. It's a forecast of the surface, not a grooming report or a safety rating.${S.mode==="bc"? " <b>It says nothing about avalanche danger.</b>" : ""} Switch Alpine / Skate / Classic to see each sport's score.</p>`;
+}
+
+
+/* ================= First visit: welcome, favorites, Home Screen ================= */
+const APP = (()=>{ const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
+  return { ios, android, mobile: ios || android,
+    inApp: /FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|LinkedInApp|Pinterest|musical_ly|TikTok/.test(ua),
+    iosOther: ios && /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/.test(ua),
+    standalone: !!(navigator.standalone || matchMedia("(display-mode: standalone)").matches) }; })();
+let BIP = null;   // Android/desktop Chrome's own install prompt, kept for our button
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); BIP = e; if($("#installSheet")?.classList.contains("on")) renderInstall(); });
+addEventListener("appinstalled", () => { BIP = null; store.set("installed", 1); closeSheet("installSheet"); $("#a2hs")?.remove(); toast("Snowline is on your Home Screen"); });
+store.set("visits", store.get("visits",0) + 1);
+
+const IC = {
+  share: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>`,
+  plus: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></svg>`,
+  dots: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`,
+  vdots: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>`,
+  home: `<img src="/icon-192.png" width="22" height="22" alt="" style="border-radius:6px">` };
+const stepHTML = steps => `<ol class="ig">${steps.map(([ic, html], i)=>`<li><span class="ig-n">${i+1}</span><span class="ig-ic">${ic}</span><span class="ig-t">${html}</span></li>`).join("")}</ol>`;
+
+function installGuideHTML(){
+  if(APP.standalone) return `<div class="ig-done">✅ Snowline is already on your Home Screen. You're opening it like an app right now.</div>`;
+  const why = `<p class="muted" style="margin:0 0 14px">It opens full screen like a regular app, starts faster, works with weak signal, and${APP.ios? " is needed on iPhone for" : " can send"} snow alerts on your lock screen. Free, nothing to download from the App Store.</p>`;
+  if(APP.inApp) return why + `<div class="callout rain" style="margin-bottom:12px">You're in another app's built-in browser, which can't add to the Home Screen. Open Snowline in ${APP.ios? "Safari" : "Chrome"} first:</div>`
+    + stepHTML([[IC.dots, `Tap the <b>•••</b> menu (usually top right).`], ["↗️", `Choose <b>Open in ${APP.ios? "Safari" : "browser"}</b>.`], [IC.home, `Then tap <b>Settings ⚙︎ › Add to Home Screen</b> in Snowline for the last steps.`]])
+    + `<button class="btn wide" style="margin-top:12px" onclick="copyAppLink()">Copy the link instead</button>`;
+  if(APP.ios) return why + stepHTML(APP.iosOther ? [
+      [IC.share, `Tap the <b>Share</b> button in the address bar.`],
+      [IC.plus, `Scroll down and tap <b>Add to Home Screen</b>. (Don't see it? Open snowline-forecast.netlify.app in Safari instead.)`],
+      [IC.home, `Tap <b>Add</b>. Snowline is now on your Home Screen.`] ] : [
+      [IC.share, `Tap the <b>Share</b> button. It's at the bottom of Safari, or inside the <b>•••</b> button next to the address bar on newer iPhones.`],
+      [IC.plus, `Scroll down the list and tap <b>Add to Home Screen</b>.`],
+      [IC.home, `Leave <b>Open as Web App</b> on if you see it, then tap <b>Add</b>. Snowline appears on your Home Screen.`] ])
+    + `<div class="ig-arrow">${IC.share}<span>The Share button looks like this</span></div>`;
+  if(APP.android) return why + (BIP ? `<button class="btn primary wide ig-big" onclick="doInstall()">📲 Install Snowline</button><p class="muted" style="text-align:center;margin:8px 0 0">One tap, then <b>Install</b>.</p>`
+    : stepHTML([[IC.vdots, `Tap the <b>⋮</b> menu at the top right of Chrome.`], [IC.plus, `Tap <b>Add to Home screen</b> or <b>Install app</b>.`], [IC.home, `Tap <b>Install</b>. Snowline shows up with your other apps.`]]));
+  return why + (BIP ? `<button class="btn primary wide ig-big" onclick="doInstall()">💻 Install Snowline on this computer</button>`
+    : `<p>On your phone, open <b>snowline-forecast.netlify.app</b> and come back here for the steps. On a computer: in Chrome or Edge, click the install icon at the right end of the address bar; in Safari on a Mac, choose <b>File › Add to Dock</b>.</p>`);
+}
+function openInstall(){ renderInstall(); openSheet("installSheet"); }
+function renderInstall(){ $("#installBox").innerHTML = installGuideHTML(); }
+async function doInstall(){ if(!BIP) return renderInstall(); BIP.prompt(); const r = await BIP.userChoice.catch(()=>null); BIP = null; if(r?.outcome==="accepted") store.set("installed",1); renderInstall(); }
+function copyAppLink(){ navigator.clipboard?.writeText(location.origin).then(()=>toast("Link copied. Paste it into Safari or Chrome."), ()=>toast(location.origin)); }
+
+const WELCOME_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Hoodoo, OR", "Willamette Pass, OR", "Tumalo Mountain, OR"];
+const W = { step:0, picks:new Set(), mode:null };
+function openWelcome(){ W.step = 0; W.picks = new Set(S.favs.map(f=>f.name)); W.mode = S.mode==="bc"? "alpine" : S.mode; renderWelcome(); openSheet("welcomeSheet"); }
+function renderWelcome(){
+  const box = $("#welcomeBox"), last = APP.standalone ? 1 : 2;
+  const dots = `<div class="wl-dots">${[0,1,2].slice(0,last+1).map(i=>`<i class="${i===W.step?"on":""}"></i>`).join("")}</div>`;
+  if(W.step===0) box.innerHTML = `<div class="wl-hero"><img src="/icon-192.png" alt="" width="64" height="64"><h2>Welcome to Snowline</h2>
+      <p>Free snow forecasts from nine weather models, by elevation, with ski conditions for each hour. No account, no ads.</p></div>
+      <div class="wl-q">What do you ski most?</div>
+      <div class="wl-modes">${[["alpine","⛷️","Alpine","Resort skiing"],["skate","🎿","Skate","Nordic skate"],["classic","🎿","Classic","Nordic classic"]].map(([k,e,n,s])=>`<button data-wm="${k}" class="${W.mode===k?"on":""}"><span>${e}</span><b>${n}</b><small>${s}</small></button>`).join("")}</div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">You can switch anytime at the top. Backcountry touring is under <b>Tour</b>.</p>
+      ${dots}<button class="btn primary wide" id="wlNext">Next</button>`;
+  if(W.step===1) box.innerHTML = `<div class="wl-hero sm"><h2>Star your spots</h2><p>They'll be one tap away in <b>Favorites</b>, side by side.</p></div>
+      <div class="wl-spots">${WELCOME_SPOTS.map(n=>{ const p = PRESETS.find(x=>x.name===n); if(!p) return ""; const on = W.picks.has(n);
+        return `<button data-wp="${encodeURIComponent(n)}" class="${on?"on":""}"><span class="wl-star">${on?"★":"☆"}</span><span><b>${esc(n.replace(/, OR$/,""))}</b><small>${p.bc? "Backcountry tour" : /Nordic|Trails|Birkie/i.test(n)? "Nordic" : "Resort"} · ${fmtEl(p.base/FT).replace(/ ?(ft|m)$/,"")}–${fmtEl(p.top/FT)}</small></span></button>`; }).join("")}</div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Somewhere else? Tap the spot name at the top and search any town, peak or resort, then tap ★.</p>
+      ${dots}<div class="row" style="gap:8px"><button class="btn" id="wlBack" style="flex:0 0 auto">Back</button><button class="btn primary" id="wlNext" style="flex:1">${W.picks.size? `Next · ${W.picks.size} starred` : "Skip for now"}</button></div>`;
+  if(W.step===2) box.innerHTML = `<div class="wl-hero sm"><h2>Put it on your Home Screen</h2></div>${installGuideHTML()}
+      ${dots}<div class="row" style="gap:8px;margin-top:6px"><button class="btn" id="wlBack" style="flex:0 0 auto">Back</button><button class="btn primary" id="wlNext" style="flex:1">I'm all set</button></div>
+      <button class="link" id="wlLater" style="display:block;margin:10px auto 0">Maybe later</button>`;
+  box.querySelectorAll("[data-wm]").forEach(b=>b.onclick=()=>{ W.mode=b.dataset.wm; renderWelcome(); });
+  box.querySelectorAll("[data-wp]").forEach(b=>b.onclick=()=>{ const n=decodeURIComponent(b.dataset.wp); W.picks.has(n)? W.picks.delete(n) : W.picks.add(n); renderWelcome(); });
+  const back = $("#wlBack"); if(back) back.onclick = ()=>{ W.step--; renderWelcome(); };
+  const later = $("#wlLater"); if(later) later.onclick = ()=>{ store.set("a2hsSnooze", Date.now()+7*864e5); finishWelcome(); };
+  $("#wlNext").onclick = ()=>{ if(W.step < last){ W.step++; renderWelcome(); } else finishWelcome(); };
+}
+function finishWelcome(){
+  store.set("welcomed", 1); closeSheet("welcomeSheet");
+  const add = [...W.picks].filter(n=>!S.favs.some(f=>f.name===n)).map(n=>PRESETS.find(p=>p.name===n)).filter(Boolean);
+  S.favs = S.favs.filter(f=>W.picks.has(f.name) || !WELCOME_SPOTS.includes(f.name)).concat(add.map(p=>({...p})));
+  store.set("favs", S.favs); try{ pushSync(); }catch(e){}
+  const modeChanged = W.mode && W.mode!==S.mode; if(modeChanged) setMode(W.mode);
+  const first = S.favs[0]; const go = first && (!S.loc || !S.favs.some(f=>f.name===S.loc.name)) ? first : null;
+  if(go) load(go); else { updateTop(); if(modeChanged && S.data) render(); }
+  toast(add.length? `★ ${add.length} spot${add.length>1?"s":""} saved to Favorites` : "You're all set");
+}
+
+/* ---------- Keeping score: save this morning's Snowline forecast at the gauge so it can be graded after the storm ---------- */
+function saveScore(loc){
+  try{
+    const v = S.extras[loc.name]?.verify, st = v?.station; if(!st?.id || !st.elevFt || S.loc!==loc || !S.data) return;
+    if(Object.keys(S.data.models).filter(id=>id!=="hrrr").length < 5) return;   // only complete forecasts
+    const D = S.data, C = computeAt(st.elevFt/FT), issued = C.time[C.nowIdx]?.slice(0,10); if(!issued) return;
+    const key = `score-${st.id}`; if(store.get(key) === issued) return;
+    const tot = {}; C.time.forEach((t,i)=>{ const c = C.cons[i]; if(!c || i < C.nowIdx) return; const d = t.slice(0,10); if(d <= issued) return; const o = tot[d] ||= [0,0,0]; o[0] += c.snow; o[1] += (c.P||0)/25.4; o[2]++; });
+    const fc = Object.entries(tot).filter(([d,o])=>o[2]>=22).sort().slice(0,5).map(([d,o])=>[d, Math.round(o[0]*10)/10, Math.round(o[1]*100)/100]);
+    if(!fc.length) return;
+    fetch(API+"/score", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({station: st.id, issued, fc})}).then(r=>{ if(r.ok) store.set(key, issued); }).catch(()=>{});
+    if(/^Mt\. Bachelor/.test(loc.name) && store.get("score-resort-bachelor") !== issued){
+      const B = PRESETS.find(p=>p.name==="Mt. Bachelor, OR"); const Cm = computeAt((B.base+B.top)/2/FT), tm = {};
+      Cm.time.forEach((t,i)=>{ const c = Cm.cons[i]; if(!c || i < Cm.nowIdx) return; const d = t.slice(0,10); if(d <= issued) return; const o = tm[d] ||= [0,0,0]; o[0] += c.snow; o[1] += (c.P||0)/25.4; o[2]++; });
+      const fr = Object.entries(tm).filter(([d,o])=>o[2]>=22).sort().slice(0,5).map(([d,o])=>[d, Math.round(o[0]*10)/10, Math.round(o[1]*100)/100]);
+      if(fr.length) fetch(API+"/score", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({station:"resort:bachelor", issued, fc:fr})}).then(r=>{ if(r.ok) store.set("score-resort-bachelor", issued); }).catch(()=>{});
+    }
+  }catch(e){}
+}
+const MNAME = id => MODELS.find(m=>m.id===id)?.name || id;
+function trustLineHTML(){
+  const v = S.loc && S.extras[S.loc.name]?.verify; if(!v || !S.learnOn) return "";
+  const R = v.record;
+  if(R && R.storms >= 1) return `<button class="trust" data-open="g-acc"><span>🎯</span><span><b>Snowline here: within 2″ on ${R.within} of ${R.storms} storm${R.storms>1?"s":""}</b><small>Graded against ${esc(v.station.name)} · tap for the scorecard</small></span></button>`;
+  if(v.status !== "ok") return "";
+  const b = v.bestByLead || {}, b1 = b[1], b5 = b[5];
+  return `<button class="trust" data-open="g-acc"><span>🎯</span><span><b>Tuned to ${esc(v.station.name)}</b><small>${b1? `${MNAME(b1)} has been closest 1 day out` : ""}${b5 && b5!==b1? `, ${MNAME(b5)} 5 days out` : ""}${v.basis==="last-season"? " (last winter)" : ""}</small></span></button>`;
+}
+document.addEventListener("click", e=>{ const b = e.target.closest("[data-open]"); if(!b) return; const g = document.querySelector(`details[data-sec="${b.dataset.open}"]`); if(!g) return; g.open = true; setTimeout(()=>g.scrollIntoView({behavior:"smooth", block:"start"}), 50); });
+
+/* ---------- Jump tabs: one tap to each part of the page, and they follow your scroll ---------- */
+(()=>{ const nav = $("#jtabs"); if(!nav) return;
+  const offset = () => (document.querySelector(".top")?.getBoundingClientRect().height || 56) + nav.offsetHeight + 8;   // where the tabs sit once stuck
+  let lock = 0;
+  const mark = b => { nav.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b)); if(b){ const l = b.offsetLeft - 12; nav.scrollTo({left: l - nav.clientWidth/2 + b.offsetWidth/2, behavior:"smooth"}); } };
+  nav.onclick = e => { const b = e.target.closest("button"); if(!b) return;
+    if(b.dataset.g){ const g = document.querySelector(`details[data-sec="${b.dataset.g}"]`); if(g) g.open = true; }
+    const el = document.getElementById(b.dataset.j); if(!el) return;
+    mark(b); lock = Date.now() + 900;
+    scrollTo({top: scrollY + el.getBoundingClientRect().top - offset() + 4, behavior:"smooth"}); };
+  const sync = () => { if(Date.now() < lock || $("#view-forecast").style.display==="none") return;
+    // hide tabs whose section isn't on this page (e.g. no cams)
+    let cur = null;
+    nav.querySelectorAll("button").forEach(b=>{ const el = document.getElementById(b.dataset.j); const has = el && !el.hidden && el.innerHTML.trim()!=="" && !el.closest("details.gsec")?.hidden;
+      b.hidden = !has; if(!has) return;
+      const top = (el.closest("details.gsec:not([open])") || el).getBoundingClientRect().top;
+      if(top - offset() <= 12) cur = b; });
+    const first = [...nav.querySelectorAll("button")].find(b=>!b.hidden);
+    if(cur !== nav._cur){ nav._cur = cur; mark(cur || first); } };
+  addEventListener("scroll", ()=>requestAnimationFrame(sync), {passive:true});
+  new MutationObserver(()=>requestAnimationFrame(sync)).observe($("#app"), {childList:true});
+  setInterval(sync, 2000);
+})();
+
+/* ---------- Season so far: snowpack vs normal at the nearest gauge ---------- */
+function renderSeasonCard(){
+  const el = $("#seasonCard"); if(!el || !S.loc) return; const Z = extrasFor(S.loc).season;
+  if(!Z || Z.status!=="ok"){ el.innerHTML = ""; return; }
+  const N = Z.now, P = N.med >= 2? N.pct : null, sr = Z.series.filter(r=>r[1]!=null || r[3]!=null);
+  const word = P==null? "" : P>=130? "Way above normal" : P>=110? "Above normal" : P>=90? "About normal" : P>=70? "Below normal" : "Well below normal";
+  const col = P==null? "#e6edf7" : P>=110? "#7dd3fc" : P>=90? "#86efac" : P>=70? "#fde68a" : "#fca5a5";
+  el.dataset.sv = P!=null? `${P}% of normal snowpack` : `${fmtSnow(N.depth||0,0)} on the ground`;
+  // chart: this season's snow water vs the median for each date
+  const W = 320, H = 110, n = sr.length, mx = Math.max(1, ...sr.map(r=>Math.max(r[1]||0, r[3]||0)))*1.1;
+  const X = i => i/(Math.max(1,n-1))*W, Y = v => H - v/mx*H;
+  const line = k => sr.map((r,i)=> r[k]==null? null : `${X(i).toFixed(1)},${Y(r[k]).toFixed(1)}`).filter(Boolean).join(" ");
+  const area = sr.some(r=>r[1]!=null)? `M0,${H} L${sr.map((r,i)=>`${X(i).toFixed(1)},${Y(r[1]??0).toFixed(1)}`).join(" L")} L${W},${H}Z` : "";
+  const months = sr.map((r,i)=>[r[0],i]).filter(([d])=>d.slice(8)==="01").map(([d,i])=>`<span style="left:${(X(i)/W*100).toFixed(1)}%">${new Date(d+"T12:00:00Z").toLocaleString([], {month:"short", timeZone:"UTC"})}</span>`).join("");
+  const unit = imp()? "″" : " cm", sw = v => v==null? "—" : imp()? v.toFixed(1)+"″" : Math.round(v*2.54)+" cm";
+  el.innerHTML = `<div class="card-h"><h2>Season so far${tipI("season")}</h2></div>
+    <div class="se-hero">${P!=null? `<div class="se-big num" style="color:${col}">${P}%</div><div><b>${word}</b><br><span class="muted">snowpack for ${new Date(N.date+"T12:00:00Z").toLocaleDateString([], {month:"short", day:"numeric", timeZone:"UTC"})}</span></div>` : `<div><b>Early season</b><br><span class="muted">Too little snow so far, here or in a normal year, for a fair % of normal. It shows once the snowpack builds.</span></div>`}</div>
+    <div class="fr se-fr"><div><b class="num">${N.depth!=null? fmtSnow(N.depth,0) : "—"}</b><small>On the ground</small></div><div><b class="num">${fmtSnow(Z.fallen,0)}</b><small>Measured since Oct 1</small></div><div><b class="num">${sw(N.swe)}</b><small>Snow water${N.med!=null? ` · normal ${sw(N.med)}` : ""}</small></div></div>
+    <svg viewBox="0 -4 ${W} ${H+4}" width="100%" height="120" preserveAspectRatio="none" class="se-ch"><defs><linearGradient id="seG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8" stop-opacity=".45"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs>
+      ${area? `<path d="${area}" fill="url(#seG)"/>` : ""}<polyline points="${line(3)}" fill="none" stroke="#8b93a7" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/><polyline points="${line(1)}" fill="none" stroke="#7dd3fc" stroke-width="2.2" vector-effect="non-scaling-stroke"/></svg><div class="se-m">${months}</div>
+    <div class="qleg" style="margin-top:4px"><span><i style="background:#7dd3fc"></i>This season</span><span><i style="background:#8b93a7"></i>Normal</span></div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px">${esc(Z.station.name)} snow gauge, ${fmtEl(Z.station.elevFt/FT)}. Normal is the 1991–2020 median.</div>`;
+}
+
+/* ---------- Data source status (from the daily health check) ---------- */
+async function openStatus(){
+  $("#tipTitle").textContent = "Data source status"; $("#tipBox").innerHTML = `<div class="loading"><div class="spin"></div>Checking every source…</div>`; openSheet("tipSheet");
+  try{ const r = await api("/health");
+    $("#tipBox").innerHTML = `<p class="muted" style="margin:0 0 10px">Checked ${new Date(r.at).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"})}</p>
+      <div class="list">${r.results.map(x=>`<div class="li" style="min-height:44px"><span class="nm"><b>${esc(x.name)}</b>${x.ok? "" : `<small style="color:#fca5a5">${esc(x.error||"failing")}</small>`}</span><span style="color:${x.ok? "#6ee7a0" : "#fca5a5"};font-weight:700">${x.ok? "OK" : "Down"}</span></div>`).join("")}</div>`;
+    try{ const f = await api("/feedback"); if(f.items?.length) $("#tipBox").insertAdjacentHTML("beforeend", `<div class="grp">Forecast reports from users</div><div class="list">${f.items.slice(0,25).map(x=>`<div class="li" style="min-height:44px"><span class="nm"><b>${esc(x.spot)} · ${esc(x.kind)}</b><small>${new Date(x.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}${x.fc?.next24!=null? ` · showed ${x.fc.next24}″ next 24h` : ""}${x.note? ` · “${esc(x.note)}”` : ""}</small></span></div>`).join("")}</div>`); }catch(e){}
+  }catch(e){ $("#tipBox").innerHTML = `<p>Couldn't run the check right now.</p>`; }
+}
+if(location.hash==="#status"){ history.replaceState(null, "", location.pathname + location.search + "#forecast"); setTimeout(openStatus, 1200); }
+
+/* ---------- This weekend: which favorite to ski, with drive time from Bend ---------- */
+const HOME = {name:"Bend", lat:44.058, lon:-121.315};
+const driveMin = sp => { const k = km(HOME.lat, HOME.lon, sp.lat, sp.lon); return k > 900? null : Math.round(k*1.3/72*60 + 8); };
+const fmtDrive = m => m==null? "" : m < 60? `${m} min` : `${Math.floor(m/60)} h ${String(m%60).padStart(2,"0")}`;
+function weekendDays(){ const t0 = todayStr(), dw = new Date(t0+"T12:00:00Z").getUTCDay(); const sat = dw===6? t0 : dw===0? dateAdd(t0,-1) : dateAdd(t0, 6-dw); return [sat, dateAdd(sat,1)].filter(d=>d>=t0); }
+function rankWeekend(rows, d){
+  const nordic = S.mode==="skate" || S.mode==="classic";
+  return rows.map(r=>{ const D = r.dn.find(x=>x.d===d), P = r.dn.find(x=>x.d===dateAdd(d,-1)); if(!D) return null;
+    const fresh = (P? P.night : 0) + D.day, hiF = D.hi*9/5+32, windy = D.wmax >= 40, rain = D.rain >= 2;
+    let s = nordic? 6 + Math.min(fresh,4)*.4 - Math.max(0, fresh-6)*.2 : 4 + Math.min(fresh,14)*.45;
+    if(rain) s -= 3; if(windy) s -= nordic? 1.5 : 1; if(hiF < 5) s -= 1; if(hiF > 40) s -= nordic? 1.5 : 1; if(D.cc < 40) s += .4;
+    const why = [fresh>=1? `${fmtSnow(fresh,0)} fresh` : "no new snow", `${fmtT(D.hi)}`, rain? "rain" : windy? "windy" : D.cc<40? "sunny" : D.cc>80? "cloudy" : "some sun"];
+    return {r, s: Math.max(0, Math.min(10, s)), why: why.join(" · "), drive: driveMin(r.spot)}; }).filter(Boolean).sort((a,b)=>b.s-a.s || (a.drive??999)-(b.drive??999));
+}
+function weekendHTML(list, rows){
+  const days = weekendDays(); if(list.length < 2 || !days.length) return "";
+  const pick = days.includes(S.wkDay)? S.wkDay : days[0], R = rankWeekend(rows.filter(r=>list.some(s=>s.name===r.spot.name)), pick);
+  if(!R.length) return "";
+  return `<div class="card wk"><div class="card-h"><h2>This weekend</h2>${days.length>1? `<div class="seg sm" id="wkSeg">${days.map(d=>`<button data-d="${d}" class="${d===pick?"on":""}">${d===todayStr()? "Today" : dow(d)}</button>`).join("")}</div>` : `<span class="muted">${dayLabel(pick)}</span>`}</div>
+    ${R.slice(0,5).map((x,i)=>`<button class="wk-r" data-n="${encodeURIComponent(x.r.spot.name)}"><span class="wk-n ${i===0?"wk-top":""}">${i+1}</span><span class="wk-t"><b>${esc(x.r.spot.name.replace(/, [A-Z]{2}$/,""))}</b><small>${x.why}${x.drive!=null? ` · ${fmtDrive(x.drive)} from ${HOME.name}` : ""}</small></span>${scoreChip(x.s)}</button>`).join("")}
+    <div class="muted" style="font-size:11.5px;margin-top:6px">Ranked for ${MODE_NAME[S.mode].toLowerCase()} by fresh snow, temperature, wind and rain. Drive times are estimates.</div></div>`;
+}
+
+/* ---------- "Forecast look wrong?" reports: quick taps, saved with what Snowline showed ---------- */
+function openFeedback(){
+  if(!S.ctx || !S.loc) return; const {C, e} = S.ctx, daily = C.consDays.map(d=>d.day+d.night); let sel = null;
+  const K = [["more","More snow than shown"],["less","Less snow than shown"],["rain","It was rain"],["windier","Windier"],["colder","Colder"],["warmer","Warmer"],["other","Something else"]];
+  $("#tipTitle").textContent = "Forecast look wrong?";
+  $("#tipBox").innerHTML = `<p class="muted" style="margin:0 0 10px">Tell us what you're seeing at ${esc(S.loc.name)}. Reports show where the forecast misses so it can get better. Nothing personal is saved.</p>
+    <div class="fb-k">${K.map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
+    <textarea id="fbNote" rows="2" class="sh-msg" placeholder="Anything to add? (optional) e.g. 6 inches at the lodge, rain below 6,000 ft"></textarea>
+    <button class="btn primary wide" id="fbSend" style="margin-top:10px" disabled>Send report</button>`;
+  $("#tipBox").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{ sel = b.dataset.k; $("#tipBox").querySelectorAll("[data-k]").forEach(x=>x.classList.toggle("on", x===b)); $("#fbSend").disabled = false; });
+  $("#fbSend").onclick = async () => { if(!sel) return; $("#fbSend").disabled = true;
+    const c = C.cons[C.nowIdx], next24 = C.cons.slice(C.nowIdx, C.nowIdx+24).reduce((a,x)=>a+(x?.snow||0),0);
+    try{ await api("/feedback", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({spot:S.loc.name, lat:S.loc.lat, lon:S.loc.lon, elevFt: e*FT, mode:S.mode, kind:sel, note:$("#fbNote").value,
+      fc:{last24: S.ctx.last24 ?? null, today: daily[0], next24, tempF: c? c.Te*9/5+32 : null}})}); closeSheet("tipSheet"); toast("Thanks! Report sent"); }
+    catch(e){ $("#fbSend").disabled = false; toast("Couldn't send. Try again"); } };
+  openSheet("tipSheet");
+}
+
+
+
+/* ---------- At a glance: the three numbers people check first ---------- */
+function glanceHTML(C, slNow){
+  const st = findStorms(C)[0];
+  const wk = d => { const l = dayLabel(d); return /\d/.test(l)? new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"}) : l; };
+  const stTxt = !st? "None soon" : (st.a - C.nowIdx <= 3? `${fmtSnow(st.tot,0)} now` : (()=>{ const d1 = C.time[st.a].slice(0,10), d2 = C.time[st.b].slice(0,10), w = d => new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"});
+      return `${fmtSnow(st.tot,0)} ${d1===d2? wk(d1) : (d1===todayStr()? "now" : w(d1))+"–"+w(d2)}`; })());
+  return `<div class="glance">
+    <div><span>Next storm</span><b class="num">${stTxt}</b></div>
+    <div><span>Snow level</span><b class="num">${fmtEl(slNow)}</b></div></div>`;
+}
+/* ---------- Confidence, in plain words: how sure we are about the next 5 days, and the realistic range ---------- */
+function agreeHTML(C, N, winTot, conf){
+  const v = MODELS.filter(m=>m.id!=="hrrr" && S.enabled[m.id] && C.modelDays[m.id]).map(m=>modelWindow(C, m.id, N)).filter(isNum).sort((a,b)=>a-b);
+  if(v.length < 3 || v[v.length-1] < 1 || !isNum(winTot)) return "";
+  const q = f => { const x = f*(v.length-1), i = Math.floor(x); return v[i] + (v[Math.min(i+1, v.length-1)] - v[i])*(x-i); };
+  const lo = Math.min(q(.2), winTot), hi = Math.max(q(.8), winTot), max = Math.max(v[v.length-1], hi) * 1.05 || 1, pos = x => Math.max(0, Math.min(100, x/max*100));
+  const word = {hi:"High", md:"Medium", lo:"Low"}[conf.lvl] || "Medium";
+  const note = conf.lvl==="hi"? "The weather models agree." : conf.lvl==="md"? "The weather models mostly agree." : "The weather models disagree, so this may change.";
+  const r = `${fmtSnow(lo,0).replace(/"|\s?cm/,"")}–${fmtSnow(hi,0)}`;
+  return `<button class="conf-b" data-tip="conf" aria-label="About forecast confidence">
+    <div class="cf-h"><span class="cf-l c-${conf.lvl}">${word} confidence</span><span class="cf-r">Next ${N} days: <b>${fmtSnow(winTot,0)}</b>, likely ${r}</span></div>
+    <div class="cf-bar"><i class="cf-rng" style="left:${pos(lo)}%;width:${Math.max(2, pos(hi)-pos(lo))}%"></i><i class="cf-me" style="left:${pos(winTot)}%"></i></div>
+    <div class="cf-n">${note} <span>ⓘ</span></div></button>`;
+}
+
+
+
+
+
+
+/* Powder-day burst: a quick shower of flakes from the verdict the first time you open an 8+ day (once per spot per day). */
+function powderBurst(){
+  const v = document.querySelector("#app .verdict"), chip = v?.querySelector(".v-sc, .sc, .chip"); if(!v || !chip) return;
+  const sc = parseFloat(chip.textContent); if(!(sc >= 8)) return;
+  const key = "burst_" + S.loc.name + "_" + todayStr(); if(store.get(key) || matchMedia("(prefers-reduced-motion: reduce)").matches) return; store.set(key, 1);
+  const r = v.getBoundingClientRect(), box = document.createElement("div"); box.className = "pb-box";
+  for(let i=0; i<26; i++){ const f = document.createElement("i"); f.textContent = i%3? "❄" : "✦";
+    f.style.cssText = `left:${r.left + Math.random()*r.width}px;top:${r.top + 10}px;font-size:${10 + Math.random()*12}px;animation-delay:${Math.random()*0.35}s;--dx:${(Math.random()-0.5)*90}px;--dy:${120 + Math.random()*160}px`;
+    box.appendChild(f); }
+  document.body.appendChild(box); setTimeout(()=>box.remove(), 2200);
+}
+
+/* =====================  Snowflake forecast + falling snow  ===================== */
+// A snowflake's shape is set by the temperature (and moisture) of the cloud it grows in. One small extra request per spot
+// gets temperature and humidity at 4 heights (about 5,000 to 18,000 ft); the storm's flakes are classified from the
+// layers that are saturated, weighted by how much snow falls each hour.
+const FLAKES = {
+  dendrite: {name:"Stellar dendrites", line:"Big, feathery six-armed stars. The fluffiest, lightest powder there is.", fluff:5},
+  plate:    {name:"Plates and stars", line:"Flat six-sided plates and simple stars. Light, soft snow.", fluff:4},
+  column:   {name:"Columns and needles", line:"Tiny needles and columns. Packs down into denser, smooth snow.", fluff:2},
+  rimed:    {name:"Rimed flakes and graupel", line:"Flakes coated in frozen droplets, some like little foam pellets. Heavier, grippy snow.", fluff:2},
+  broken:   {name:"Wind-broken crystals", line:"Strong wind snaps flakes into fragments, which pack into firm, wind-pressed snow.", fluff:1},
+  cold:     {name:"Cold bullets and columns", line:"Small, very cold crystals. Light and dry, but not much loft.", fluff:3},
+};
+function flakeSVG(k, s=44){
+  const c = "#e0f2fe", arm = (a, inner) => `<g transform="rotate(${a} 50 50)">${inner}</g>`, six = inner => [0,60,120,180,240,300].map(a=>arm(a, inner)).join("");
+  const body = {
+    dendrite: six(`<line x1="50" y1="50" x2="50" y2="10" /><line x1="50" y1="30" x2="40" y2="21"/><line x1="50" y1="30" x2="60" y2="21"/><line x1="50" y1="20" x2="43" y2="13"/><line x1="50" y1="20" x2="57" y2="13"/><line x1="50" y1="40" x2="44" y2="34"/><line x1="50" y1="40" x2="56" y2="34"/>`),
+    plate: `<polygon points="50,18 78,34 78,66 50,82 22,66 22,34" fill="rgba(224,242,254,.15)"/>` + six(`<line x1="50" y1="50" x2="50" y2="24"/>`),
+    column: `<polygon points="38,22 62,22 68,30 68,70 62,78 38,78 32,70 32,30" fill="rgba(224,242,254,.12)"/><line x1="44" y1="24" x2="44" y2="76"/><line x1="56" y1="24" x2="56" y2="76"/>`,
+    rimed: `<circle cx="50" cy="50" r="22" fill="rgba(224,242,254,.18)"/>` + [0,40,80,120,160,200,240,280,320].map(a=>`<circle cx="${50+22*Math.cos(a*Math.PI/180)}" cy="${50+22*Math.sin(a*Math.PI/180)}" r="5" fill="${c}"/>`).join("") + `<circle cx="44" cy="45" r="4" fill="${c}"/><circle cx="56" cy="54" r="4" fill="${c}"/>`,
+    broken: `<line x1="30" y1="28" x2="46" y2="42"/><line x1="38" y1="30" x2="34" y2="38"/><line x1="58" y1="60" x2="72" y2="74"/><line x1="64" y1="64" x2="70" y2="60"/><line x1="56" y1="26" x2="66" y2="38"/><line x1="28" y1="64" x2="40" y2="70"/>`,
+    cold: `<polygon points="44,26 56,26 60,32 60,62 56,68 44,68 40,62 40,32" fill="rgba(224,242,254,.12)"/><polygon points="50,70 44,82 56,82" fill="${c}"/>`,
+  }[k] || "";
+  return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" fill="none" stroke="${c}" stroke-width="4" stroke-linecap="round" aria-hidden="true">${body}</svg>`;
+}
+async function loadFlakes(loc){
+  const k = loc.name; S.flk ||= {}; if(S.flk[k]?.at && Date.now() - S.flk[k].at < 60*60e3) return S.flk[k];
+  const L = [850,700,600,500], v = L.flatMap(p=>[`temperature_${p}hPa`, `relative_humidity_${p}hPa`]).join(",");
+  try{ const j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=${v}&forecast_days=10&timezone=auto&models=gfs_seamless`);
+    const h = j.hourly, idx = new Map(h.time.map((t,i)=>[t,i]));
+    S.flk[k] = {at: Date.now(), get: t => { const i = idx.get(t); if(i==null) return null; return L.map(p=>({p, T: h[`temperature_${p}hPa`]?.[i], RH: h[`relative_humidity_${p}hPa`]?.[i], z: {850:1500,700:3000,600:4200,500:5600}[p]})); }};
+  }catch(e){ S.flk[k] = {at: Date.now() - 50*60e3, get: ()=>null}; }
+  return S.flk[k];
+}
+function flakeType(lay, c, e){
+  if(!lay) return null; const cloud = lay.filter(x=>x.z > e - 200 && isNum(x.T) && isNum(x.RH) && x.RH >= 85); if(!cloud.length) return null;
+  if(windM(c) >= 60) return "broken";
+  if(cloud.some(x=>x.T <= -12 && x.T >= -18)) return "dendrite";
+  const warm = cloud.reduce((a,b)=>b.T > a.T? b : a, cloud[0]);
+  if(isNum(c?.Te) && c.Te > -3 && warm.T > -8 && (c.snow||0) >= 0.25) return "rimed";
+  if(warm.T > -4 || (warm.T <= -10 && warm.T > -12) || (warm.T < -18 && warm.T >= -25)) return "plate";
+  if(warm.T <= -4 && warm.T > -10) return "column";
+  return "cold";
+}
+function flakeForecast(C, e){
+  const F = S.flk?.[S.loc?.name]; if(!F?.get) return null;
+  const st = findStorms(C)[0], snowingNow = (C.cons[C.nowIdx]?.snow||0) > 0.02;
+  const a = snowingNow? C.nowIdx : st?.a, b = snowingNow? C.nowIdx + 12 : st?.b; if(a==null) return null;
+  const w = {}; let tot = 0;
+  for(let i=a; i<=Math.min(b, C.cons.length-1); i++){ const c = C.cons[i], s = c?.snow||0; if(s < 0.03) continue; const k = flakeType(F.get(C.time[i]), c, e); if(!k) continue; w[k] = (w[k]||0) + s; tot += s; }
+  if(tot < 0.3) return null; const k = Object.entries(w).sort((x,y)=>y[1]-x[1])[0][0];
+  return {k, share: w[k]/tot, now: snowingNow, when: snowingNow? "Falling now" : `Next storm's flakes`};
+}
+function flakeHTML(C, e){ const f = flakeForecast(C, e); if(!f) return ""; const F = FLAKES[f.k];
+  return `<button class="flk" data-tip="flakes" aria-label="About the snowflake forecast">${flakeSVG(f.k)}<div><span class="muted">${f.when}</span><b>${F.name}</b><small>${F.line}</small></div></button>`; }
+
+// The app snows when it snows: flakes drift behind the forecast at the real intensity and wind angle.
+const Fall = { cv:null, ctx:null, P:[], raf:0, rate:0, dx:0, last:0 };
+function fallSet(rateInHr, windKmh, fromDeg){
+  const off = !rateInHr || rateInHr < 0.03 || matchMedia("(prefers-reduced-motion: reduce)").matches || localStorage.getItem("sl_fall")==="0" || document.documentElement.classList.contains("sun") || (S.view||"forecast")!=="forecast";
+  if(off){ Fall.rate = 0; if(Fall.cv) Fall.cv.style.opacity = 0; cancelAnimationFrame(Fall.raf); Fall.raf = 0; return; }
+  if(!Fall.cv){ Fall.cv = document.createElement("canvas"); Fall.cv.id = "flakes"; document.body.prepend(Fall.cv); Fall.ctx = Fall.cv.getContext("2d"); addEventListener("resize", fallSize); fallSize(); }
+  Fall.rate = rateInHr; const to = ((fromDeg??270) + 180) * Math.PI/180; Fall.dx = Math.sin(to) * Math.min(1, (windKmh||0)/45);
+  const n = Math.round(rateInHr >= 1? 170 : rateInHr >= 0.4? 100 : 45);
+  while(Fall.P.length < n) Fall.P.push(fallFlake(true)); Fall.P.length = n;
+  Fall.cv.style.opacity = 1; if(!Fall.raf){ Fall.last = performance.now(); Fall.raf = requestAnimationFrame(fallTick); }
+}
+function fallSize(){ const d = devicePixelRatio || 1; Fall.cv.width = innerWidth*d; Fall.cv.height = innerHeight*d; Fall.ctx.setTransform(d,0,0,d,0,0); }
+function fallFlake(any){ const r = Math.random()*1.8 + 0.8; return {x: Math.random()*innerWidth, y: any? Math.random()*innerHeight : -8, r, v: 28 + r*22 + Math.random()*20, ph: Math.random()*6.28, o: 0.35 + Math.random()*0.5}; }
+function fallTick(now){
+  const dt = Math.min(0.05, (now - Fall.last)/1000); Fall.last = now; const g = Fall.ctx;
+  if(document.hidden || !Fall.rate){ Fall.raf = 0; return; }
+  g.clearRect(0, 0, innerWidth, innerHeight); g.fillStyle = "#fff";
+  for(const f of Fall.P){ f.ph += dt*1.3; f.y += f.v*dt; f.x += (Fall.dx*f.v*1.4 + Math.sin(f.ph)*10)*dt;
+    if(f.y > innerHeight + 8 || f.x < -20 || f.x > innerWidth + 20){ Object.assign(f, fallFlake(false)); if(Fall.dx > 0.3) f.x = Math.random()*innerWidth*0.7 - 10; else if(Fall.dx < -0.3) f.x = innerWidth*0.3 + Math.random()*innerWidth*0.7 + 10; }
+    g.globalAlpha = f.o; g.beginPath(); g.arc(f.x, f.y, f.r, 0, 6.283); g.fill(); }
+  g.globalAlpha = 1; Fall.raf = requestAnimationFrame(fallTick);
+}
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && Fall.rate && !Fall.raf){ Fall.last = performance.now(); Fall.raf = requestAnimationFrame(fallTick); } });
+function fallFromForecast(){
+  if(!S.ctx?.C) return fallSet(0); const C = S.ctx.C, c = C.cons[C.nowIdx];
+  const nc = S.nc?.[S.loc.name+"|"+Math.round(S.ctx.e)], n = nc? ncAnalyze(nc.m, nc.off) : null;
+  const rate = n? (n.state==="now"? Math.max(n.nowRate, 0.05) : 0) : (c?.snow||0);
+  fallSet(rate, c?.W, c?.WD);
+}
+
+/* =====================  Getting around: back gestures, remembered places, tappable snow bars  ===================== */
+
+// A swipe in from the left edge goes back: closes the open sheet, or returns to the screen you came from.
+(()=>{ let x0 = null, y0 = 0;
+  addEventListener("touchstart", e=>{ const t = e.touches[0]; x0 = (t.clientX < 22 && e.touches.length===1)? t.clientX : null; y0 = t.clientY; }, {passive:true});
+  addEventListener("touchend", e=>{ if(x0==null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = Math.abs(t.clientY - y0); x0 = null;
+    if(dx < 70 || dy > 60) return;
+    const sh = [...document.querySelectorAll(".sheet.on")].pop(); if(sh){ closeSheet(sh.id); return; }
+    if(S.prevView && S.prevView !== (S.view||"forecast")) history.back(); }, {passive:true});
+})();
+
+// Remember where you were on each screen: coming back to Forecast (same spot), Favorites, Maps or Alerts
+// returns to the same place on the page instead of the top.
+S.sp = {};
+function saveSpot(force){ if(!force && Date.now() - (S.spAt||0) < 800) return; const v = S.view || "forecast"; S.sp[v] = {y: scrollY, loc: S.loc?.name}; S.spAt = Date.now(); }
+// Save the spot on the tap itself: changing the address jumps the page to the top before the screen switches.
+document.addEventListener("click", e=>{ const a = e.target.closest('a[href^="#"], a[href^="/#"], #tabs a, [data-v]'); if(a) saveSpot(true); }, true);
+function restoreSpot(v){ const s = S.sp[v]; if(!s || (v==="forecast" && s.loc !== S.loc?.name)) return false;
+  const go = () => scrollTo({top: s.y}); requestAnimationFrame(go); setTimeout(go, 120); setTimeout(()=>{ if(Math.abs(scrollY - s.y) > 40) go(); }, 500); return true; }
+
+// Tap a day in the Snow Summary bars: jump to that day in the Daily list, opened.
+document.addEventListener("click", e=>{ const r = e.target.closest("#snowCard [data-bd]"); if(!r) return;
+  const d = r.dataset.bd, row = document.querySelector(`#dailyList .dl-day[data-d="${d}"]`); if(!row) return;
+  if(getComputedStyle(row).display === "none") document.querySelector("#dailyList ~ .dl-all, #dailyCard .dl-all")?.click();
+  if(S.selDay !== d) row.click();
+  const off = (document.querySelector(".top")?.getBoundingClientRect().height || 56) + ($("#jtabs")?.offsetHeight || 0) + 8;
+  scrollTo({top: scrollY + row.getBoundingClientRect().top - off, behavior: "smooth"}); });
+
+/* =====================  Everyday polish  ===================== */
+// 1) Fresh when you come back: a Home Screen app can sit frozen in the background for hours. Returning after 15+ minutes
+//    reloads the forecast (and the snow countdown) on its own.
+(()=>{ let hid = 0; document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "hidden"){ hid = Date.now(); return; }
+  if(hid && Date.now() - hid > 15*60e3 && (S.view||"forecast") === "forecast" && S.loc && navigator.onLine !== false){ MEM.delete(S.loc.name); load(S.loc).catch(()=>{}); }
+  hid = 0; }); })();
+
+// 2) Favorites one tap away: a row of your spots under the name, and swipe left/right on the forecast to move between them.
+function favRowRender(){
+  const el = $("#favRow"); if(!el) return; const F = S.favs || [];
+  if(F.length < 2 || (S.view||"forecast") !== "forecast"){ el.innerHTML = ""; el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = F.map(f=>`<button data-fav="${esc(f.name)}" class="${f.name===S.loc?.name? "on" : ""}">${esc(dispName(f.name))}</button>`).join("");
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{ const f = F.find(x=>x.name===b.dataset.fav); if(f && f.name !== S.loc?.name){ scrollTo({top:0}); load(f); } });
+  const on = el.querySelector(".on"); if(on) el.scrollTo({left: on.offsetLeft - el.clientWidth/2 + on.offsetWidth/2});
+}
+function favStep(dir){
+  const F = S.favs || []; if(F.length < 2) return; let i = F.findIndex(f=>f.name===S.loc?.name);
+  const f = F[i < 0? 0 : (i + dir + F.length) % F.length]; const a = $("#app");
+  a.classList.remove("sw-l","sw-r"); void a.offsetWidth; a.classList.add(dir > 0? "sw-l" : "sw-r");
+  scrollTo({top:0}); load(f); toast(dispName(f.name));
+}
+(()=>{ let x0 = null, y0 = 0, t0 = 0;
+  const skip = "#bigmap,.ss-r,.hs,.dh,.tablewrap,.fav-row,.leaflet-container,iframe,.np-f,.zn-svg,.gl-strip,.jtabs,.elv,.seg,.cf-bar,canvas,.mx-cam,input,.sheet";
+  addEventListener("touchstart", e=>{ if((S.view||"forecast")!=="forecast" || e.touches.length>1 || e.target.closest(skip) || document.querySelector(".sheet.on")){ x0 = null; return; } x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); }, {passive:true});
+  addEventListener("touchend", e=>{ if(x0==null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+    if(Date.now() - t0 < 600 && Math.abs(dx) > 80 && Math.abs(dy) < 45) favStep(dx < 0? 1 : -1); }, {passive:true});
+})();
+
+// 3) Works with no signal at the trailhead: once the forecast is up, quietly fetch your other favorites so switching is
+//    instant and still works offline (answers are kept on the phone for a day as a fallback).
+function preloadFavs(){
+  if(S.preT && Date.now() - S.preT < 40*60e3) return; S.preT = Date.now();
+  const list = (S.favs||[]).filter(f=>f.name!==S.loc?.name && isNum(f.lat) && isNum(f.base) && isNum(f.top)).slice(0,5); let k = 0;
+  const next = async () => { const f = list[k++]; if(!f) return; if(document.visibilityState !== "visible"){ S.preT = 0; return; }
+    const ref = ((f.base+f.top)/2)/FT;
+    await Promise.all([...MODELS.map(m=>fetchDet(m, f, ref).catch(()=>null)), ...ENS.map(m=>fetchEns(m, f, ref).catch(()=>null))]);
+    setTimeout(next, 1500); };
+  setTimeout(next, 5000);
+}
+
+// 4) Directions to the right lot, in Apple Maps on iPhone and Google Maps elsewhere.
+const DIR_PLACE = {"Mt. Bachelor, OR":"Mt. Bachelor West Village Lodge, Bend, OR", "Mt. Bachelor Nordic Center, OR":"Mt. Bachelor Nordic Center, Bend, OR", "Meissner Nordic (Bend), OR":"Virginia Meissner Sno-Park, Bend, OR"};
+const DIR_NONE = new Set(["Elk Lake Resort (Nordic), OR"]);   // no winter road to the resort itself
+function dirURL(L){
+  if(!L || DIR_NONE.has(L.name)) return null; const q = DIR_PLACE[L.name], ios = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
+  if(ios) return q? `https://maps.apple.com/?daddr=${encodeURIComponent(q)}&dirflg=d` : `https://maps.apple.com/?daddr=${L.lat},${L.lon}&dirflg=d`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${q? encodeURIComponent(q) : `${L.lat},${L.lon}`}`;
+}
+
+// 5) Bright-sun display: a light, high-contrast version that's readable on a sunny chairlift with sunglasses on.
+function applySun(){ const on = localStorage.getItem("sl_sun")==="1"; document.documentElement.classList.toggle("sun", on);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", on? "#ffffff" : "#0b1220");
+  document.querySelectorAll("#sunSeg button").forEach(b=>b.classList.toggle("on", (b.dataset.s==="1")===on)); }
+function syncFallSeg(){ const on = localStorage.getItem("sl_fall")!=="0"; document.querySelectorAll("#fallSeg button").forEach(b=>b.classList.toggle("on", (b.dataset.f==="1")===on)); }
+document.addEventListener("click", e=>{ const b = e.target.closest("#fallSeg button"); if(!b) return; localStorage.setItem("sl_fall", b.dataset.f); syncFallSeg(); fallFromForecast(); });
+syncFallSeg();
+document.addEventListener("click", e=>{ const b = e.target.closest("#sunSeg button"); if(!b) return; localStorage.setItem("sl_sun", b.dataset.s); applySun(); fallFromForecast(); });
+applySun();
+
+/* =====================  Snow countdown (live) + storm receipts  ===================== */
+// Same engine as the push alert: Open-Meteo's 15-minute forecast says when snow starts, how hard, and when it lets up.
+function ncAnalyze(m, off, now = Date.now()){
+  if(!m?.time?.length) return null;
+  const S = m.time.map((t,i)=>({ms: Date.parse(t+":00Z") - off*1000, sn: m.snowfall?.[i]||0, p: m.precipitation?.[i]||0, T: m.temperature_2m?.[i]}));
+  const snowy = s => s && (s.sn >= 0.05 || (s.p >= 0.1 && s.T != null && s.T <= 0.5)), wet = s => s && s.p >= 0.1 && !snowy(s);
+  let k0 = S.findIndex(s=>s.ms > now) - 1; if(k0 < 0) k0 = 0;
+  const inch = cm => cm/2.54, rate = s => inch(s.sn)*4;
+  const endFrom = j => { let k = j; while(k < S.length && (snowy(S[k]) || snowy(S[k+1]))) k++; return k; };
+  const pack = (a, b) => { const sl = S.slice(a, b), pk = sl.reduce((x,s)=>rate(s)>rate(x)? s : x, sl[0]); return {endMs: b < S.length? S[b].ms : null, totIn: inch(sl.reduce((x,s)=>x+s.sn,0)), peakMs: pk?.ms, peakRate: pk? rate(pk) : 0, nowRate: rate(S[k0]||{sn:0})}; };
+  if(snowy(S[k0]) || (snowy(S[k0-1]) && snowy(S[k0+1]))) return {state:"now", ...pack(k0, endFrom(k0))};
+  for(let j=k0+1; j<S.length && S[j].ms-now <= 6*3600e3; j++){
+    if(snowy(S[j])) return {state:"soon", startMs:S[j].ms, ...pack(j, endFrom(j))};
+    if(wet(S[j])){ let k = j; while(k < S.length && !snowy(S[k]) && S[k].ms-now <= 6*3600e3) k++; return {state:"rain", startMs:S[j].ms, snowMs: k < S.length && snowy(S[k])? S[k].ms : null}; }
+  }
+  return {state:"dry"};
+}
+const ncClock = ms => new Date(ms).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}).replace(":00","").replace(/\s?(AM|PM)/i, (x,a)=>a.toLowerCase());
+const ncIn = ms => { const m = Math.max(0, Math.round((ms - Date.now())/60e3)); return m < 60? `${m} min` : `${Math.floor(m/60)} h ${String(m%60).padStart(2,"0")} min`; };
+async function loadNowcast(){
+  const loc = S.loc; if(!loc || !S.ctx) return; const e = Math.round(S.ctx.e), k = loc.name+"|"+e;
+  S.nc ||= {}; const c = S.nc[k];
+  if(!c || Date.now() - c.at > 10*60e3){
+    try{ const j = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${e}&minutely_15=snowfall,precipitation,temperature_2m&past_minutely_15=2&forecast_minutely_15=28&timezone=auto`).then(r=>r.json());
+      S.nc[k] = {at: Date.now(), m: j.minutely_15, off: j.utc_offset_seconds||0}; }catch(err){ return; }
+  }
+  if(S.loc === loc) renderNowcast();
+}
+function renderNowcast(){
+  const el = $("#ncStrip"); if(!el || !S.ctx) return; const c = S.nc?.[S.loc.name+"|"+Math.round(S.ctx.e)]; if(!c){ el.innerHTML = ""; return; }
+  const n = ncAnalyze(c.m, c.off); const hard = r => r >= 1? "heavy" : r >= 0.4? "steady" : "light";
+  let h = "";
+  if(n?.state==="soon" && (n.totIn >= 0.3)) h = `<div class="nc nc-soon"><div class="nc-i">❄️</div><div><div class="nc-t">Snow in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
+      <div class="nc-s">Starts around ${ncClock(n.startMs)}${n.totIn >= 0.5? ` · about ${fmtSnow(n.totIn, n.totIn<1?1:0)}${n.endMs? ` by ${ncClock(n.endMs)}` : ""}` : ""}${n.peakRate >= 0.4? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
+  else if(n?.state==="now") h = `<div class="nc nc-now"><div class="nc-i"><span class="nc-dot"></span>❄️</div><div><div class="nc-t">Snowing now · ${hard(n.nowRate)}</div>
+      <div class="nc-s">${n.totIn >= 0.3? `About ${fmtSnow(n.totIn, n.totIn<1?1:0)} more` : "Light"}${n.endMs? ` · lets up around ${ncClock(n.endMs)}` : " · keeps going for a while"}${n.peakRate >= 0.8 && n.peakMs > Date.now()+20*60e3? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
+  else if(n?.state==="rain") h = `<div class="nc nc-rain"><div class="nc-i">🌧️</div><div><div class="nc-t">Rain in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
+      <div class="nc-s">Starts around ${ncClock(n.startMs)} at ${fmtEl(S.ctx.e)}${n.snowMs? ` · turns to snow around ${ncClock(n.snowMs)}` : ""}</div></div></div>`;
+  el.innerHTML = h; fallFromForecast();
+  clearInterval(S.ncTick); if(h.includes("data-nc")) S.ncTick = setInterval(()=>{ const b = $("#ncStrip [data-nc]"); if(!b){ clearInterval(S.ncTick); return; } const ms = +b.dataset.nc; if(ms <= Date.now()) { clearInterval(S.ncTick); renderNowcast(); } else b.textContent = ncIn(ms); }, 30e3);
+}
+
+// Storm receipt: for 3 days after a storm, a slim strip at the top shows how Snowline did, with one-tap share.
+function renderReceipt(){
+  const el = $("#rcptStrip"); if(!el || !S.loc) return; const R = recapData(); if(!R){ el.innerHTML = ""; return; }
+  const end = R.st.end || R.st.start; const key = S.loc.name+"|"+end;
+  if(!end || end < dateAdd(todayStr(), -3) || store.get("rcptHide","")===key){ el.innerHTML = ""; return; }
+  const got = R.st.obsSnow, mark = R.nailed? "✓ Nailed it" : R.close? "✓ On target" : got > R.said? "Overdelivered" : "Came up short";
+  el.innerHTML = `<div class="rc"><div class="rc-b"><div class="rc-h">🧾 Storm receipt · ${esc(R.range)}</div>
+      <div class="rc-n"><span>Snowline said <b>${fmtSnow(R.said,0)}</b></span><span>${esc((R.fell||"Measured").replace(" reported",""))} got <b>${fmtSnow(got,0)}</b></span><span class="rc-v ${R.close? "ok" : ""}">${mark}</span></div></div>
+    <button class="rc-sh" onclick="openRecapSheet()">Share</button><button class="rc-x" aria-label="Hide">✕</button></div>`;
+  el.querySelector(".rc-x").onclick = ()=>{ store.set("rcptHide", key); el.innerHTML = ""; };
+}
+
+/* =====================  Mt. Bachelor: wind holds, crowds, where it's skiing best · Nordic: glide  ===================== */
+const isBach = () => S.loc?.name === "Mt. Bachelor, OR";
+const tgtDay = (cutHr) => { const h = +S.ctx.C.time[S.ctx.C.nowIdx].slice(11,13); return h >= cutHr ? dateAdd(todayStr(), 1) : todayStr(); };
+const dayWord = d => d===todayStr()? "Today" : d===dateAdd(todayStr(),1)? "Tomorrow" : dayLabel(d);
+function cAt(ft){ const k = Math.round(ft/100); S.ctx.zc ||= {}; return S.ctx.zc[k] ||= computeAt(ft/FT); }
+const windM = c => c? Math.max(c.RW||0, (c.G||0)*0.8) : 0;
+const angD = (a, b) => { const d = Math.abs(((a - b) % 360 + 360) % 360); return d > 180 ? 360 - d : d; };
+
+/* Lift wind holds. Each lift's tipping point starts from how exposed it is, then is replaced by what Snowline has
+   learned from Bachelor's own lift reports (logged every 30 minutes all season). */
+const BACH_LIFTS = [
+  {n:"Summit", ft:9000, mid:55}, {n:"Northwest", ft:7900, mid:70}, {n:"Outback", ft:7700, mid:72}, {n:"Cloudchaser", ft:7700, mid:72},
+  {n:"Pine Marten", ft:7750, mid:80}, {n:"Skyliner", ft:7650, mid:82}, {n:"Alpenglow", ft:7300, mid:88}, {n:"Rainbow", ft:7100, mid:92},
+  {n:"Red Chair", ft:7000, mid:92}, {n:"Sunrise", ft:6900, mid:95}, {n:"Early Riser", ft:6700, mid:98}, {n:"Little Pine", ft:6700, mid:100}];
+function liftHolds(d){
+  const learned = S.liftwx?.lifts || {};
+  return BACH_LIFTS.map(L=>{
+    const C = cAt(L.ft), learnedMid = Object.entries(learned).find(([k])=>k.toLowerCase().startsWith(L.n.toLowerCase()))?.[1]?.mid;
+    const mid = learnedMid || L.mid; let am = 0, pm = 0;
+    for(let h=9; h<16; h++){ const i = idxOf(C).get(`${d}T${String(h).padStart(2,"0")}:00`); if(i==null) continue; const m = windM(C.cons[i]); if(h<12) am = Math.max(am, m); else pm = Math.max(pm, m); }
+    const p = m => 1/(1+Math.exp(-(m-mid)/7)), pa = p(am), pp = p(pm);
+    return {...L, pa, pp, p:Math.max(pa,pp), when: pa>=0.35 && pp>=0.35? "all day" : pa>=pp? "morning" : "afternoon", gust: Math.max(am,pm), learned: !!learnedMid};
+  });
+}
+
+/* Crowds: an estimate from the day, school holidays, fresh snow and sunshine. Not live lot data. */
+function nthMon(y, m, n){ const d = new Date(Date.UTC(y, m, 1)); const off = (8 - d.getUTCDay()) % 7; return new Date(Date.UTC(y, m, 1 + off + 7*(n-1))).toISOString().slice(0,10); }
+function crowdFor(d, holds){
+  const dt = new Date(d+"T12:00"), dow = dt.getDay(), y = dt.getFullYear(), md = d.slice(5);
+  let s = [0.6,0.6,0.6,0.6,0.6,1.2,3,2.5][dow===0? 7 : dow] ?? 0.6; if(dow===0) s = 2.5; const why = [];
+  if(dow===6) why.push("Saturday"); else if(dow===0) why.push("Sunday");
+  const thx = (()=>{ const n = new Date(Date.UTC(y,10,1)); const off = (11 - n.getUTCDay()) % 7; return new Date(Date.UTC(y,10,1+off+21)).toISOString().slice(0,10); })();
+  const hol = (md >= "12-20" || md <= "01-04")? "Winter break" : d===nthMon(y,0,3)? "MLK Day" : d===nthMon(y,1,3)? "Presidents' Day" : (d===thx || d===dateAdd(thx,1))? "Thanksgiving" : (md >= "03-21" && md <= "03-29")? "Spring break" : null;
+  if(hol){ s = Math.max(s, 2.2) + (hol==="Spring break"? 1 : 1.8); why.push(hol); }
+  const C = cAt(7700), i8 = idxOf(C).get(`${d}T08:00`); let fresh = 0, cc = 0, n = 0, snowing = 0;
+  if(i8!=null){ for(let i=Math.max(0,i8-24); i<=i8; i++) fresh += C.cons[i]?.snow||0; for(let h=9; h<14; h++){ const c = C.cons[i8+h-8]; if(c){ cc += c.CC??50; n++; snowing += c.snow||0; } } }
+  if(fresh >= 6){ s += 1.6; why.push(`${fmtSnow(fresh,0)} new`); } else if(fresh >= 3){ s += 0.8; why.push(`${fmtSnow(fresh,0)} new`); }
+  if(n && cc/n < 35){ s += 0.5; why.push("sunny"); } if(snowing >= 3) { s -= 0.6; why.push("stormy"); }
+  if(holds?.[0]?.pa > 0.6) s -= 0.3;
+  const lv = s >= 4.5? ["Packed", "Lots likely full by about 8:45. Aim to park by 8:15.", "#fca5a5"] : s >= 3? ["Very busy", "Lots likely full by about 9:30. Aim to park by 9.", "#fcd34d"] : s >= 1.6? ["Busy", "Lots may fill by late morning.", "#93c5fd"] : ["Quiet", "Parking should be easy.", "#6ee7a0"];
+  return {lv:lv[0], tip:lv[1], c:lv[2], why: why.length? why.join(" · ") : "Weekday"};
+}
+
+function renderMtn(){
+  const el = $("#mtnCard"); if(!el || !isBach() || !S.ctx) return;
+  const d = tgtDay(14), holds = liftHolds(d).sort((a,b)=>b.p-a.p), cr = crowdFor(d, holds);
+  const risky = holds.filter(h=>h.p >= 0.35), top = holds[0], learnedN = S.liftwx?.days || 0;
+  const tag = p => p >= 0.65? ["Likely hold", "hi"] : ["Possible hold", "md"];
+  const preseason = !(extrasFor(S.loc).groom?.lifts||[]).some(l=>l.status==="open");
+  el.innerHTML = `<div class="card-h"><h2>${dayWord(d)} at Mt. Bachelor</h2>${preseason? `<span class="muted">Preview</span>` : ""}</div>
+    <div class="mt-row"><div class="mt-k">Wind holds</div><div class="mt-v">
+      ${risky.length? risky.slice(0,4).map(h=>{ const [t,c] = tag(h.p); return `<div class="wh"><b>${esc(h.n)}</b><span class="wh-t w-${c}">${t}</span><span class="muted">${h.when}</span></div>`; }).join("") + (risky.length>4? `<div class="muted" style="font-size:12px">+${risky.length-4} more lifts at risk</div>` : "")
+        : `<div class="wh ok"><b>No wind holds expected</b><span class="muted">Summit gusts to ${fmtWind(top.gust)} ${windU()}</span></div>`}
+    </div></div>
+    <div class="mt-row"><div class="mt-k">Crowds</div><div class="mt-v"><div class="wh"><b style="color:${cr.c}">${cr.lv}</b><span class="muted">${esc(cr.why)}</span></div><div class="mt-tip">${cr.tip}</div></div></div>
+    <div class="muted mt-foot">Snowline's estimates <button class="tipbtn" data-tip="mtnest" aria-label="How these are estimated">ⓘ</button> · <a href="https://www.mtbachelor.com/the-mountain/lift-trail-report/" target="_blank" rel="noopener">Lift report ↗</a></div>`;
+}
+
+/* Where it's skiing best: each part of the mountain gets its own snow-surface simulation for the way it faces and its
+   height (sun, warmth, refreeze), then wind: slopes downwind of recent snow + wind get loaded, upwind slopes get scoured. */
+const BACH_ZONES = [
+  {n:"Summit", sub:"Summit Express", az:null, ft:8800, x:0, y:0},
+  {n:"Frontside", sub:"Pine Marten · Skyliner", az:0, ft:7300},
+  {n:"Outback", sub:"Outback Express", az:330, ft:7300},
+  {n:"Northwest", sub:"Northwest Express", az:285, ft:7700},
+  {n:"Rainbow", sub:"Rainbow · Sunrise", az:60, ft:6900},
+  {n:"Cloudchaser", sub:"Cloudchaser · Alpenglow", az:115, ft:7300},
+  {n:"South side", sub:"from the Summit", az:185, ft:8400}];
+const AZN = a => a==null? "all ways" : ["north","northeast","east","southeast","south","southwest","west","northwest"][Math.round(a/45)%8];
+function zoneRead(z, d, h){
+  const C = cAt(z.ft), i = idxOf(C).get(`${d}T${String(h).padStart(2,"0")}:00`); if(i==null) return null;
+  const k = "s"+z.ft+"_"+z.az; S.ctx.zs ||= {}; const SIM = S.ctx.zs[k] ||= simulate(C, z.az); const sim = SIM[i]; if(!sim) return null;
+  let sc = scoreOf(sim), lab = sim.label, wind = null;
+  let u = 0, v = 0, mx = 0, snow = 0; for(let j=Math.max(0,i-18); j<=i; j++){ const c = C.cons[j]; if(!c) continue; snow += c.snow||0; const m = windM(c); mx = Math.max(mx, m); if(isNum(c.WD) && m){ u += Math.sin(c.WD*Math.PI/180)*m; v += Math.cos(c.WD*Math.PI/180)*m; } }
+  const from = (Math.atan2(u, v)*180/Math.PI + 360) % 360;
+  if(mx >= 30 && (u || v)){
+    if(z.az==null){ if(mx >= 45){ wind = "scoured"; } }
+    else if(snow >= 1.5 && angD(z.az, from+180) <= 60){ wind = "loaded"; }
+    else if(angD(z.az, from) <= 60){ wind = "scoured"; }
+  }
+  if(wind==="loaded"){ sc = Math.min(10, sc + 0.6); lab = "Wind-loaded powder"; }
+  if(wind==="scoured"){ sc = Math.max(0, sc - 1.2); lab = "Wind-scoured, firm in spots"; }
+  return {sc, lab, wind};
+}
+function renderZones(){
+  const el = $("#zoneCard"); if(!el || !isBach() || !S.ctx) return;
+  const d = tgtDay(14), h = S.zoneHr ?? (+S.ctx.C.time[S.ctx.C.nowIdx].slice(11,13) >= 11 && d===todayStr()? 14 : 10);
+  const Z = BACH_ZONES.map(z=>({...z, r: zoneRead(z, d, h)})).filter(z=>z.r);
+  if(!Z.length){ el.remove(); return; }
+  const best = [...Z].sort((a,b)=>b.r.sc-a.r.sc)[0], R = 118, cx = 130, cy = 130;
+  const spread = best.r.sc - Math.min(...Z.map(z=>z.r.sc));
+  if(spread < 0.4){ el.innerHTML = `<div class="card-h"><h2>Where to ski${tipI("zones")}</h2></div><div class="zn-same"><div><b>About the same on every side</b><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"} · ${esc(best.r.lab.toLowerCase())}</span></div>${scoreChip(best.r.sc)}</div><div class="muted" style="font-size:11.5px;margin-top:6px">When one side of the mountain skis noticeably better, a map of every side shows here.</div>`; return; }
+  const arc = (a0, a1, r0, r1) => { const p = (a, r) => [cx + r*Math.sin(a*Math.PI/180), cy - r*Math.cos(a*Math.PI/180)]; const [x0,y0] = p(a0,r1), [x1,y1] = p(a1,r1), [x2,y2] = p(a1,r0), [x3,y3] = p(a0,r0); return `M${x0},${y0} A${r1},${r1} 0 0 1 ${x1},${y1} L${x2},${y2} A${r0},${r0} 0 0 0 ${x3},${y3}Z`; };
+  const ring = Z.filter(z=>z.az!=null), sum = Z.find(z=>z.az==null);
+  const svg = `<svg viewBox="0 -4 260 266" class="zn-svg" role="img" aria-label="Mt. Bachelor snow quality by side of the mountain">
+    ${ring.sort((a,b)=>a.az-b.az).map((z,k,A)=>{ const prev = A[(k-1+A.length)%A.length].az, next = A[(k+1)%A.length].az;
+      const gapL = ((z.az - prev + 360) % 360) || 360, gapR = ((next - z.az + 360) % 360) || 360;
+      const a0 = z.az - Math.min(40, gapL/2 - 2), a1 = z.az + Math.min(40, gapR/2 - 2), mid = (a0+a1)/2, tx = cx + 86*Math.sin(mid*Math.PI/180), ty = cy - 86*Math.cos(mid*Math.PI/180);
+      return `<path d="${arc(a0,a1,52,R)}" fill="${scoreColor(z.r.sc)}" stroke="${z===best? "#fff" : "#111113"}" stroke-width="${z===best? 2.5 : 2}"/>
+      <text x="${tx}" y="${ty-3}" text-anchor="middle" class="zn-t">${z.n}</text><text x="${tx}" y="${ty+12}" text-anchor="middle" class="zn-s">${z.r.sc.toFixed(1)}</text>`; }).join("")}
+    ${sum? `<circle cx="${cx}" cy="${cy}" r="46" fill="${scoreColor(sum.r.sc)}" stroke="${sum===best? "#fff" : "#111113"}" stroke-width="${sum===best? 2.5 : 2}"/><text x="${cx}" y="${cy-3}" text-anchor="middle" class="zn-t">Summit</text><text x="${cx}" y="${cy+12}" text-anchor="middle" class="zn-s">${sum.r.sc.toFixed(1)}</text>` : ""}
+    <text x="${cx}" y="8" text-anchor="middle" class="zn-n">N ↑</text></svg>`;
+  el.innerHTML = `<div class="card-h"><h2>Where to ski${tipI("zones")}</h2><div class="seg sm zn-seg">${[[10,"Morning"],[14,"Afternoon"]].map(([v,l])=>`<button data-h="${v}" class="${v===h?"on":""}">${l}</button>`).join("")}</div></div>
+    <div class="zn-best"><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"}</span><div><b>${best.n}</b> · ${esc(best.r.lab.toLowerCase())}</div></div>
+    ${svg}
+    ${(()=>{ const row = z=>`<div class="zn-li"><div><b>${z.n}</b><small>${esc(z.sub)} · faces ${AZN(z.az)}</small><small class="zn-l">${esc(z.r.lab)}</small></div>${scoreChip(z.r.sc)}</div>`, L = [...Z].sort((a,b)=>b.r.sc-a.r.sc);
+      return `<details class="nb zn-more"><summary>Every side, ranked</summary><div class="zn-list">${L.map(row).join("")}</div></details>`; })()}
+    <div class="muted mt-foot">Snowline's estimate. Each side of the mountain is simulated for its sun, warmth and height, then adjusted for wind: slopes downwind of recent snow and wind collect it, upwind slopes get blown firm. Sides are approximate.</div>`;
+  el.querySelectorAll(".zn-seg button").forEach(b=>b.onclick=()=>{ S.zoneHr = +b.dataset.h; renderZones(); });
+}
+
+/* Nordic glide forecast: how fast skis will run, hour by hour, from air temperature, humidity, sun and new snow. */
+function glideAt(C, i){
+  const c = C.cons[i]; if(!c || !isNum(c.Te)) return null; const T = c.Te, RH = c.RH ?? 70, sun = (c.SW||0) > 350 && (c.CC??100) < 50, snowing = (c.snow||0) > 0.04;
+  let new12 = 0; for(let j=Math.max(0,i-12); j<=i; j++) new12 += C.cons[j]?.snow||0;
+  if(T >= 1.5) return (RH >= 85 || snowing || (c.P||0) > 0.2)? {r:1, t:"Wet and grabby"} : {r:2, t:"Slushy"};
+  if(T > -1.5) return (sun || RH >= 90 || snowing)? {r:1, t:"Sticky"} : {r:2, t:"Medium"};
+  if(new12 >= 1 && T < -6) return {r:1, t:"Slow: fresh, cold snow"};
+  if(T <= -12) return {r:1, t:"Slow: very cold, dry snow"};
+  if(new12 >= 1) return {r:2, t:"Medium: new snow"};
+  return {r:3, t:"Fast"};
+}
+function renderGlide(){
+  const el = $("#glideCard"); if(!el || !S.ctx) return; const {C, SIM} = S.ctx;
+  const d = tgtDay(14), hrs = [8,9,10,11,12,13,14,15,16];
+  const G = hrs.map(h=>{ const i = idxOf(C).get(`${d}T${String(h).padStart(2,"0")}:00`); return i==null? null : {h, i, g: glideAt(C, i)}; }).filter(x=>x?.g);
+  if(G.length < 4){ el.remove(); return; }
+  const best = Math.max(...G.map(x=>x.g.r)); let run = [], cur = [];
+  G.forEach(x=>{ if(x.g.r===best){ cur.push(x); if(cur.length > run.length) run = [...cur]; } else cur = []; });
+  const word = {3:"Fast", 2:"Medium", 1:"Slow"}, col = {3:"#38bdf8", 2:"#fde68a", 1:"#fca5a5"};
+  const w = wax(SIM[run[0].i], C.cons[run[0].i]);
+  const all = run.length === G.length;
+  const head = all? `${word[best]} glide all day` : best===3? `Fastest ${hl(run[0].h)}–${hl(run[run.length-1].h+1)}` : best===2? `Medium glide at best, ${hl(run[0].h)}–${hl(run[run.length-1].h+1)}` : `Slow all day`;
+  el.innerHTML = `<div class="card-h"><h2>Glide${tipI("glide")}</h2><span class="muted">${dayWord(d)} · ${fmtEl(S.ctx.e)}</span></div>
+    <div class="gl-h"><b>${head}</b><span class="muted">${esc(run[0].g.t)}${w? ` · wax: ${esc(w.glide.split(" (")[0].toLowerCase())}` : ""}</span></div>
+    <div class="gl-strip">${G.map(x=>`<div class="gl-c" title="${esc(x.g.t)}"><i style="background:${col[x.g.r]}"></i><span>${hl(x.h)}</span></div>`).join("")}</div>
+    <div class="gl-key"><span><i style="background:#38bdf8"></i>Fast</span><span><i style="background:#fde68a"></i>Medium</span><span><i style="background:#fca5a5"></i>Slow / sticky</span></div>`;
+}
+
+/* ---------- Nordic Pulse live grooming, shown as Nordic Pulse's own page inside Snowline (nothing copied or stored) ---------- */
+const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Elk Lake Resort (Nordic), OR": "https://nordic-pulse.com/ski-areas/US/OR/Elk-Lake-Resort", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
+function npEmbed(name){
+  const u = NP_PAGES[name]; if(!u) return "";
+  return `<div class="np"><div class="np-h"><b>Live grooming</b><span><button class="np-full" data-np="${u}">Full screen</button><a href="${u}" target="_blank" rel="noopener">Open ↗</a></span></div>
+    <div class="np-f"><iframe src="${u}" loading="lazy" title="Live grooming map from Nordic Pulse" referrerpolicy="no-referrer"></iframe></div>
+    <div class="muted np-c">Live from Nordic Pulse · posted by the groomers as they work</div></div>`;
+}
+function wireNP(root){ root.querySelectorAll(".np-full").forEach(b=>b.onclick=()=>{
+  const d = document.createElement("div"); d.className = "np-sheet";
+  d.innerHTML = `<div class="np-bar"><b>Live grooming · Nordic Pulse</b><button aria-label="Close">Done</button></div><iframe src="${b.dataset.np}" title="Live grooming map from Nordic Pulse"></iframe>`;
+  d.querySelector("button").onclick = () => { d.remove(); document.body.style.overflow = ""; };
+  document.body.appendChild(d); document.body.style.overflow = "hidden"; }); }
+/* ---------- Live at Meissner: the club's own station, ODOT's Wanoga Butte station, the parking-lot cam ---------- */
+function mxGroomLine(){ const m = new Date().getMonth(); return (m===11 || m<=2)? "7 days a week through March" : "Daily Dec–Mar, snow permitting"; }
+function renderMeissner(){
+  const el = $("#mxCard"); if(!el || !S.loc) return; const M = extrasFor(S.loc).mx; if(!M) return;
+  const ago2 = s => { const m = String(s).match(/(\d+)\/(\d+)\/(\d{4})\s+(\d+):(\d+)\s*([ap])m/i); let ms = m? new Date(+m[3], m[1]-1, +m[2], (+m[4]%12)+(m[6].toLowerCase()==="p"?12:0), +m[5]).getTime() : Date.parse(s); return isFinite(ms)? ago(ms) : s; };
+  const tF = v => v==null? "—" : imp()? `${Math.round(v)}°` : `${Math.round((v-32)*5/9)}°`, wnd = v => v==null? "—" : imp()? `${Math.round(v)}` : `${Math.round(v*1.609)}`;
+  const spark = sr => { if(!sr || sr.length < 4) return ""; const v = sr.map(r=>r[1]), lo = Math.min(...v), hi = Math.max(...v), W = 110, H = 28;
+    const pts = v.map((x,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H - (hi===lo? H/2 : (x-lo)/(hi-lo)*H)).toFixed(1)}`).join(" ");
+    return `<svg viewBox="0 -2 ${W} ${H+4}" width="${W}" height="${H+4}" class="mx-sp"><polyline points="${pts}" fill="none" stroke="#7dd3fc" stroke-width="1.6"/></svg><small class="muted">24 h: ${tF(lo)} to ${tF(hi)}</small>`; };
+  const st = (M.stations||[]).map(s => s.error? `<div class="mx-st"><div class="mx-h"><b>${esc(s.name)}</b><a href="${s.link}" target="_blank" rel="noopener">Open ↗</a></div><div class="muted">Not reporting right now.</div></div>`
+    : `<div class="mx-st"><div class="mx-h"><b>${esc(s.name.replace("Meissner ",""))}</b><span class="muted">${s.elevFt? fmtEl(s.elevFt/FT) : ""}</span></div>
+      <div class="mx-big num">${tF(s.tempF)}</div>
+      <div class="mx-kv"><span>Wind ${s.windDir||""} ${wnd(s.windMph)}${s.gustMph!=null? `–${wnd(s.gustMph)}` : ""} ${windU()}</span><span>Humidity ${s.rh!=null? s.rh+"%" : "—"}</span></div>
+      ${spark(s.series)}
+      <div class="muted mx-u">${s.time? "Updated "+ago2(s.time) : s.updated? "Updated "+esc(ago2(s.updated)) : ""}</div></div>`).join("");
+  const cam = M.cam? `<a class="mx-cam" href="${M.cam.page}" target="_blank" rel="noopener"><img loading="lazy" src="${M.cam.img}?t=${Math.floor(Date.now()/36e5)}" alt="Meissner Sno-Park webcam" onerror="this.closest('a').remove()"><span>Parking lot cam · every 2 hours</span></a>` : "";
+  el.innerHTML = `<div class="card-h"><h2>Live at Meissner</h2><a class="muted" href="https://meissnernordic.org/weather/" target="_blank" rel="noopener">Meissner Nordic ↗</a></div>
+    <div class="mx-grid">${st}</div>${cam}
+    <div class="mx-gr"><b>Grooming</b><span class="muted">${mxGroomLine()}</span></div>
+    ${npEmbed(S.loc.name)}
+    <div class="mx-links">${(M.links||[]).filter(([l])=>!/grooming map/i.test(l)).map(([l,u])=>`<a class="btn" href="${u}" target="_blank" rel="noopener">${l} ↗</a>`).join("")}</div>
+    <div class="muted" style="font-size:11px;margin-top:8px">Stations: Meissner Nordic, and ODOT via the National Weather Service.</div>`;
+  wireNP(el);
+}
+/* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
+const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
+const TIPS = {
+  elevchart: () => ["Snow by height", `<p>How much snow falls at each height on the mountain over the days you pick. Up the side is elevation, across is snow.</p><p>The <b>line</b> is Snowline's forecast. The <b>shaded band</b> is the range between the lowest and highest weather model. <b>Base</b>, <b>Summit</b> and <b>You</b> (the elevation you picked) are marked.</p>`],
+  hourly: () => ["Hourly forecast", `<p>Each column is one hour at the elevation shown. Top to bottom: <b>chance of rain or snow</b>, <b>temperature</b>, <b>new snow</b> that hour (blank means none), and <b>wind</b> (direction it's coming from, then speed).</p><p>Swipe sideways for later hours. Tap "Detailed hourly forecast" for gusts, snow level and more.</p>`],
+  daily: () => ["Daily forecast", `<p>One row per day: the <b>high and low</b>, the <b>ski score</b> (0–10, how good it should ski; tap any score for how it works), and the <b>snow range</b>, from a quiet case to a big one.</p><p>Tap a day to open its hour-by-hour details.</p>`],
+  forecaster: () => ["Snowline Forecaster", `<p>A written summary of what's coming, put together automatically from the weather models. Think of it as the short version a forecaster would tell you: when the next storm arrives, how much, and the best days to go.</p><p>The <b>Meteorologists' discussion</b> further down is the National Weather Service's own write-up.</p>`],
+  storm: () => ["Storm timeline", `<p><b>When</b> the next storm starts and ends, and the <b>total</b> it should bring at this elevation.</p><p><b>Peak rate</b> is the heaviest hour of snowfall. <b>Quality</b> says how light the snow is, and <b>Wind</b> shows the strongest gusts during the storm (strong wind packs snow and can close lifts).</p>`],
+  ratio: () => ["Snow quality", `<p>How much snow you get from the same amount of water. <b>15:1 or more</b> is light, fluffy powder. Around <b>10–12:1</b> is average. <b>Under 10:1</b> is heavy, wet snow that's great for the base but harder to ski.</p>`],
+  byelev: () => ["By elevation", `<p>The same forecast at three heights on the mountain: <b>top, middle and base</b>, side by side for each day. It shows how much more snow falls up high, how much colder it is, and whether the base gets rain while the top gets snow.</p>`],
+  models: () => ["The weather models", `<p>Snowline blends about a dozen of the world's weather models (American, European, Canadian, German, Japanese and more), giving more weight to the ones that have been most accurate here.</p><p>This table shows what each one says on its own. When they agree, confidence is high. When one is far off from the rest, Snowline leans on the others.</p>`],
+  accum: () => ["Running total", `<p>Snow adding up over the next days. The line is Snowline's forecast and the shading is the realistic low-to-high range. Read across to any day to see the total by then.</p>`],
+  zones: () => ["Where to ski", `<p>Each side of Mt. Bachelor faces a different way, so sun, warmth and wind treat it differently. Snowline estimates the snow quality on each side, then marks the best one.</p><p><b>Downwind</b> sides collect blowing snow and get deeper. <b>Upwind</b> sides get blown firm. <b>Sunny</b> sides soften first and can crust up later.</p>`],
+  glide: () => ["Glide", `<p>How fast your skis should run each hour, from temperature, humidity, sun and new snow. <b>Blue</b> is fast. <b>Yellow</b> is medium. <b>Red</b> is slow or sticky (very cold snow, fresh cold snow, or wet snow near freezing).</p><p>The wax suggestion matches the fastest part of the day.</p>`],
+  mtnest: () => ["How these are estimated", `<p><b>Wind holds</b> come from the forecast wind near each lift's top. Every 30 minutes all season, Snowline saves Bachelor's lift status next to the wind, so each lift's tipping point is learned from what really happened${S.liftwx?.days? ` (${S.liftwx.days} days so far)` : ""}.</p><p><b>Crowds</b> come from the day of the week, school holidays, fresh snow and sunshine. They're not live parking counts.</p>`],
+  flakes: () => ["Snowflake forecast", `<p>A snowflake's shape is set by the <b>temperature of the cloud it grows in</b>. Snowline checks the temperature and moisture at four heights above the mountain (about 5,000 to 18,000 ft) for each hour of the storm.</p>
+    <p><b>Stellar dendrites</b> grow around 0 to −6°F (−12 to −18°C) and make the lightest, fluffiest powder. <b>Needles and columns</b> grow around 14 to 25°F (−4 to −10°C) and pack down denser. <b>Rimed flakes and graupel</b> collect frozen droplets in milder, wetter storms. <b>Strong wind</b> breaks crystals into fragments that pack firm.</p>
+    <p class="muted">An estimate from forecast temperatures aloft. Real storms usually bring a mix; this is the most common type.</p>`],
+  quality: () => ["Ski quality", qualityExplainHTML()],
+  conf: () => ["Confidence", `<p><b>How sure Snowline is</b> about the snow total for the next 5 days at this elevation, based on how much the weather models agree.</p>
+    <p>The <b>white mark</b> is Snowline's forecast. The <b>blue band</b> is the likely range: where most of the models land.</p>
+    <p><b>High:</b> the models are within about a third of each other. <b>Medium:</b> they differ by up to about two-thirds. <b>Low:</b> some models show a lot more or less than others, so the total could change a lot. <b>Dry:</b> less than half an inch expected.</p>
+    <p class="muted">Low confidence is common 5+ days out and with storms that could track north or south of you. Check back as it gets closer.</p>`],
+  best: () => ["Best day", `<p>The day in the next 7 with the <b>highest ski quality score</b> for ${MODE_NAME[S.mode].toLowerCase()} skiing, and its best 3-hour window between 8am and 5pm.</p><p class="muted">The number is that window's 0–10 score. It's about the snow surface and weather only. Tap any score for how it works.</p>`],
+  lifts: () => ["Lift holds", `<p>Based on the forecast wind at ridgetop and the gusts.</p>
+    <p><b>Lifts OK:</b> under about 30 mph. <b>Holds possible:</b> about 30–45 mph, when upper lifts often slow down or pause. <b>Holds likely:</b> over about 45 mph.</p>
+    <p class="muted">An estimate from the weather, not the resort's lift status. Each resort decides lift by lift.</p>`],
+  snowlevel: () => ["Snow level", `<p><b>The elevation where falling precipitation turns from rain to snow.</b> Above it you get snow; below it, rain or a mix.</p>
+    <p>On the chart, <b>each thin line is one weather model</b> and the thick line is Snowline's blend. Where the thin lines fan out, the models disagree, so rain versus snow is still uncertain. Blue shading is snow and green is rain. The bars along the bottom show when it's precipitating, colored snow, mix or rain at your elevation.</p>
+    <p>Snowline takes the freezing level from the models and sets the snow level about 1,000 ft below it, since snowflakes take a while to melt on the way down.</p>
+    <p class="muted">If the snow level is close to your elevation, small changes decide rain or snow, so expect wetter, heavier snow and less certain totals.</p>`],
+  season: () => ["Season so far", `<p><b>Snowpack % of normal</b> compares the water stored in the snow at the nearest SNOTEL gauge with the median for the same date over 1991–2020. 100% is a typical year; it's the number water managers and forecasters use.</p>
+    <p><b>On the ground</b> is today's snow depth at the gauge. <b>Measured since Oct 1</b> adds up each day's rise in depth. Snow settles between storms, so the real snowfall is a bit higher.</p>`],
+  accuracy: () => ["How accuracy is measured", `<p><b>The gauge:</b> the nearest SNOTEL station, an automated government snow gauge in the mountains, measures new snow depth and the water in it every day.</p>
+    <p><b>Snowline's record:</b> each morning Snowline saves its own forecast for that gauge's elevation. After a storm it's compared with what fell. "Within 2″" counts a storm as close when the miss is 2″ or less, or 25% on big storms.</p>
+    <p><b>Model by model:</b> every model's forecasts made 1, 3 and 5 days ahead are compared with the gauge over the last 90 days (last winter when it's been dry). The models that have been closest get more weight in Snowline's blend for that lead time, and models that run wet or dry are corrected, within limits.</p>
+    <p class="muted">Measured depth runs a little low because new snow settles, so the water amount counts most when picking the closest model.</p>`],
+  chance: () => ["Chance of snow", `<p>Each weather center runs its model many times with slightly different starting conditions (the "ensemble"). <b>The chance is the share of those runs</b> that give at least that much snow over the window you picked.</p>
+    <p class="muted">70% for 6″ means 7 out of 10 runs show 6″ or more. It's a better guide to the odds than any single forecast number.</p>`],
+};
+document.addEventListener("click", e => { const b = e.target.closest("[data-tip]"); if(!b) return; e.preventDefault(); e.stopPropagation();
+  const f = TIPS[b.dataset.tip]; if(!f) return; const [h, body] = f(); $("#tipTitle").textContent = h; $("#tipBox").innerHTML = body; openSheet("tipSheet"); }, true);
+/* ================= Grooming, avalanche observations, snow stake time-lapse ================= */
+const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Elk Lake Resort (Nordic), OR", "Methow Valley Trails, WA", "Birkie Trail (Cable, WI)", "Mt. Spokane, WA"];
+function renderGroom(){
+  const card = $("#groomCard"); if(!card || !S.loc) return; const G = extrasFor(S.loc).groom;
+  if(!G || S.mode==="bc"){ card.hidden = true; return; }
+  if(G.links && S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = true; return; }
+  if(G.links && NP_PAGES[S.loc.name] && S.mode!=="bc"){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2>${RESORT_SITE[S.loc.name]? `<a class="muted" href="${RESORT_SITE[S.loc.name]}" target="_blank" rel="noopener">Area site ↗</a>` : ""}</div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
+  if(G.links){ if(!G.links.length){ card.hidden = true; return; }
+    card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><div class="row" style="gap:8px;flex-wrap:wrap">${G.links.map(([t,u])=>`<a class="btn" style="text-decoration:none" href="${u}" target="_blank" rel="noopener">${t} ↗</a>`).join("")}</div>
+      <div class="muted" style="font-size:11px;margin-top:6px">Live grooming for this area is published on its own report; Snowline links to it rather than copying it.</div>`; return; }
+  if(G.error){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><a href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor's grooming report ↗</a>`; return; }
+  const nordic = !isAlp() || S.loc.name==="Mt. Bachelor Nordic Center, OR", D = nordic ? G.nordic : G.alpine, R = G.report; card.hidden = false;
+  if(!D.total && !D.groomed){ D.preseason = true; }
+  const kinds = Object.entries(D.kinds||{}).map(([k,n])=>`<span class="chip-s">${esc(k.replace(/ And /g," & "))} · ${n}</span>`).join("");
+  const head = D.groomed ? `<div class="gr-big"><b class="num">${D.groomed}</b><span>of ${D.total} ${nordic? "trails" : "runs"} groomed${D.latest? `<br><small>last update ${ago(D.latest)}</small>` : ""}</span></div>`
+    : D.preseason ? `<p class="muted" style="margin:4px 0">Mt. Bachelor hasn't posted ${nordic? "Nordic trail" : "run"} grooming yet. It shows here once the mountain opens.</p>`
+    : `<p class="muted" style="margin:4px 0">No ${nordic? "trails" : "runs"} marked groomed right now${D.open? ` · ${D.open} open` : ""}.</p>`;
+  const npHere = nordic && NP_PAGES[S.loc.name];
+  card.innerHTML = `<div class="card-h"><h2>${nordic? "Grooming · Nordic" : "Grooming & resort report"}</h2><a class="muted" href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor ↗</a></div>
+    ${npHere? npEmbed(S.loc.name) + `<div class="grp">From Mt. Bachelor</div>` : ""}${npHere && D.preseason? "" : head}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
+    ${!nordic? liftsHTML(G.lifts) : ""}
+    ${D.trails?.length? `<details class="nb" style="margin-top:8px"><summary>See groomed ${nordic? "trails" : "runs"}</summary><div class="list">${D.trails.map(x=>`<div class="li" style="min-height:38px"><span class="nm"><b>${esc(x.name)}</b><small>${esc((x.groom||"").replace(/ And /g," & "))}${x.updated? " · "+ago(x.updated) : ""}</small></span></div>`).join("")}</div></details>` : ""}
+    ${R? `<div class="grp">Resort snow report</div><div class="fr"><div><b class="num">${R.overnight ?? "—"}″</b><small>Overnight</small></div><div><b class="num">${R.h24 ?? "—"}″</b><small>24 hours</small></div><div><b class="num">${R.base ?? "—"}″</b><small>Base</small></div></div>
+      ${R.text? `<p class="muted clamp3" style="margin:8px 0 0;font-size:13px">${esc(R.text)}</p>` : ""}` : ""}
+    <div class="muted" style="font-size:11px;margin-top:6px">From Mt. Bachelor's own mountain report.</div>`;
+  wireNP(card);
+}
+function liftsHTML(L){
+  if(!L || !L.length) return "";
+  const open = L.filter(l=>l.status==="open"), dot = s => s==="open"? "#34d399" : /hold|delay/i.test(s)? "#fbbf24" : "#52525b";
+  const waits = open.filter(l=>l.wait && /\d/.test(l.wait));
+  return `<div class="grp">Lifts</div>
+    <div class="lf-top"><b class="num">${open.length}</b><span>of ${L.length} lifts open${waits.length? ` · longest wait ${esc(waits.map(l=>l.wait).sort((a,b)=>parseInt(b)-parseInt(a))[0])}` : ""}</span></div>
+    <details class="nb" style="margin-top:6px"><summary>All lifts</summary><div class="list">${L.map(l=>`<div class="li lf"><i style="background:${dot(l.status)}"></i><span class="nm"><b>${esc(l.name)}</b><small>${esc(l.area||"")}${l.hours? " · "+esc(l.hours.replace(/:00/g,"").replace(/\s*([ap])\.m\./gi,"$1").replace(/\s*-\s*/g,"–")) : ""}</small></span><span class="lf-s">${l.status==="open"? (l.wait? esc(l.wait) : "Open") : esc(l.status.charAt(0).toUpperCase()+l.status.slice(1))}</span></div>`).join("")}</div></details>`;
+}
+async function loadAvyObs(loc){
+  const X = extrasFor(loc); if(X.avyobs && Date.now()-X.avyobsAt < 15*60e3) return;
+  try{ X.avyobs = await api(`/avyobs?lat=${loc.lat.toFixed(3)}&lon=${loc.lon.toFixed(3)}`); X.avyobsAt = Date.now(); if(S.loc===loc) renderBC(); }catch(e){}
+}
+function avyObsHTML(){
+  const O = extrasFor(S.loc).avyobs; if(!O) return `<div class="loading"><div class="spin"></div>Loading field observations…</div>`;
+  if(O.error) return `<p class="muted" style="margin:4px 0 8px">Recent observations from skiers and forecasters (cracking, collapsing, avalanches seen) are posted on the avalanche center's site.</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><a class="btn" style="text-decoration:none" href="https://coavalanche.org/pages/observations" target="_blank" rel="noopener">Read field observations ↗</a></div>`;
+  const list = (O.obs||[]).slice(0, 6);
+  const chip = (on, t) => on? `<span class="ob-chip">${t}</span>` : "";
+  const items = list.map(o=>{ const f=o.flags||{}, txt = o.avalanches || o.instability || o.summary;
+    return `<a class="ob" href="${o.link}" target="_blank" rel="noopener">${o.photo? `<img src="${o.photo}" alt="" loading="lazy">` : ""}<div>
+      <div class="ob-h"><b>${esc(o.where||"Field observation")}</b><small>${new Date(o.date+"T12:00:00").toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"})} · ${o.pro? "Professional" : "Public"}${o.org? " · "+esc(o.org) : ""}</small></div>
+      <div class="ob-chips">${chip(f.caught, "Someone caught")}${chip(f.triggered, "Avalanche triggered")}${chip(f.avalanchesSeen, "Avalanches seen")}${chip(f.cracking, "Cracking")}${chip(f.collapsing, "Collapsing")}</div>
+      ${txt? `<p class="clamp3">${esc(txt)}</p>` : ""}</div></a>`; }).join("");
+  return (items || `<p class="muted">No field observations posted near here in the last 14 days. That does not mean the snowpack is stable.</p>`)
+    + `<p class="muted" style="font-size:11px;margin:6px 0 0">As reported to the avalanche center by observers${O.total>list.length? ` · <a href="https://coavalanche.org/pages/observations" target="_blank" rel="noopener">see all ${O.total}</a>` : ""}. Snowline doesn't check or rate them.</p>`;
+}
+async function renderStakeCard(){
+  const card = $("#stakeCard"); if(!card) return;
+  if(!card.innerHTML) card.innerHTML = `<div class="card-h"><h2>Snow stake · last 24 h</h2><span class="muted">Mt. Bachelor</span></div><div id="stakeBox"><div class="loading"><div class="spin"></div>Loading pictures…</div></div>`;
+  let j; try{ j = await api("/stake"); }catch(e){ card.remove(); return; }
+  const F = j.frames || []; if(F.length < 3){ $("#stakeBox").innerHTML = `<p class="muted">Snowline saves the snow stake picture every 30 minutes. The time-lapse fills in over the first few hours.</p>`; return; }
+  let i = F.length-1, timer = null;
+  const box = $("#stakeBox");
+  box.innerHTML = `<div class="stake-img"><img id="stakeImg" src="${F[i].src}" alt="Snow stake"><span id="stakeT"></span></div>
+    <div class="tl-row"><button id="stakePlay" aria-label="Play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button><input type="range" id="stakeSl" min="0" max="${F.length-1}" value="${i}" aria-label="Time"></div>
+    <div class="muted" style="font-size:11px;margin-top:4px">Pictures from <a href="${j.page}" target="_blank" rel="noopener">Mt. Bachelor's snow stake camera</a>, saved every 30 minutes.</div>`;
+  const img = $("#stakeImg"), lab = $("#stakeT"), sl = $("#stakeSl"), pl = $("#stakePlay");
+  const show = k => { i = k; img.src = F[k].src; sl.value = k; lab.textContent = new Date(F[k].t).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}); };
+  show(i);
+  F.forEach(f=>{ const im = new Image(); im.src = f.src; });   // warm the cache so playback is smooth
+  sl.oninput = () => { clearInterval(timer); timer=null; pl.innerHTML = PLAY_SVG; show(+sl.value); };
+  pl.onclick = () => { if(timer){ clearInterval(timer); timer=null; pl.innerHTML = PLAY_SVG; return; } if(i >= F.length-1) show(0); pl.innerHTML = PAUSE_SVG;
+    timer = setInterval(()=>{ if(i >= F.length-1){ clearInterval(timer); timer=null; pl.innerHTML = PLAY_SVG; return; } show(i+1); }, 350); };
+}
+
+/* ================= Free "pro" extras: NWS meteorologists, warnings, top/mid/bottom table, cloud base ================= */
+const NWS_OFFICE = { PDT:"Pendleton", PQR:"Portland", MFR:"Medford", BOI:"Boise", SEW:"Seattle", OTX:"Spokane", MSO:"Missoula", DLH:"Duluth", MPX:"Twin Cities", EKA:"Eureka", STO:"Sacramento", REV:"Reno" };
+const nwsName = o => "NWS " + (NWS_OFFICE[o] || o);
+function renderNwsAlerts(){
+  const box = $("#nwsAlerts"); if(!box || !S.loc) return; const N = extrasFor(S.loc).nws; const A = (N?.alerts || []).slice(0, 3);
+  if(!A.length){ box.innerHTML = ""; return; }
+  const when = t => t? new Date(t).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}) : "";
+  const sev = s => /Extreme|Severe/.test(s)? "#ef4444" : /Moderate/.test(s)? "#f59e0b" : "#38bdf8";
+  box.innerHTML = A.map((a,i)=>`<details class="nws-al" style="border-color:${sev(a.severity)}"><summary><b style="color:${sev(a.severity)}">⚠ ${esc(a.event)}</b><span>${a.ends? "until "+when(a.ends) : a.onset? "from "+when(a.onset) : ""} · ${nwsName(N.office)}</span></summary>
+    <p>${esc(a.desc)}</p>${a.instr? `<p class="muted">${esc(a.instr)}</p>`:""}<p class="muted" style="font-size:11px">Issued by the National Weather Service.</p></details>`).join("");
+}
+function renderAFD(){
+  const card = $("#afdCard"); if(!card || !S.loc) return; const N = extrasFor(S.loc).nws, F = N?.afd;
+  if(!F || !(F.sections||[]).length){ card.hidden = true; return; }
+  card.hidden = false;
+  const lead = F.sections.find(s=>s.key==="KEY MESSAGES") || F.sections.find(s=>s.key==="SYNOPSIS") || F.sections[0];
+  const rest = F.sections.filter(s=>s!==lead && s.key!=="UPDATE");
+  const para = s => s.text.split(/\n\n/).map(p=>`<p>${esc(p)}</p>`).join("");
+  card.innerHTML = `<div class="card-h"><h2>Meteorologists' discussion</h2><span class="muted">${nwsName(F.office)} · ${F.issued? new Date(F.issued).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}) : ""}</span></div>
+    <div class="afd"><div class="grp" style="margin-top:4px">${esc(lead.title)}${lead.when? ` <span style="text-transform:none;letter-spacing:0">· ${esc(lead.when)}</span>`:""}</div><div class="clamp4" id="afdLead">${para(lead)}</div>
+    <div id="afdRest" hidden>${rest.map(s=>`<div class="grp">${esc(s.title)}${s.when? ` <span style="text-transform:none;letter-spacing:0">· ${esc(s.when)}</span>`:""}</div>${para(s)}`).join("")}</div></div>
+    <div class="row" style="justify-content:space-between;margin-top:6px"><button class="link" id="afdMore">Read the full discussion</button><a class="muted" href="${F.url}" target="_blank" rel="noopener" style="font-size:12px">Original ↗</a></div>
+    <div class="muted" style="font-size:11px;margin-top:6px">Written by the National Weather Service forecasters for the whole region, not just this spot. Technical terms are theirs.</div>`;
+  $("#afdMore").onclick = () => { const r=$("#afdRest"), l=$("#afdLead"); const open = r.hidden; r.hidden = !open; l.classList.toggle("clamp4", !open); $("#afdMore").textContent = open? "Show less" : "Read the full discussion"; };
+}
+// Dew point (Magnus) and the height where rising air reaches it (about 125 m per °C of spread).
+const dewPt = (T, RH) => { if(!isNum(T) || !isNum(RH) || RH <= 0) return null; const a=17.62, b=243.12, g=Math.log(RH/100)+a*T/(b+T); return b*g/(a-g); };
+function cloudBaseAt(C, i, refM){ const c = C.cons[i]; if(!c || !isNum(c.RH) || !isNum(c.CC) || c.CC < 60) return null; const td = dewPt(c.Te, c.RH); if(td==null) return null; return refM + Math.max(0, 125*(c.Te - td)); }
+function elevDays(ftElev, nDays){
+  const C = computeAt(ftElev/FT), out = [];
+  for(let k=0;k<nDays;k++){ const d = C.days[k]; let wmax=0, gmax=0, chill=99, n=0, slS=0, slN=0;
+    C.time.forEach((t,i)=>{ if(i < C.nowIdx && k===0) return; const [dd] = periodOf(t); if(dd!==d) return; const c=C.cons[i]; if(!c) return; n++;
+      if(isNum(c.W)) wmax=Math.max(wmax,c.W); if(isNum(c.G)) gmax=Math.max(gmax,c.G); const h=+t.slice(11,13); if(h>=8 && h<=16){ const wc=windChill(c.Te, c.W); if(isNum(wc)) chill=Math.min(chill,wc); } if(isNum(c.sl)){ slS+=c.sl; slN++; } });
+    const cd = C.consDays[k]; out.push({ d, n, snow: cd.n? cd.day+cd.night : null, hi: cd.tmax>-99? cd.tmax : null, lo: cd.tmin<99? cd.tmin : null, wmax, gmax, chill: chill<99? chill : null, sl: slN? slS/slN : null }); }
+  return { C, out };
+}
+function renderElevTable(){
+  const card = $("#elevCard"); if(!card || !S.loc || !S.data) return; const L0 = S.loc, nD = 6;
+  const bands = [["Top", L0.top], ["Mid", Math.round((L0.base+L0.top)/2)], ["Bottom", L0.base]];
+  const rows = bands.map(([lab, ft])=>({ lab, ft, ...elevDays(ft, nD) }));
+  const days = rows[0].out.map(x=>x.d);
+  // cloud base at midday, from the mid-mountain models
+  const Cr = computeAt(S.data.ref), cb = days.map(d=>{ const i = Cr.time.findIndex(t=>t.startsWith(d+"T13")); return i>=0? cloudBaseAt(Cr, i, S.data.ref) : null; });
+  const snowCell = v => v==null? "—" : v>=0.5? `<b style="color:${v>=6?"var(--deep)":"var(--ice)"}">${fmtSnow(v,0)}</b>` : "0";
+  const head = `<tr><th></th>${days.map(d=>`<th>${d===todayStr()? "Today" : dow(d)}<br><small>${md(d)}</small></th>`).join("")}</tr>`;
+  const body = rows.map(r=>`<tr class="et-h"><td colspan="${nD+1}">${r.lab} · ${fmtEl(r.ft/FT)}</td></tr>
+    <tr><td class="et-l">Snow</td>${r.out.map(x=>`<td>${snowCell(x.snow)}</td>`).join("")}</tr>
+    <tr><td class="et-l">High / low</td>${r.out.map(x=>`<td>${x.hi!=null? fmtT(x.hi) : "—"}<br><small>${x.lo!=null? fmtT(x.lo) : ""}</small></td>`).join("")}</tr>
+    <tr><td class="et-l">Wind / gust<br><small>${windU()}</small></td>${r.out.map(x=>`<td>${x.n? fmtWind(x.wmax) : "—"}<br><small>${x.n? fmtWind(x.gmax) : ""}</small></td>`).join("")}</tr>
+    <tr><td class="et-l">Wind chill<br><small>daytime low</small></td>${r.out.map(x=>`<td>${x.chill!=null? fmtT(x.chill) : "—"}</td>`).join("")}</tr>`).join("");
+  const fz = rows[0].out.map(x=>x.sl);
+  card.innerHTML = `<div class="card-h"><h2>By elevation${tipI("byelev")}</h2><span class="muted">next ${nD} days</span></div>
+    <div class="et-wrap"><table class="et">${head}${body}
+      <tr class="et-h"><td colspan="${nD+1}">Whole mountain</td></tr>
+      <tr><td class="et-l">Snow level</td>${fz.map(v=>`<td>${v!=null? fmtEl(v) : "—"}</td>`).join("")}</tr>
+      <tr><td class="et-l">Cloud base<br><small>~1pm</small></td>${cb.map(v=>`<td>${v==null? "<small>clear or broken</small>" : v <= L0.top/FT ? `${fmtEl(v)}<br><small style="color:var(--warn)">summit in cloud</small>` : fmtEl(v)}</td>`).join("")}</tr>
+    </table></div>
+    <div class="muted" style="font-size:11px;margin-top:6px">Each elevation is modeled separately: temperature adjusted for height, snow vs. rain at that height. Cloud base is estimated from temperature and humidity when skies are mostly cloudy.</div>`;
+}
+
+/* ---------- Wax log (learns what works for you) ---------- */
+const SURF_FAMILY = { powder:"new", fresh:"new", heavy:"new", damp:"new", softpack:"new", wind:"new", packed:"packed", cold:"packed", firm:"firm", ice:"firm", corn:"wet", soft:"wet", slush:"wet", rain:"wet" };
+const waxLog = () => store.get("waxlog", []);
+function waxSuggest(c, sim){
+  if(!c || !sim) return null; const fam = SURF_FAMILY[sim.key];
+  const cand = waxLog().filter(x=>x.mode===S.mode && x.rating>=4 && Math.abs(x.tempC - c.Te) <= 3.5 && SURF_FAMILY[x.surface]===fam)
+    .sort((a,b)=> (b.rating - a.rating) || (Math.abs(a.tempC-c.Te) - Math.abs(b.tempC-c.Te)));
+  const bad = waxLog().filter(x=>x.mode===S.mode && x.rating<=2 && Math.abs(x.tempC - c.Te) <= 3 && SURF_FAMILY[x.surface]===fam);
+  if(!cand.length && !bad.length) return null;
+  const t = cand[0];
+  return { good: t, avoid: bad[0], text: t ? `Last time it was like this (${fmtT(t.tempC)}, ${SURF[t.surface]?.label.toLowerCase()}), ${t.wax} ran ${t.rating===5?"great":"well"}.` : null };
+}
+function renderWaxLog(el){
+  const {C, SIM} = S.ctx, c = C.cons[C.nowIdx], sim = SIM[C.nowIdx];
+  const list = waxLog().filter(x=>x.mode===S.mode).slice(-20).reverse(); const sug = waxSuggest(c, sim);
+  el.innerHTML = `${sug?.text? `<div class="callout" style="margin:0 0 12px">🧠 ${sug.text}${sug.avoid? ` Skip ${sug.avoid.wax} (it ran poorly).` : ""}</div>` : ""}
+    <div class="muted" style="margin-bottom:8px">Log what you waxed and how it ran. Snowline saves today's conditions (${fmtT(c?.Te)}, ${sim?.label.toLowerCase()}) with it and suggests your best wax next time it's similar.</div>
+    <div class="field">${S.mode==="classic"?"Kick + glide wax":"Glide wax"}<input id="wxWax" list="waxNames" placeholder="${S.mode==="classic"?"e.g. Swix VR45 / Rode Blue":"e.g. Swix TS6, Rex Blue"}"></div>
+    <datalist id="waxNames">${[...new Set(waxLog().map(x=>x.wax))].map(w=>`<option value="${w}">`).join("")}</datalist>
+    <div class="field">How did it run?<div class="seg" id="wxRate">${[1,2,3,4,5].map(n=>`<button data-r="${n}">${"★".repeat(n)}</button>`).join("")}</div></div>
+    <div class="field">Notes<input id="wxNote" placeholder="optional: icing, slow on climbs, perfect…"></div>
+    <button class="btn primary wide" id="wxSave">Save to wax log</button>
+    ${list.length? `<div class="grp">Your log</div><div class="list">${list.map(x=>`<div class="li" style="min-height:48px"><span class="nm"><b>${x.wax} <span style="color:var(--warn)">${"★".repeat(x.rating)}</span></b><small>${new Date(x.t).toLocaleDateString([], {month:"short",day:"numeric"})} · ${x.spot.replace(/,\s*[A-Z]{2}$/,"")} · ${fmtT(x.tempC)} · ${SURF[x.surface]?.label||x.surface}${x.note? " · "+x.note : ""}</small></span></div>`).join("")}</div>` : ""}`;
+  let rating = 0; el.querySelectorAll("#wxRate button").forEach(b=>b.onclick=()=>{ rating=+b.dataset.r; el.querySelectorAll("#wxRate button").forEach(x=>x.classList.toggle("on", +x.dataset.r===rating)); });
+  $("#wxSave").onclick = () => { const w = $("#wxWax").value.trim(); if(!w || !rating){ toast("Add the wax and a rating"); return; }
+    const all = waxLog(); all.push({t:Date.now(), spot:S.loc.name, mode:S.mode, wax:w, rating, note:$("#wxNote").value.trim(), tempC: +(c?.Te||0).toFixed(1), surface: sim?.key, age: sim?.age}); store.set("waxlog", all.slice(-300)); toast("Saved to wax log"); renderWaxLog(el); };
+}
+
+/* ---------- Birkie race mode ---------- */
+const BIRKIE_PTS = [ {k:"Start", name:"Cable start", lat:46.207, lon:-91.290, km:0}, {k:"Midway", name:"OO trailhead (approx.)", lat:46.105, lon:-91.327, km:23}, {k:"Finish", name:"Hayward Main St", lat:46.013, lon:-91.485, km:50} ];
+const parseHM = s => { const m = String(s||"").match(/^(\d{1,2}):(\d{2})$/); return m? +m[1]*60 + +m[2] : null; };
+async function birkieForecast(){
+  if(S.birkieFc && Date.now()-S.birkieFc.t < 3600e3) return S.birkieFc;
+  const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${BIRKIE_PTS.map(p=>p.lat).join(",")}&longitude=${BIRKIE_PTS.map(p=>p.lon).join(",")}&hourly=temperature_2m,snowfall,precipitation,wind_speed_10m,wind_gusts_10m,cloud_cover&timezone=America%2FChicago&start_date=${BIRKIE.date}&end_date=${BIRKIE.date}`)).json();
+  S.birkieFc = {t:Date.now(), pts: Array.isArray(j)? j : [j]}; return S.birkieFc;
+}
+function glideByTemp(T){ const sT=Math.min(T,0); return sT<=-12? "Cold (−12°C & colder)" : sT<=-5? "Mid-cold (−12 to −5°C)" : sT<=-1? "Mid (−5 to −1°C)" : T<=2? "Warm (−1 to +2°C)" : "Wet (+2°C & up)"; }
+async function renderBirkie(){
+  const el = $("#birkiePanel"); if(!el) return;
+  const days = Math.ceil((BIRKIE.start - Date.now())/864e5); if(days < -1){ el.remove(); return; }
+  const goal = store.get("birkieGoal","3:00"), wave = store.get("birkieWave","8:30");
+  el.innerHTML = `<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><div><h2>Birkie race mode</h2><div class="muted">50k skate · Cable → Hayward · Sat Feb 27, 2027</div></div><div style="text-align:right"><div class="num" style="font-size:32px;color:var(--ice)">${days}</div><div class="muted">days</div></div></div>
+    <div class="form2" style="margin-top:10px"><div class="field">Goal finish (h:mm)<input id="bkGoal" value="${goal}" inputmode="numeric"></div><div class="field">Wave start<input id="bkWave" value="${wave}" inputmode="numeric"></div></div>
+    <div id="bkPlan"></div>`;
+  const savePlan = () => { store.set("birkieGoal",$("#bkGoal").value); store.set("birkieWave",$("#bkWave").value); drawPlan(); };
+  $("#bkGoal").onchange = savePlan; $("#bkWave").onchange = savePlan;
+  const drawPlan = async () => {
+    const g = parseHM($("#bkGoal").value) || 180, w = parseHM($("#bkWave").value) || 510;
+    const rows = BIRKIE_PTS.map(p=>{ const tmin = w + g*p.km/50; return {...p, tmin, hh: Math.floor(tmin/60), mm: Math.round(tmin%60)}; });
+    const pace = (g/50); const paceTxt = imp()? `${Math.floor(pace*1.609)}:${String(Math.round((pace*1.609%1)*60)).padStart(2,"0")}/mi` : `${Math.floor(pace)}:${String(Math.round((pace%1)*60)).padStart(2,"0")}/km`;
+    let fc = null; if(days <= 15){ try{ fc = await birkieForecast(); }catch(e){} }
+    $("#bkPlan").innerHTML = `<div class="tablewrap"><table><tr><th class="m">Point</th><th>Time</th><th>Temp</th><th>Wind</th><th>Snow</th></tr>${rows.map((r,i)=>{ let T="—",Wd="—",Sn="—";
+      if(fc){ const P=fc.pts[i]?.hourly; const hi=P? P.time.findIndex(t=>+t.slice(11,13)===r.hh) : -1; if(hi>=0){ T=fmtT(P.temperature_2m[hi]); Wd=fmtWind(P.wind_speed_10m[hi]); let s=0; for(let k=Math.max(0,hi-12);k<=hi;k++) s+=(P.snowfall[k]||0)/2.54; Sn=fmtSnow(s,1); r.T=P.temperature_2m[hi]; } }
+      return `<tr><td class="m"><b>${r.k}</b><div class="muted" style="font-size:11px">km ${r.km}</div></td><td>${hl(r.hh).replace(/([ap])$/,"")}:${String(r.mm).padStart(2,"0")}${r.hh<12?"a":"p"}</td><td>${T}</td><td>${Wd}</td><td>${Sn}</td></tr>`; }).join("")}</table></div>
+      <div class="muted" style="margin-top:6px">Goal pace ${paceTxt}. ${fc? `Glide for the start: <b>${glideByTemp(rows[0].T ?? -6)}</b>${isNum(rows[2].T) && Math.abs((rows[2].T)-(rows[0].T??rows[2].T))>=3? `; it warms to ${fmtT(rows[2].T)} by the finish, so pick a wax that covers both or go one step warmer.`:"."}` : `The race-day forecast for the course appears around Feb 12. Midway point is approximate.`}</div>`;
+  };
+  drawPlan();
+}
+/* ---------- Avalanche (detail by elevation + problems) ---------- */
+const AVY_LVL = {1:["Low","#50b848"],2:["Moderate","#fff200"],3:["Considerable","#f7941e"],4:["High","#ed1c24"],5:["Extreme","#231f20"]};
+const DIRS = ["north","northeast","east","southeast","south","southwest","west","northwest"];
+function roseSVG(locs){
+  const set = new Set((locs||[]).map(s=>String(s).toLowerCase())); const R=[44,30,16], bands=["lower","middle","upper"];
+  let g=""; DIRS.forEach((d,i)=>{ const a0=(i*45-22.5-90)*Math.PI/180, a1=(i*45+22.5-90)*Math.PI/180;
+    bands.forEach((b,j)=>{ const r0 = j===2? 0 : R[j+1], r1 = R[j]; const on = set.has(`${d} ${b}`);
+      const p = (r,a)=>`${50+r*Math.cos(a)},${50+r*Math.sin(a)}`;
+      g += `<path d="M${p(r0,a0)} L${p(r1,a0)} A${r1} ${r1} 0 0 1 ${p(r1,a1)} L${p(r0,a1)} ${r0? `A${r0} ${r0} 0 0 0 ${p(r0,a0)}`:""} Z" fill="${on?"#f7941e":"#26262b"}" stroke="#0b0b0c" stroke-width="1"/>`; }); });
+  return `<svg width="84" height="84" viewBox="0 0 100 100">${g}<text x="50" y="7" fill="#8e8e93" font-size="8" text-anchor="middle">N</text></svg>`;
+}
+async function renderAvy(){
+  if(!S.loc) return; const L0 = S.loc; const X = extrasFor(L0); const A = X.avy;
+  let mini="—", sv="", body;
+  if(A && A.zone){
+    const z=A.zone, d=A.detail, lvl=z.danger, [nm,col] = AVY_LVL[lvl] || ["No rating","#3a4a6b"];
+    mini = `<span class="pill"><i class="sw" style="background:${col}"></i>${lvl>0?lvl:"–"}</span>`;
+    sv = `<span class="pill"><i class="sw" style="background:${col}"></i>${lvl>0? lvl+" · ":""}${z.off_season? "Off season" : nm}</span>`;
+    const band = (lab, v) => { const [n,c]=AVY_LVL[v]||["—","#333"]; return `<div class="avb"><span>${lab}</span><i style="background:${c}"></i><b>${v>0? v+" · "+n : "—"}</b></div>`; };
+    body = `<p class="bc-alert" style="margin:0 0 10px"><b>⚠️ Avalanches are deadly.</b> This is the avalanche center's forecast, shown as published. Snowline adds no rating or recommendation of its own; read the full forecast and make your own decisions.</p><div class="muted" style="margin-bottom:8px">${z.center||""} · ${z.name||""}${d?.published? " · issued "+new Date(d.published).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"}):""}</div>
+      ${d?.danger? `<div class="avbands">${band("Above treeline",d.danger.upper)}${band("Near treeline",d.danger.middle)}${band("Below treeline",d.danger.lower)}</div>` : `<div class="now"><span style="width:44px;height:44px;border-radius:12px;background:${col};display:grid;place-items:center;color:#000;font-weight:800;font-size:20px">${lvl>0?lvl:"–"}</span><div class="lab">${nm}</div></div>`}
+      ${d?.tomorrow? `<div class="muted" style="margin-top:6px">Tomorrow: ${["upper","middle","lower"].map(k=>(AVY_LVL[d.tomorrow[k]]||["—"])[0]).join(" / ")}</div>`:""}
+      ${d?.bottomLine? `<p class="desc">${d.bottomLine}</p>` : z.travel_advice? `<p class="desc">${z.travel_advice}</p>` : ""}
+      ${(d?.problems||[]).length? `<div class="grp">Avalanche problems</div>${d.problems.map(p=>`<div class="avp">${roseSVG(p.location)}<div><b>${p.name}</b><div class="muted">Likelihood: ${p.likelihood||"—"} · Size: ${(p.size||[]).join("–")||"—"}</div>${p.note? `<div class="clamp3" style="font-size:13px;margin-top:4px;color:#c7c7cc">${p.note}</div>`:""}</div></div>`).join("")}`:""}
+      ${z.link? `<a href="${z.link}" target="_blank" rel="noopener">Read the full forecast →</a>`:""}`;
+  } else if(A && A.zone===null){ body = `<div class="muted">No avalanche center covers this spot. See <a href="https://avalanche.org" target="_blank" rel="noopener">avalanche.org</a>.</div>`; mini="n/a"; }
+  else if(X.avyFailed || A?.error){ body = `<div class="muted">Couldn't load the avalanche forecast. See <a href="https://avalanche.org" target="_blank" rel="noopener">avalanche.org</a>.</div>`; }
+  else body = `<div class="loading"><div class="spin"></div>Loading avalanche forecast…</div>`;
+  if(S.loc !== L0) return;
+  S.avyMini = mini; S.avyLabel = sv;
+  try{ renderBC(); }catch(e){}
+  const m=$("#mAvy .v"); if(m) m.innerHTML=mini; const s2=$("#sv-avy"); if(s2) s2.innerHTML=sv; const b=$("#sb-avy"); if(b) b.innerHTML=body;
+}
+
+
+/* ================= Backcountry (Tour mode) =================
+   Snowline only shows weather facts and the avalanche center's own forecast. It never rates avalanche danger,
+   never calls a slope or a day safe, and never recommends where or whether to go. */
+const BC_WARN = `Avalanches kill people in Central Oregon. Snowline shows weather data and links the avalanche center's forecast. It does not assess avalanche danger, does not make recommendations, and cannot tell you whether any slope, route or day is safe. Weather models are often wrong in the mountains. You alone are responsible for your decisions in avalanche terrain.`;
+function bcAcknowledge(force){
+  if(!force && store.get("bcAck", 0) > Date.now() - 180*864e5) return;   // asked again every 6 months
+  let sh = $("#bcAck"); if(!sh){ sh = document.createElement("div"); sh.id = "bcAck"; sh.className = "sheet"; document.body.appendChild(sh); }
+  sh.innerHTML = `<div class="sheet-b"><div class="grab"></div>
+    <h2 style="margin:4px 0 10px">⚠️ Before you use Tour mode</h2>
+    <p style="line-height:1.5;margin:0 0 10px"><b>${BC_WARN}</b></p>
+    <ul class="bc-list">
+      <li>Read the <a href="https://www.coavalanche.org/" target="_blank" rel="noopener">Central Oregon Avalanche Center</a> forecast every day you go, and follow it.</li>
+      <li>Every person carries a beacon, shovel and probe, and knows how to use them.</li>
+      <li>Take an avalanche course (AIARE or similar) before going into avalanche terrain, and never travel alone.</li>
+      <li>Tell someone your plan and when you'll be back. Cell service is poor or absent on most tours.</li>
+    </ul>
+    <p class="muted" style="margin:10px 0 12px">By continuing you accept that Snowline and its maker take no responsibility for how you use this information.</p>
+    <button class="btn primary wide" id="bcAckOk">I understand</button>
+    <button class="btn wide" id="bcAckNo" style="margin-top:8px">Go back to Alpine mode</button></div>`;
+  sh.classList.add("on"); document.body.style.overflow = "hidden";
+  const close = () => { sh.classList.remove("on"); document.body.style.overflow = ""; };
+  $("#bcAckOk").onclick = () => { store.set("bcAck", Date.now()); close(); };
+  $("#bcAckNo").onclick = () => { close(); S.autoBC = false; setMode("alpine"); render(); };
+}
+const lee = from => (from + 180) % 360;
+const aspectsAround = (deg, spread) => { const out = []; for(let d=-spread; d<=spread; d+=45){ const c = compass((deg+d+360)%360); if(!out.includes(c)) out.push(c); } return out; };
+function bcFacts(){
+  const L0 = S.loc, ctx = S.ctx; if(!ctx || !S.data) return null;
+  const Ct = ctx.Ctop || (ctx.Ctop = computeAt(L0.top/FT)); const n = Ct.nowIdx, cons = Ct.cons;
+  const sumSnow = (a, b) => { let s=0, k=0; for(let i=Math.max(0,a); i<Math.min(cons.length,b); i++){ if(cons[i]){ s += cons[i].snow; k++; } } return k? s : null; };
+  const windOver = (a, b) => { let u=0, v=0, sp=0, mx=0, k=0; for(let i=Math.max(0,a); i<Math.min(cons.length,b); i++){ const c=cons[i]; if(!c || !isNum(c.WD)) continue; const w = Math.max(c.RW||0, c.W||0); u+=Math.sin(c.WD*Math.PI/180)*w; v+=Math.cos(c.WD*Math.PI/180)*w; sp+=w; mx=Math.max(mx, c.G||w); k++; } return k? {from:(Math.atan2(u,v)*180/Math.PI+360)%360, avg:sp/k, max:mx} : null; };
+  const past72 = sumSnow(n-72, n), next24 = sumSnow(n, n+24), next48 = sumSnow(n, n+48);
+  const wPast = windOver(n-72, n), wNext = windOver(n, n+24);
+  // warming and rain on snow at the summit and trailhead over the next 48 hours
+  const Cb = ctx.Cbase || (ctx.Cbase = computeAt(L0.base/FT));
+  let maxT = -99, maxTt = null, rainH = 0, rainBaseH = 0, minSL = 99999, maxSL = 0;
+  for(let i=n; i<Math.min(cons.length, n+48); i++){ const c = cons[i]; if(!c) continue; if(c.Te > maxT){ maxT = c.Te; maxTt = Ct.time[i]; } if(c.P > 0.2 && c.frac < 0.5) rainH++; if(isNum(c.sl)){ minSL = Math.min(minSL, c.sl); maxSL = Math.max(maxSL, c.sl); }
+    const cb = Cb.cons[i]; if(cb && cb.P > 0.2 && cb.frac < 0.5) rainBaseH++; }
+  // the day you'd tour: today until 1pm, after that tomorrow
+  const nowH = +String(Ct.time[n]||"").slice(11,13), day = nowH >= 13 ? dateAdd(Ct.time[n].slice(0,10), 1) : Ct.time[n].slice(0,10);
+  const hrs = []; Ct.time.forEach((tm, i)=>{ if(tm.slice(0,10)===day){ const h=+tm.slice(11,13); if(h>=7 && h<=16 && cons[i]) hrs.push({h, c:cons[i]}); } });
+  const chill = (T, kmh) => kmh < 5 ? T : 13.12 + 0.6215*T - 11.37*Math.pow(kmh,0.16) + 0.3965*T*Math.pow(kmh,0.16);
+  const noon = hrs.find(x=>x.h===12) || hrs[Math.floor(hrs.length/2)];
+  const flat = hrs.filter(x=>(x.c.CC||0) >= 90 && x.c.P > 0.1);
+  const sunny = hrs.filter(x=>(x.c.CC??100) < 35);
+  const st = sunTimes(day);
+  return { day, past72, next24, next48, wPast, wNext, maxT, maxTt, rainH, rainBaseH, minSL, maxSL, noon, chillNoon: noon? chill(noon.c.Te, Math.max(noon.c.RW||0, noon.c.W||0)) : null, flat, sunny, st,
+    gain: L0.top - L0.base };
+}
+function renderBC(){
+  const card = $("#bcCard"); if(!card) return; const L0 = S.loc; const F = bcFacts(); if(!F){ card.innerHTML = ""; return; }
+  const P = PRESETS.find(p=>p.name===L0.name), info = P?.bc;
+  const A = extrasFor(L0).avy, z = A?.zone, d = A?.detail;
+  const band = (lab, v) => { const [nm, col] = AVY_LVL[v] || ["Not rated", "#3a4a6b"]; return `<div class="avb"><span>${lab}</span><i style="background:${col}"></i><b>${v>0? v+" · "+nm : nm}</b></div>`; };
+  let avy;
+  if(z && !z.off_season && d?.danger) avy = `<div class="muted" style="margin:0 0 6px">${esc(z.center||"Avalanche center")} · ${esc(z.name||"")}${d.published? " · issued "+new Date(d.published).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}) : ""}</div>
+      <div class="avbands">${band("Above treeline", d.danger.upper)}${band("Near treeline", d.danger.middle)}${band("Below treeline", d.danger.lower)}</div>
+      ${(d.problems||[]).length? `<div class="muted" style="margin-top:8px"><b style="color:var(--text)">Avalanche problems:</b> ${d.problems.map(p=>esc(p.name)).join(" · ")}</div>`:""}
+      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">${z.link? `<a class="btn primary" style="text-decoration:none" href="${z.link}" target="_blank" rel="noopener">Read the full avalanche forecast ↗</a>`:""}<button class="btn" id="bcAvyMore">Problems and bottom line</button></div>`;
+  else if(z && z.off_season) avy = `<p class="bc-alert">The avalanche center is <b>not issuing forecasts right now</b>. No forecast does not mean no danger. Assess the snowpack yourself and check <a href="${z.link||"https://www.coavalanche.org/"}" target="_blank" rel="noopener">${esc(z.center||"the avalanche center")}</a> for observations.</p>`;
+  else if(A && z===null) avy = `<p class="bc-alert">No avalanche center covers this spot. No forecast does not mean no danger. See <a href="https://avalanche.org" target="_blank" rel="noopener">avalanche.org</a>.</p>`;
+  else if(extrasFor(L0).avyFailed) avy = `<p class="bc-alert">Couldn't load the avalanche forecast. <b>Read it before you go:</b> <a href="https://www.coavalanche.org/" target="_blank" rel="noopener">Central Oregon Avalanche Center ↗</a></p>`;
+  else avy = `<div class="loading"><div class="spin"></div>Loading the avalanche forecast…</div>`;
+  const facts = [];
+  if(isNum(F.past72) && F.wPast){
+    const windy = F.wPast.avg >= 25;   // km/h, about 15 mph and up moves snow
+    facts.push(`<b>Last 3 days:</b> about ${fmtSnow(F.past72)} of new snow at the summit${windy? `, with ridgetop wind from the ${compass(F.wPast.from)} averaging ${fmtWind(F.wPast.avg)} ${windU()} (gusts near ${fmtWind(F.wPast.max)}). Wind like that moves snow onto <b>${aspectsAround(lee(F.wPast.from),45).join(", ")}</b>-facing slopes, mostly near ridgelines` : `, with lighter ridgetop wind`}.`);
+  }
+  if(isNum(F.next24) && F.wNext) facts.push(`<b>Next 24 hours:</b> ${F.next24>=0.5? `about ${fmtSnow(F.next24)} more snow` : "little or no new snow"}, ridgetop wind from the ${compass(F.wNext.from)} around ${fmtWind(F.wNext.avg)} ${windU()}${F.wNext.avg>=25 && F.next24>=1? ` (loading ${aspectsAround(lee(F.wNext.from),45).join(", ")}-facing slopes)` : ""}.`);
+  const warm = [];
+  if(F.maxT > 0.5) warm.push(`the summit goes above freezing (about ${fmtT(F.maxT)} around ${dow(F.maxTt.slice(0,10))} ${hl(+F.maxTt.slice(11,13))})`);
+  if(F.rainH) warm.push(`about ${F.rainH} hours of rain at the summit`);
+  else if(F.rainBaseH) warm.push(`about ${F.rainBaseH} hours of rain at the trailhead`);
+  if(F.maxSL > 0) warm.push(Math.abs(F.maxSL-F.minSL) < 60 ? `snow level near ${fmtEl(F.maxSL)}` : `snow level between ${fmtEl(F.minSL)} and ${fmtEl(F.maxSL)}`);
+  if(warm.length) facts.push(`<b>Next 48 hours:</b> ${warm.join("; ")}.`);
+  if(F.sunny.length >= 3 && F.maxT > -3) facts.push(`<b>Sun:</b> mostly clear ${hl(F.sunny[0].h)}–${hl(F.sunny[F.sunny.length-1].h+1)} on ${dow(F.day)}; sun warms east, south and west-facing snow through the day.`);
+  const tour = [];
+  if(F.st?.rise && F.st?.set) tour.push(`Daylight ${clock(F.st.rise)}–${clock(F.st.set)}`);
+  if(F.noon) tour.push(`summit at noon ${fmtT(F.noon.c.Te)}${isNum(F.chillNoon) && F.chillNoon < F.noon.c.Te-2? `, feels like ${fmtT(F.chillNoon)} in the wind` : ""}`);
+  if(F.flat.length) tour.push(`snow and thick cloud ${hl(F.flat[0].h)}–${hl(F.flat[F.flat.length-1].h+1)} (poor visibility)`);
+  if(F.gain > 300) tour.push(`${Math.round(F.gain).toLocaleString()} ft from ${info?.from ? esc(info.from) : "the base"} to the summit, often about ${Math.max(1, Math.round(F.gain/1000*2)/2)} h at a steady 1,000 ft an hour`);
+  card.innerHTML = `<div class="card-h"><h2>Backcountry</h2><button class="link" id="bcWhy" style="padding:0">Read first</button></div>
+    <p class="bc-alert"><b>⚠️ Avalanche danger is serious.</b> Snowline makes no recommendations and cannot tell you whether a slope is safe. Read the avalanche center's forecast and make your own decisions. You are responsible for them.</p>
+    <div class="grp" style="margin-top:12px">Avalanche forecast (from the avalanche center)</div>${avy}
+    <div class="grp">Recent field observations · last 14 days</div>${avyObsHTML()}
+    <div class="grp">Weather that affects the snowpack</div>
+    ${facts.length? `<ul class="bc-list">${facts.map(f=>`<li>${f}</li>`).join("")}</ul>` : `<p class="muted">Waiting for the forecast…</p>`}
+    <p class="muted" style="font-size:11.5px;margin:6px 0 0">Model estimates for the summit (${fmtEl(L0.top/FT)}), not observations. Wind-loading notes describe where wind moves snow, not where avalanches will or won't happen.</p>
+    <div class="grp">Your day · ${dayLabel(F.day)}</div>
+    <p style="margin:4px 0 10px;line-height:1.5">${tour.join(" · ")}.</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="bcMap">🗺️ Slope angle & wind-loading map</button></div>`;
+  $("#bcWhy").onclick = () => bcAcknowledge(true);
+  $("#bcMap").onclick = () => { ["lySlope","lyWind","lyAvy"].forEach(id=>document.querySelector(`#mapLayers [data-l="${id}"]`)?.classList.add("on")); location.hash = "maps"; setTimeout(()=>{ if(bigMap){ bigMap.setView([L0.lat, L0.lon], 13); applyLayers(); } }, 400); };
+  const more = $("#bcAvyMore"); if(more) more.onclick = () => { const dd = document.querySelector('details[data-sec="avy"]'); if(dd){ dd.open = true; dd.scrollIntoView({behavior:"smooth", block:"start"}); } };
+}
+
+/* ---------- Backcountry map layers (computed from open terrain tiles) ---------- */
+const SLOPE_COLORS = [[27,30,[248,231,28]],[30,32,[247,165,35]],[32,35,[239,108,0]],[35,45,[229,57,53]],[45,50,[142,36,170]],[50,90,[40,40,40]]];
+function demTile(coords, paint){
+  const tile = document.createElement("canvas"); tile.width = tile.height = 256;
+  const img = new Image(); img.crossOrigin = "anonymous";
+  img.onload = () => { try{
+      const cx = document.createElement("canvas"); cx.width=cx.height=256; const g=cx.getContext("2d"); g.drawImage(img,0,0);
+      const src = g.getImageData(0,0,256,256).data, H = new Float32Array(65536);
+      for(let i=0;i<65536;i++){ H[i] = src[i*4]*256 + src[i*4+1] + src[i*4+2]/256 - 32768; }
+      const n = 2**coords.z, latRad = Math.atan(Math.sinh(Math.PI*(1-2*(coords.y+.5)/n)));
+      const px = 40075016.686*Math.cos(latRad)/(256*n);
+      const ctx = tile.getContext("2d"), out = ctx.createImageData(256,256), o = out.data;
+      for(let y=1;y<255;y++) for(let x=1;x<255;x++){
+        const i=y*256+x; const dzdx=(H[i+1]-H[i-1])/(2*px), dzdn=-(H[i+256]-H[i-256])/(2*px);
+        const slope = Math.atan(Math.hypot(dzdx,dzdn))*180/Math.PI, aspect = (Math.atan2(-dzdx,-dzdn)*180/Math.PI+360)%360;
+        const c = paint(slope, aspect); if(c){ o[i*4]=c[0]; o[i*4+1]=c[1]; o[i*4+2]=c[2]; o[i*4+3]=c[3]; }
+      }
+      ctx.putImageData(out,0,0);
+    }catch(e){} tile._done(null, tile); };
+  img.onerror = () => tile._done(null, tile);
+  img.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${coords.z}/${coords.x}/${coords.y}.png`;
+  return tile;
+}
+function makeDemLayer(paint){
+  const Layer = L.GridLayer.extend({ createTile(coords, done){ const t = demTile(coords, paint); t._done = done; return t; } });
+  return new Layer({minZoom:11, maxNativeZoom:14, maxZoom:16, opacity:.62, attribution:"Terrain: Mapzen/AWS terrain tiles"});
+}
+let slopeLayer, windLayer;
+function windLoadInfo(){
+  const ctx = S.ctx; if(!ctx) return null; const {C} = ctx; let u=0, v=0, sp=0, n=0, snow=0;
+  for(let i=Math.max(0,C.nowIdx-24); i<Math.min(C.time.length, C.nowIdx+12); i++){ const c=C.cons[i]; if(!c || !isNum(c.WD)) continue; const w = Math.max(c.RW||0, c.W||0);
+    u += Math.sin(c.WD*Math.PI/180)*w; v += Math.cos(c.WD*Math.PI/180)*w; sp += w; n++; if(i<C.nowIdx+12) snow += c.snow; }
+  if(!n) return null; const from = (Math.atan2(u,v)*180/Math.PI+360)%360;
+  return { from, lee:(from+180)%360, speed: sp/n, snow, strength: Math.min(1, (sp/n)/55) * (snow>=2? 1 : 0.6) };
+}
+function applyBackcountry(){
+  const on = id => !!document.querySelector(`#mapLayers [data-l="${id}"]`)?.classList.contains("on");
+  if(on("lySlope")){ if(!slopeLayer) slopeLayer = makeDemLayer((s)=>{ for(const [a,b,c] of SLOPE_COLORS) if(s>=a && s<b) return [...c,190]; return null; }); slopeLayer.addTo(bigMap); } else if(slopeLayer) slopeLayer.remove();
+  if(on("lyAspect")){ if(!aspectLayer) aspectLayer = makeDemLayer(aspectPaint); aspectLayer.addTo(bigMap); } else if(aspectLayer) aspectLayer.remove();
+  const wi = windLoadInfo();
+  if(on("lyWind") && wi){ if(windLayer) windLayer.remove();
+    windLayer = makeDemLayer((s,a)=>{ if(s<25) return null; let d=Math.abs(a-wi.lee); d=Math.min(d,360-d); if(d>60) return null; const k=(1-d/60)*wi.strength; return [180,140,255, Math.round(60+170*k)]; }).addTo(bigMap); }
+  else if(windLayer){ windLayer.remove(); windLayer=null; }
+  const leg = $("#bcLegend"); if(leg){
+    leg.innerHTML = (on("lySlope")? `<span><b>Slope</b></span>${SLOPE_COLORS.map(([a,b,c])=>`<span><i class="dot" style="background:rgb(${c})"></i>${a}${b<90?"–"+b:"+"}°</span>`).join("")}` : "") +
+      (on("lyWind") && wi? `<span style="flex-basis:100%"><i class="dot" style="background:#b48cff"></i> Wind-loaded: <b>${compass(wi.lee)}</b>-facing slopes ≥25° (wind from ${compass(wi.from)}, ~${fmtWind(wi.speed)} ${windU()}${wi.snow>=1? `, ${fmtSnow(wi.snow)} new snow`:""})</span>` : "") +
+      (on("lyAspect")? `<span style="flex-basis:100%"><b>Aspect</b> (slopes ≥12°, bolder ≥30°)</span>${ASPECT_COLORS.map(([n,c])=>`<span><i class="dot" style="background:rgb(${c})"></i>${n}</span>`).join("")}` : "") +
+      ((on("lySlope")||on("lyWind")||on("lyAspect")) && bigMap.getZoom()<11? `<span style="color:var(--warn)">Zoom in to see terrain layers</span>`:"");
+  }
+}
+
+/* ---------- Push notifications ---------- */
+const VAPID_PUBLIC = "BFz0cUE1bJC-y37oqE6QIlgGZtlqjZQcqMy2CPcpfI39ftQ5hfIZHmEZcLSh4etQv5DgWWkwnWE44IIn4Gi3-Y4";
+const b64u = s => { const p='='.repeat((4-s.length%4)%4); const r=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); };
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent), standalone = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+async function pushSub(){ if(!("serviceWorker" in navigator)) return null; const reg = await navigator.serviceWorker.ready; return reg.pushManager.getSubscription(); }
+/* ================= FEATURES v5 ================= */
+const NORDIC_SPOTS = { "Meissner Nordic (Bend), OR": {thr:14, label:"Meissner grooming", snopark:true}, "Elk Lake Resort (Nordic), OR": {thr:14, label:"Elk Lake grooming"}, "Mt. Bachelor Nordic Center, OR": {thr:18, label:"Bachelor Nordic trails"}, "Methow Valley Trails, WA": {thr:12, label:"Methow trail grooming"}, "Birkie Trail (Cable, WI)": {thr:8, label:"Birkie trail grooming"} };
+const OREGON = n => /,\s*OR\)?$/.test(n) || /\(.*,\s*OR\)/.test(n);
+
+/* ---------- Trail-opening predictor ---------- */
+function openingOutlook(){
+  if(isAlp() || !S.ctx) return null;
+  const L0 = S.loc, cfg = NORDIC_SPOTS[L0.name] || (/Nordic|Trails|XC|Sno-?Park/i.test(L0.name)? {thr:12, label:"Trail grooming"} : null);
+  const ob = nearObs(); if(!cfg || !ob || !isNum(ob.depth)) return null;
+  const C2 = S.ctx.Cbase || (S.ctx.Cbase = computeAt(L0.base/FT));
+  let depth = ob.depth; const proj = [depth]; let hit = depth >= cfg.thr ? 0 : null;
+  for(let k=0;k<Math.min(15,C2.days.length);k++){
+    const cd = C2.consDays[k]; const fresh = cd.day+cd.night; const tmax = isNum(cd.tmaxD)? cd.tmaxD : (cd.tmax>-90? cd.tmax : 0);
+    depth = Math.max(0, depth + 0.5*fresh - (tmax>0? tmax*0.35 : 0)); proj.push(depth);
+    if(hit==null && depth >= cfg.thr) hit = k+1;
+  }
+  return { cfg, ob, now: ob.depth, proj, hit, date: hit!=null && hit>0 ? C2.days[hit-1] : null, need: Math.max(0, cfg.thr - ob.depth) };
+}
+function renderOpening(){
+  const el = $("#openCard"); if(!el) return; const o = openingOutlook(); if(!o || (o.hit===0 && o.now >= o.cfg.thr*1.6)){ el.remove(); return; }
+  const W=300,H=70, mx=Math.max(o.cfg.thr*1.3, ...o.proj); const x=i=>i*W/(o.proj.length-1), y=v=>H-6-(v/mx)*(H-12);
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}"><line x1="0" x2="${W}" y1="${y(o.cfg.thr)}" y2="${y(o.cfg.thr)}" stroke="#6ee7a0" stroke-dasharray="5 4"/><text x="${W-2}" y="${y(o.cfg.thr)-4}" fill="#6ee7a0" font-size="10" text-anchor="end">groomable ~${fmtSnow(o.cfg.thr,0)}</text><polyline fill="none" stroke="#5aa2ff" stroke-width="2.5" points="${o.proj.map((v,i)=>`${x(i)},${y(v)}`).join(" ")}"/>${o.hit? `<circle cx="${x(o.hit)}" cy="${y(o.proj[o.hit])}" r="4" fill="#6ee7a0"/>`:""}</svg>`;
+  const headline = o.hit===0 ? `Deep enough to groom` : o.hit? `~${dow(o.date)} ${md(o.date)}` : `Not in the next 2 weeks`;
+  const sub = o.hit===0 ? `${fmtSnow(o.now,0)} on the ground, above the ~${fmtSnow(o.cfg.thr,0)} groomers usually need.` : o.hit? `Projected depth reaches ~${fmtSnow(o.cfg.thr,0)}, enough for grooming, in about ${o.hit} day${o.hit>1?"s":""}.` : `Needs about ${fmtSnow(o.need,0)} more settled snow; the forecast doesn't get there yet.`;
+  el.innerHTML = `<div class="card-h"><h2>Trail opening outlook</h2><span class="muted">${o.cfg.label}</span></div>
+    <div class="num" style="font-size:30px;color:${o.hit===0?"#6ee7a0":o.hit?"var(--ice)":"var(--mute)"}">${headline}</div><div class="muted" style="margin:2px 0 8px">${sub}</div>${svg}
+    <div class="muted" style="margin-top:6px">Rule of thumb, not an official opening date. Uses ${o.ob.name} SNOTEL (${Math.round(o.ob.elevFt).toLocaleString()} ft) plus the forecast at the trailhead, with settling and melt.</div>`;
+}
+
+/* ---------- After-work planner + cold exposure ---------- */
+function sunTimes(dateStr){
+  const L0=S.loc, off=S.data.offset*1000, mid=Date.parse(dateStr+"T00:00:00Z")-off; let rise=null,set=null,dusk=null,prev=null;
+  for(let m=240;m<=1320;m+=2){ const t=new Date(mid+m*60e3); const el=sunPos(t,L0.lat,L0.lon).elev*180/Math.PI;
+    if(prev!=null){ if(prev<-0.833 && el>=-0.833) rise=t; if(prev>=-0.833 && el<-0.833) set=t; if(prev>=-6 && el<-6) dusk=t; } prev=el; }
+  return {rise,set,dusk};
+}
+const clock = t => t? new Date(t.getTime()+S.data.offset*1000).toISOString().slice(11,16).replace(/^0/,"").replace(/^(\d+):(\d\d)$/,(m,h,mm)=>`${(+h%12)||12}:${mm}${+h<12?"a":"p"}`) : "—";
+function renderAfterWork(C, SIM){
+  const el = $("#workCard"); if(!el) return;
+  const nk = Date.now(); let d = todayStr(); let st = sunTimes(d);
+  if(st.dusk && nk > st.dusk.getTime()-30*60e3){ d = dateAdd(d,1); st = sunTimes(d); }
+  if(!st.set){ el.remove(); return; }
+  const light = st.rise && st.set ? (st.set-st.rise)/60e3 : null;
+  const duskH = +new Date(st.dusk.getTime()+S.data.offset*1000).toISOString().slice(11,13);
+  let best=null; for(let h=7; h<duskH; h++){ const x=at(C,SIM,d,h); if(!x || x.i < C.nowIdx || !x.sim) continue; const sc=scoreOf(x.sim); if(!best || sc>best.sc+0.05) best={h,sc,sim:x.sim,c:x.c}; }
+  const late = at(C,SIM,d,Math.max(15,duskH-1)); const isToday = d===todayStr();
+  const headlamp = new Date(st.dusk.getTime()-15*60e3);
+  el.innerHTML = `<div class="card-h"><h2>${isToday? "After-work ski" : "Tomorrow's light"}</h2><span class="muted">${light? Math.floor(light/60)+"h "+Math.round(light%60)+"m daylight" : ""}</span></div>
+    <div class="kv k3">
+      <div><div class="l">Sunset</div><div class="v num">${clock(st.set)}</div></div>
+      <div><div class="l">Last light</div><div class="v num">${clock(st.dusk)}</div></div>
+      <div><div class="l">Headlamp by</div><div class="v num" style="color:var(--warn)">${clock(headlamp)}</div></div>
+      ${best? `<div class="full"><div class="l">Best hour ${isToday? "left today" : "tomorrow"}</div><div class="v"><b>${hl(best.h)}–${hl(best.h+1)}</b> · ${best.sim.icon} ${best.sim.label} ${scoreChip(best.sc)} · ${fmtT(best.c.Te)}</div></div>`:""}
+      ${late?.sim? `<div class="full"><div class="l">At ${hl(Math.max(15,duskH-1))}</div><div class="v">${late.sim.icon} ${late.sim.label} ${scoreChip(scoreOf(late.sim))} · ${fmtT(late.c.Te)}, feels ${fmtT(late.sim.feels)}${late.sim.key==="firm"? " · refreezing, getting fast":""}</div></div>`:""}
+    </div>`;
+}
+function coldNote(c, sim){
+  if(!c || !sim || !isNum(sim.feels)) return null; const fF = sim.feels*9/5+32;
+  const frost = fF<=-48? "5 min" : fF<=-35? "10 min" : fF<=-18? "30 min" : null;
+  const nordic = !isAlp();
+  const layer = fF>=35? "Light layers." : fF>=20? (nordic? "Light base layer and a wind shirt." : "Base layer plus a shell.") : fF>=5? (nordic? "Warm base, wind-blocking top and front, hat and gloves." : "Insulated mid layer, shell, warm gloves.") : fF>=-10? (nordic? "Insulated layers, buff, lobster mitts; cover exposed skin." : "Full winter kit, face covering, mittens.") : "Full winter kit and limit exposed skin.";
+  if(fF>25 && !frost) return null;
+  return `${frost? `<b style="color:#ffb35c">Frostbite in ~${frost}</b> on exposed skin. ` : ""}${layer}${nordic && fF<20? " You'll run hot skiing hard, so start a little cold." : ""}`;
+}
+
+/* ---------- Skier trail reports ---------- */
+const REP_SURF = {powder:"❄️ Powder", packed:"🎿 Packed", firm:"🪨 Firm", icy:"🧊 Icy", soft:"💦 Soft/wet", crusty:"🥖 Crusty", slush:"💧 Slush"};
+S.reports = {}; S.favView = store.get("favView","snow");
+const myReports = () => store.get("myReports", {});
+async function loadReports(loc, force){ const R = S.reports[loc.name]; if(R && !force && Date.now()-R.t < 120e3) return R; try{ const r = await api(`/trail-reports?spot=${encodeURIComponent(loc.name)}`); S.reports[loc.name] = {t:Date.now(), list:r.reports||[]}; }catch(e){ S.reports[loc.name] = {t:Date.now(), list:[], err:true}; } return S.reports[loc.name]; }
+const ago = t => { const m=Math.round((Date.now()-t)/60e3); return m<60? `${Math.max(1,m)}m ago` : m<48*60? `${Math.round(m/60)}h ago` : `${Math.round(m/1440)}d ago`; };
+async function renderReports(){
+  const el = $("#repCard"); if(!el || !S.loc) return; const L0 = S.loc;
+  const title = byMode("Skier reports","Trail reports");
+  el.innerHTML = `<div class="card-h"><h2>${title}</h2><button class="btn primary" id="repNew" style="min-height:36px;padding:7px 14px">+ Check in</button></div><div id="repList"><div class="muted">Loading…</div></div>`;
+  $("#repNew").onclick = () => openReportSheet();
+  const R = await loadReports(L0); if(S.loc!==L0) return;
+  const list = (R.list||[]).filter(r=>Date.now()-r.t < 72*3600e3); const mine = myReports();
+  $("#repList").innerHTML = list.length? `<div class="list">${list.slice(0,8).map(r=>`<div class="rp">
+      <div class="rp-h"><b>${"★".repeat(r.rating)}<span style="color:#3a3a40">${"★".repeat(5-r.rating)}</span></b><span class="muted">${r.name? r.name+" · ":""}${ago(r.t)}</span></div>
+      <div class="rp-tags"><span>${REP_SURF[r.surface]||r.surface}</span><span>${r.groomed==="yes"? "Groomed" : r.groomed==="no"? "Not groomed" : "Grooming ?"}</span><span>${MODE_NAME[r.mode]}</span></div>
+      ${r.note? `<div class="rp-note">${r.note.replace(/</g,"&lt;")}</div>`:""}
+      ${r.photo? `<img class="rp-img" loading="lazy" src="/api/trail-reports/photo?id=${r.id}" alt="Trail photo">`:""}
+      ${mine[r.id]? `<button class="link" data-del="${r.id}" style="color:#ff6b6b;font-size:13px">Delete my report</button>`:""}
+    </div>`).join("")}</div>` : `<div class="muted">${R.err? "Couldn't load reports right now." : `No reports in the last 3 days. Be the first to check in after your ${byMode("run","ski")}.`}</div>`;
+  $("#repList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{ const id=b.dataset.del, tok=myReports()[id]; try{ await api(`/trail-reports?spot=${encodeURIComponent(L0.name)}`, {method:"DELETE", headers:{"content-type":"application/json"}, body:JSON.stringify({id, token:tok})}); const m=myReports(); delete m[id]; store.set("myReports",m); await loadReports(L0,true); renderReports(); toast("Report deleted"); }catch(e){ toast("Couldn't delete"); } });
+}
+async function shrinkPhoto(file){ const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(file); });
+  const sc = Math.min(1, 1280/Math.max(img.width,img.height)); const cv=document.createElement("canvas"); cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc); cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+  let q=.72, d=cv.toDataURL("image/jpeg",q); while(d.length>780000 && q>.35){ q-=.1; d=cv.toDataURL("image/jpeg",q); } return d; }
+function openReportSheet(){
+  const L0=S.loc; let rating=0, surface=null, groomed="unsure", photo=null;
+  $("#repBox").innerHTML = `<div class="muted" style="margin-bottom:10px">${L0.name} · ${MODE_NAME[S.mode]} · shared publicly with other Snowline skiers</div>
+    <div class="field">How did it ski?<div class="seg" id="rpRate">${[1,2,3,4,5].map(n=>`<button data-r="${n}">${"★".repeat(n)}</button>`).join("")}</div></div>
+    <div class="field">Surface<div class="chips" id="rpSurf">${Object.entries(REP_SURF).map(([k,v])=>`<button data-s="${k}">${v}</button>`).join("")}</div></div>
+    <div class="field">Groomed?<div class="seg" id="rpGroom"><button data-g="yes">Yes</button><button data-g="no">No</button><button data-g="unsure" class="on">Not sure</button></div></div>
+    <div class="field">Note (optional)<input id="rpNote" maxlength="280" placeholder="${byMode("e.g. wind buff up top, soft groomers by 1pm","e.g. fast skate lanes, classic tracks iced up")}"></div>
+    <div class="field">Name (optional)<input id="rpName" maxlength="30" value="${(store.get("repName","")||"").replace(/"/g,"")}" placeholder="First name"></div>
+    <label class="btn wide" style="display:block;text-align:center;margin-bottom:10px">📷 <span id="rpPhotoLbl">Add a photo</span><input type="file" accept="image/*" id="rpPhoto" style="display:none"></label>
+    <button class="btn primary wide" id="rpSend">Post report</button>`;
+  openSheet("repSheet");
+  const sel=(id,attr,cb)=>$(id).querySelectorAll("button").forEach(b=>b.onclick=()=>{ $(id).querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); cb(b.dataset[attr]); });
+  sel("#rpRate","r",v=>rating=+v); sel("#rpSurf","s",v=>surface=v); sel("#rpGroom","g",v=>groomed=v);
+  $("#rpPhoto").onchange = async e => { const f=e.target.files[0]; if(!f) return; $("#rpPhotoLbl").textContent="Processing…"; try{ photo = await shrinkPhoto(f); $("#rpPhotoLbl").textContent="Photo added ✓"; }catch(err){ photo=null; $("#rpPhotoLbl").textContent="Couldn't read that photo"; } };
+  $("#rpSend").onclick = async () => { if(!rating || !surface){ toast("Add a rating and the surface"); return; }
+    $("#rpSend").disabled=true; $("#rpSend").textContent="Posting…"; const name=$("#rpName").value.trim(); store.set("repName", name);
+    try{ const r = await api(`/trail-reports?spot=${encodeURIComponent(L0.name)}`, {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({rating, surface, groomed, mode:S.mode, note:$("#rpNote").value, name, photo})});
+      const m=myReports(); m[r.report.id]=r.token; store.set("myReports",m); closeSheet("repSheet"); toast("Thanks! Report posted"); await loadReports(L0,true); renderReports();
+    }catch(e){ $("#rpSend").disabled=false; $("#rpSend").textContent="Post report"; toast(e.body?.error || "Couldn't post right now"); } };
+}
+
+/* ---------- Road & sno-park ---------- */
+async function renderRoads(){
+  const el = $("#roadCard"); if(!el || !S.loc) return; const L0=S.loc;
+  if(!OREGON(L0.name)){ el.remove(); return; }
+  const sno = (NORDIC_SPOTS[L0.name]?.snopark) ; const m = new Date().getMonth(); const season = m>=10 || m<=3;
+  let r = null; try{ r = await api(`/roads?spot=${encodeURIComponent(L0.name)}&lat=${L0.lat}&lon=${L0.lon}`); }catch(e){}
+  if(S.loc!==L0) return;
+  const cams = r?.cams||[], sts = r?.stations||[], inc = r?.incidents||[];
+  const tF = c => isNum(c)? fmtT(c) : "—";
+  el.innerHTML = `<div class="card-h"><h2>Getting there</h2><span class="muted">${r?.route || "ODOT TripCheck"}</span></div>
+    ${sts.length? `<div class="list">${sts.map(x=>`<div class="li" style="min-height:44px;padding:8px 0;display:block"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b style="text-transform:capitalize">${x.name.toLowerCase()}</b><span class="muted">${x.mi} mi</span></div>
+        <div class="muted" style="font-size:14px">${tF(x.tempC)} at the road${isNum(x.snowIn)? ` · ${fmtSnow(x.snowIn,0)} snow beside it` : ""}${x.rate>0? " · snowing" : ""}</div>
+        ${x.restriction? `<div style="color:var(--warn);font-size:14px">⛓️ ${x.restriction}</div>`:""}${x.comments? `<div style="font-size:14px">${x.comments}</div>`:""}</div>`).join("")}</div>` : ""}
+    ${inc.length? `<div class="list">${inc.map(x=>`<div class="li" style="min-height:44px;padding:8px 0;display:block"><div style="font-size:14px">🚧 ${x.headline}</div><div class="muted" style="font-size:12px">${x.where} · ${x.mi} mi</div></div>`).join("")}</div>`
+      : r?.configured? `<div class="muted" style="margin:6px 0">No incidents reported nearby.</div>` : ""}
+    ${cams.length? `<div class="cams">${cams.map(c=>`<figure><a href="${c.page||c.img}" target="_blank" rel="noopener"><img loading="lazy" src="${c.img}" alt="${c.name}" onerror="this.closest('figure').remove()"></a><figcaption>${c.name} · ${c.mi} mi</figcaption></figure>`).join("")}</div><div class="muted" style="font-size:11px">Road data and cameras courtesy of ODOT TripCheck</div>`:""}
+    ${sno && season? `<div class="callout" style="margin:10px 0 0">🅿️ <b>Sno-Park permit required</b> Nov 1–Apr 30 ($4 day · $9 3-day · $25 season). <a href="${r?.links?.snopark || "https://www.oregon.gov/odot/DMV/Pages/Vehicle/sno_park_permits.aspx"}" target="_blank" rel="noopener">Buy online ↗</a></div>`:""}
+    <div class="row" style="gap:8px;margin-top:10px;flex-wrap:nowrap"><a class="btn" style="flex:1;text-align:center;text-decoration:none" href="https://www.tripcheck.com/" target="_blank" rel="noopener">TripCheck map ↗</a><a class="btn" style="flex:1;text-align:center;text-decoration:none" href="https://www.tripcheck.com/Pages/Chain-Law" target="_blank" rel="noopener">Chain rules ↗</a></div>`;
+}
+
+/* ---------- Wax box ---------- */
+const WAX_PRESETS = [
+  {name:"Cold glide (green)", type:"glide", lo:-30, hi:-10}, {name:"Mid glide (blue)", type:"glide", lo:-12, hi:-5}, {name:"Universal glide (violet)", type:"glide", lo:-6, hi:-1}, {name:"Warm glide (red/yellow)", type:"glide", lo:-2, hi:4},
+  {name:"Green kick", type:"kick", lo:-30, hi:-8}, {name:"Blue kick", type:"kick", lo:-10, hi:-2}, {name:"Violet kick", type:"kick", lo:-3, hi:0}, {name:"Red kick", type:"kick", lo:-1, hi:2},
+  {name:"Blue (ice) klister", type:"klister", lo:-15, hi:-1}, {name:"Universal klister", type:"klister", lo:-3, hi:4}, {name:"Red (wet) klister", type:"klister", lo:0, hi:10},
+];
+const waxKit = () => store.get("waxkit", []);
+function fromKit(c, sim){
+  const kit = waxKit(); if(!kit.length || !c || !sim) return null; const T = c.Te, log = waxLog();
+  const rank = (w) => { const mid=(w.lo+w.hi)/2, inR = T>=w.lo-1 && T<=w.hi+1; const good = log.filter(x=>x.wax===w.name && x.rating>=4).length, bad = log.filter(x=>x.wax===w.name && x.rating<=2).length; return inR ? 10 - Math.abs(T-mid)/4 + good*1.5 - bad*2 : -99; };
+  const best = (type) => kit.filter(w=>w.type===type).map(w=>({w, s:rank(w)})).filter(x=>x.s>-50).sort((a,b)=>b.s-a.s)[0]?.w || null;
+  const needsKlister = ["firm","ice","corn","slush","soft","rain"].includes(sim.key) || T > 1;
+  return { glide: best("glide"), kick: S.mode==="classic" ? (needsKlister ? (best("klister") || best("kick")) : (best("kick") || best("klister"))) : null };
+}
+function renderWaxBox(el){
+  const kit = waxKit(); const u = v => imp()? Math.round(v*9/5+32)+"°" : v+"°";
+  el.innerHTML = `${kit.length? `<div class="list">${kit.map((w,i)=>`<div class="li" style="min-height:44px"><span class="nm"><b>${w.name}</b><small>${w.type} · ${u(w.lo)} to ${u(w.hi)}</small></span><button class="link" data-rm="${i}" style="color:#ff6b6b">Remove</button></div>`).join("")}</div>` : `<div class="muted" style="margin-bottom:8px">Add the waxes you own, and Snowline picks from your box.</div>`}
+    <div class="grp">Quick add</div><div class="chips" id="wkPre">${WAX_PRESETS.filter(p=>S.mode==="classic" || p.type==="glide").filter(p=>!kit.some(k=>k.name===p.name)).map((p,i)=>`<button data-p="${WAX_PRESETS.indexOf(p)}">+ ${p.name}</button>`).join("")}</div>
+    <div class="grp">Add your own</div>
+    <div class="field">Name (from the label)<input id="wkName" placeholder="e.g. Swix VR40"></div>
+    <div class="form2"><div class="field">Type<select id="wkType"><option value="glide">Glide</option>${S.mode==="classic"? `<option value="kick">Kick</option><option value="klister">Klister</option>`:""}</select></div><div class="field">Range (${imp()?"°F":"°C"}, from label)<div class="row" style="gap:6px;flex-wrap:nowrap"><input id="wkLo" type="number" inputmode="numeric" placeholder="from" style="min-width:0"><input id="wkHi" type="number" inputmode="numeric" placeholder="to" style="min-width:0"></div></div></div>
+    <button class="btn wide" id="wkAdd">Add to wax box</button>`;
+  const save = k => { store.set("waxkit", k); renderWaxBox(el); };
+  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ const k=waxKit(); k.splice(+b.dataset.rm,1); save(k); });
+  el.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{ const k=waxKit(); k.push({...WAX_PRESETS[+b.dataset.p]}); save(k); toast("Added to wax box"); });
+  $("#wkAdd").onclick = () => { const n=$("#wkName").value.trim(); let lo=+$("#wkLo").value, hi=+$("#wkHi").value; if(!n || $("#wkLo").value==="" || $("#wkHi").value===""){ toast("Add a name and temperature range"); return; }
+    if(imp()){ lo=Math.round((lo-32)*5/9); hi=Math.round((hi-32)*5/9); } if(lo>hi) [lo,hi]=[hi,lo]; const k=waxKit(); k.push({name:n, type:$("#wkType").value, lo, hi}); save(k); toast("Added to wax box"); };
+}
+
+/* ---------- Unified alerts (one rule list → banner + lock screen) ---------- */
+const ALERT_WIN = {h24:"24 hr", d3:"3 days", d5:"5 days", d10:"10 days"};
+function ruleLabel(r){ const sp = r.spot==="*favs"? "Any favorite" : r.spot==="*all"? "Any spot" : r.spot.replace(/,\s*[A-Z]{2}$/,""); return r.type==="overnight" ? `${sp}: ≥ ${fmtSnow(r.inches,0)} overnight` : `${sp}: ≥ ${fmtSnow(r.inches,0)} in ${ALERT_WIN[r.win||"d3"]}`; }
+function evalAlerts(F){
+  const hits = [];
+  for(const r of activeRules()){
+    const pool = r.spot === "*favs" ? F.rows.filter(x=>S.favs.some(f=>f.name===x.spot.name)) : r.spot === "*all" ? F.rows : F.rows.filter(x=>x.spot.name===r.spot);
+    for(const x of pool){ const v = r.type==="overnight" ? x.last24 : x[r.win||"d3"]; if(isNum(v) && v >= r.inches) hits.push({r, x, v, w: r.type==="overnight"? "the last 24 hr" : ALERT_WIN[r.win||"d3"]}); }
+  }
+  return hits;
+}
+function pushSpots(){ const L = S.favs.length? S.favs : (S.loc? [S.loc] : []); return L.slice(0,6).map(x=>({name:x.name, lat:x.lat, lon:x.lon, base:x.base, top:x.top})); }
+function pushRules(){ const all=[...S.favs, ...PRESETS]; return activeRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
+async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","summit"), nowcast: store.get("ncOn", true)}})}); }catch(e){} }
+function renderAlerts(){
+  const el = $("#view-alerts"); const spots = finderSpots(); const on = store.get("pushOn", false);
+  if(!alertRules().length && !store.get("alertsSeeded")){ store.set("alerts", [{spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); store.set("alertsSeeded", 1); }
+  const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const sw = (id, title, sub, onv) => `<div class="al-row"><div><b>${title}</b><div class="muted">${sub}</div></div><button class="tog ${onv?"on":""}" id="${id}" role="switch" aria-checked="${onv}" aria-label="${title}"><i></i></button></div>`;
+  const briefOn = store.get("brief","snow") !== "off";
+  const master = isIOS && !standalone ? `<div class="al-note">To get these on your lock screen, add Snowline to your Home Screen (Share → <b>Add to Home Screen</b>), open it from there, and come back here.</div>`
+    : !supported ? `<div class="al-note">This browser can't show lock-screen notifications. Alerts still show at the top of the Forecast tab.</div>`
+    : `<div class="al-row"><div><b>Lock-screen notifications</b><div class="muted">${on? "On · checked around 6am each morning" : "Off · alerts only show inside the app"}</div></div><button class="btn ${on?"":"primary"}" id="pToggle" style="flex:0 0 auto">${on? "Turn off" : "Turn on"}</button></div>`;
+  el.innerHTML = `<div class="vh"><h1>Alerts</h1></div>
+    <div class="card al-card">${master}
+      ${sw("ncTog", "Snow starting", "A heads-up about an hour before snow starts at a favorite", store.get("ncOn", true))}
+      ${sw("watchTog", "Storm watch", "A heads-up when 8″+ is coming to a favorite 2–5 days out, ready to share", store.get("watch", true))}
+      ${sw("powderTog", "Powder alert", `${fmtSnow(4,0)}+ overnight or ${fmtSnow(8,0)}+ in the next 3 days at any favorite`, store.get("powderOn", true))}
+      ${sw("briefTog", "Morning brief", "Around 6am: overnight snow, more today, grooming and the temperature up top", briefOn)}
+      ${briefOn? `<div class="seg sm" id="briefSeg" style="margin:2px 0 6px">${[["snow","Snow days"],["daily","Every day"]].map(([k,l])=>`<button data-b="${k}" class="${store.get("brief","snow")===k?"on":""}">${l}</button>`).join("")}</div>` : ""}
+      <div class="al-row al-band"><div><b>Check snow at</b><div class="muted">The elevation alerts and the brief use at each favorite</div></div></div>
+      <div class="seg sm" id="bandAl" style="margin:0 0 6px">${[["base","Base"],["mid","Mid"],["summit","Summit"]].map(([k,l])=>`<button data-k="${k}" class="${store.get("alertBand","summit")===k?"on":""}">${l}</button>`).join("")}</div>
+      ${on? `<button class="link" id="pTest" style="padding-left:0;margin-top:6px">Send a test notification</button>` : ""}
+      <div id="aHits"></div></div>
+    <details class="sec" id="customAl"><summary><span class="ttl">Custom alerts</span><span class="sv">${alertRules().filter(r=>r.spot!=="*favs").length || "Add your own"}</span></summary><div class="sec-b">
+      <div class="list" id="aList"></div>
+      <div class="grp">Add an alert</div>
+      <div class="field">Spot<select id="aSpot"><option value="*favs">Any favorite</option><option value="*all">Any spot</option>${spots.map(s=>`<option>${s.name}</option>`).join("")}</select></div>
+      <div class="form2"><div class="field">When<select id="aType"><option value="overnight">Overnight snow</option><option value="forecast" selected>Forecast</option></select></div><div class="field">At least (${imp()?"in":"cm"})<input id="aIn" type="number" inputmode="decimal" value="${imp()?6:15}"></div></div>
+      <div class="field" id="aWinF">Within<select id="aWin">${Object.entries(ALERT_WIN).map(([k,l])=>`<option value="${k}" ${k==="d3"?"selected":""}>${l}</option>`).join("")}</select></div>
+      <button class="btn primary wide" id="aAdd">Add alert</button></div></details>`;
+  const list = () => { const rs = alertRules();
+    $("#aList").innerHTML = rs.length? rs.map((r,i)=>`<div class="li"><span class="nm"><b>${r.type==="overnight"? "🌙" : "🌨"} ${ruleLabel(r)}</b></span><button class="link" data-del="${i}" style="color:#ff6b6b">Remove</button></div>`).join("") : `<div class="muted" style="padding:8px 0">No alerts yet.</div>`;
+    $("#aList").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ const r=alertRules(); r.splice(+b.dataset.del,1); store.set("alerts",r); list(); checkAlerts(); pushSync(); });
+    if(activeRules().length) loadFinder().then(F=>{ const h=evalAlerts(F); $("#aHits").innerHTML = `<div class="grp">Matching now</div>` + (h.length? h.slice(0,6).map(x=>`<div class="li"><span class="nm"><b>✅ ${x.x.spot.name}</b><small>${fmtSnow(x.v)} in ${x.w}</small></span></div>`).join("") : `<div class="muted" style="padding:8px 0">Nothing meets your alerts yet.</div>`); }).catch(()=>{});
+    else $("#aHits").innerHTML = ""; };
+  list();
+  $("#aType").onchange = () => { $("#aWinF").style.display = $("#aType").value==="overnight"? "none" : ""; };
+  $("#aAdd").onclick = () => { const v=+$("#aIn").value; if(!(v>0)) return; const r=alertRules(); r.push({spot:$("#aSpot").value, type:$("#aType").value, inches: imp()? v : v/2.54, win:$("#aWin").value}); store.set("alerts", r); list(); checkAlerts(); pushSync(); toast("Alert added"); };
+  const post = (b) => api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(b)});
+  const pt = $("#pToggle"); if(pt) pt.onclick = async () => {
+    if(on){ try{ const sub = await pushSub(); if(sub){ await post({action:"unsubscribe", endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); } }catch(e){} store.set("pushOn", false); toast("Lock-screen alerts off"); renderAlerts(); return; }
+    try{ const perm = await Notification.requestPermission(); if(perm!=="granted"){ toast("Notifications are blocked in Settings"); return; }
+      const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
+      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","summit"), nowcast: store.get("ncOn", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
+    }catch(e){ toast("Couldn't turn on notifications"); } };
+  document.querySelectorAll("#briefSeg button").forEach(b=>b.onclick=()=>{ store.set("brief", b.dataset.b); document.querySelectorAll("#briefSeg button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(b.dataset.b==="off"? "Morning brief off" : b.dataset.b==="daily"? "Morning brief every day" : "Morning brief on snow days"); });
+  const flip = (id, get, set, msg) => { const b = $("#"+id); if(b) b.onclick = () => { const v = !get(); set(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); pushSync(); toast(msg(v)); }; };
+  flip("ncTog", ()=>store.get("ncOn", true), v=>store.set("ncOn", v), v=>v? "Snow-starting alerts on" : "Snow-starting alerts off");
+  flip("watchTog", ()=>store.get("watch", true), v=>store.set("watch", v), v=>v? "Storm watch on" : "Storm watch off");
+  flip("powderTog", ()=>store.get("powderOn", true), v=>{ store.set("powderOn", v); if(v && !alertRules().some(r=>r.spot==="*favs")) store.set("alerts", [...alertRules(), {spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); checkAlerts(); }, v=>v? "Powder alert on" : "Powder alert off");
+  document.querySelectorAll("#bandAl button").forEach(b=>b.onclick=()=>{ store.set("alertBand", b.dataset.k); document.querySelectorAll("#bandAl button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(`Alerts now check snow at ${b.textContent.toLowerCase()} elevation`); });
+  const bt = $("#briefTog"); if(bt) bt.onclick = () => { store.set("brief", store.get("brief","snow")==="off"? "snow" : "off"); pushSync(); renderAlerts(); toast(store.get("brief")==="off"? "Morning brief off" : "Morning brief on snow days"); };
+  const tb = $("#pTest"); if(tb) tb.onclick = async () => { try{ const sub = await pushSub(); const r = await post({action:"test", endpoint:sub?.endpoint}); toast(r.ok? "Test sent" : "Test failed"); }catch(e){ toast("Test failed"); } };
+}
+
+/* ---------- Forecast vs. actual ---------- */
+function renderTrack(){
+  const el = $("#trackCard"); if(!el) return; const v = S.extras[S.loc?.name]?.verify;
+  if(!v || (v.status!=="ok" && !(v.storms||[]).length)){ el.innerHTML = ""; return; }
+  const st = (v.storms||[]).filter(x=>!x.ongoing), R = v.record, sn = v.station.name;
+  const range = (a,b) => a===b? md(a) : `${md(a)}–${md(b)}`;
+  const verdict = (f,o) => { if(o < 1) return {t:"—", c:"var(--mute)"}; const d = f-o; return Math.abs(d) <= Math.max(2, 0.25*o)? {t:"Close", c:"#6ee7a0"} : d>0? {t:"Too high", c:"#ffb35c"} : {t:"Too low", c:"#ffb35c"}; };
+  // 1. Snowline's own record (against the resort's own report first, where we have it)
+  const RR = v.resort, rr = RR?.record, rl = (RR?.storms||[]).find(x=>x.snowline!=null && !x.ongoing);
+  const resortHero = rr? `<div class="ac-hero"><div class="ac-big num">${rr.within}<small>/${rr.storms}</small></div><div><b>storms within 2″ of ${RR.name}'s report</b><br><span class="muted">Average miss ${fmtSnow(rr.avgErr)}${rl? ` · last storm: reported ${fmtSnow(rl.reported,0)}, Snowline said ${fmtSnow(rl.snowline,0)}` : ""}</span></div></div>`
+    : RR? `<div class="muted" style="margin:0 0 10px;font-size:13px">Snowline is also logging ${RR.name}'s daily snow report; grades against it start with the next storm.</div>` : "";
+  const rec = R && R.storms? `<div class="ac-hero"><div class="ac-big num">${R.within}<small>/${R.storms}</small></div><div><b>storms within 2″</b> (or 25% on big ones)<br><span class="muted">Average miss ${fmtSnow(R.avgErr)}${R.bias? ` · ran ${R.bias>1.08? Math.round((R.bias-1)*100)+"% high" : R.bias<0.92? Math.round((1-R.bias)*100)+"% low" : "about even"}` : ""}</span></div></div>`
+    : `<div class="ac-hero"><div class="ac-big">🎯</div><div><b>Snowline keeps score here</b><br><span class="muted">Every morning it saves its forecast for ${esc(sn)}, then grades it against what the gauge measures. The first grades come after the next storm.</span></div></div>`;
+  // 2. who has been right, by how far ahead
+  const B = v.bestByLead || {}, SL = v.scoresByLead || {};
+  const leadRow = (L, lab) => { const id = B[L]; if(!id) return ""; const s = SL[L]?.[id]; return `<div class="ac-lr"><span>${lab}</span><b>${MNAME(id)}</b><span class="muted">${s? `avg miss ${imp()? (s.mae/25.4).toFixed(2)+"″" : (s.mae/10).toFixed(1)+" cm"} water` : ""}</span></div>`; };
+  const leads = v.status==="ok"? `<div class="grp">Closest models here${v.basis==="last-season"? " · last winter" : " · last 90 days"}</div>${leadRow(1,"Tomorrow")}${leadRow(3,"3 days out")}${leadRow(5,"5+ days out")}` : "";
+  // 3. last storm
+  let last = "";
+  if(st.length){ const L0 = st[0], s1 = L0.snowline?.s, vd = verdict(isNum(s1)? s1 : L0.fcstSnow, L0.obsSnow), maxV = Math.max(L0.fcstHi, L0.obsSnow, s1||0, 1);
+    const bar = (val, col, lab) => `<div class="tk-row"><span class="tk-l">${lab}</span><div class="tk-bar"><i style="width:${Math.max(3,val/maxV*100)}%;background:${col}"></i></div><b class="num">${fmtSnow(val,0)}</b></div>`;
+    last = `<div class="grp">Last storm · ${range(L0.start,L0.end)}<span style="float:right;color:${vd.c};text-transform:none;letter-spacing:0">${vd.t}</span></div>
+      ${isNum(s1)? bar(s1, "#38bdf8", "Snowline") : ""}${bar(L0.fcstSnow, "#5a6b85", "Models avg")}${bar(L0.obsSnow, "#e6edf7", "Measured")}
+      ${L0.obsSnow >= 2 || rl? `<button class="btn wide" style="margin:8px 0 4px" onclick="openRecapSheet()">📣 Share the storm recap</button>` : ""}
+      <div class="muted" style="margin:2px 0 4px;font-size:13px">Models ranged ${fmtSnow(L0.fcstLo,0)}–${fmtSnow(L0.fcstHi,0)}${L0.closest? ` · closest: <b style="color:var(--text)">${MNAME(L0.closest.id)}</b> (${fmtSnow(L0.closest.s,0)})` : ""}</div>
+      ${st.length>1? `<div class="list" style="margin-top:6px">${st.slice(1,5).map(x=>{ const f = isNum(x.snowline?.s)? x.snowline.s : x.fcstSnow, w=verdict(f,x.obsSnow); return `<div class="li" style="min-height:40px"><span class="nm">${range(x.start,x.end)}</span><span class="muted" style="white-space:nowrap">${fmtSnow(f,0)} ${isNum(x.snowline?.s)? "Snowline" : "fcst"} · ${fmtSnow(x.obsSnow,0)} fell</span><b style="color:${w.c};margin-left:10px;font-size:12px;white-space:nowrap">${w.t}</b></div>`; }).join("")}</div>` : ""}`; }
+  el.dataset.sv = rr? `${rr.within} of ${rr.storms} storms within 2″` : R && R.storms? `${R.within} of ${R.storms} storms within 2″` : v.status==="ok"? "Model scorecard" : "Last storms";
+  el.innerHTML = `<div class="card-h"><h2>Forecast accuracy${tipI("accuracy")}</h2></div><div class="muted" style="margin:-4px 0 10px;font-size:13px">Graded at the ${esc(sn)} snow gauge, ${fmtEl(v.station.elevFt/FT)}</div>
+    ${resortHero}${rr? "" : rec}${leads}${last}
+    <a class="link" href="/accuracy" style="display:inline-block;margin:10px 0 0;font-weight:600">See every Central Oregon spot ›</a>
+    <div class="muted" style="margin-top:10px;font-size:12px">Snowline uses this: models that have been right here get more say, separately for tomorrow and the days after, and models that run wet or dry here are corrected${v.slrFix && v.slrFix!==1? `. Snow-to-water ratio tuned to this gauge (${v.slrFix>1? "+" : ""}${Math.round((v.slrFix-1)*100)}%)` : ""}.</div>`;
+}
+
+/* ---------- Measured snow map layer ---------- */
+let snotelLayer = null, snotelFor = null;
+async function showSnotel(){
+  if(!bigMap) return; const c = bigMap.getCenter(); const k = `${Math.round(c.lat*2)/2},${Math.round(c.lng*2)/2}`;
+  if(snotelLayer && snotelFor===k){ snotelLayer.addTo(bigMap); return; }
+  let j; try{ j = await api(`/snowmap?lat=${c.lat.toFixed(2)}&lon=${c.lng.toFixed(2)}`); }catch(e){ toast("Couldn't load SNOTEL stations"); return; }
+  if(!document.querySelector('#mapLayers [data-l="lySnotel"]')?.classList.contains("on")) return;
+  if(snotelLayer) snotelLayer.remove(); snotelLayer = L.layerGroup(); snotelFor = k;
+  const col = d => d>=60? "#a78bfa" : d>=36? "#5aa2ff" : d>=18? "#38bdf8" : d>=6? "#86efac" : d>0? "#fde68a" : "#6b7280";
+  (j.stations||[]).forEach(x=>{
+    const lab = x.new24>=1? `+${fmtSnow(x.new24,0)}` : fmtSnow(x.depth,0);
+    const icon = L.divIcon({className:"", html:`<div class="sn-pin" style="background:${col(x.depth)}">${lab}</div>`, iconSize:null});
+    L.marker([x.lat,x.lon],{icon}).bindPopup(`<b>${x.name}</b> · ${fmtEl(x.elevFt/FT)}<br>Depth <b>${fmtSnow(x.depth,0)}</b><br>New snow: ${x.new24==null?"—":fmtSnow(x.new24,0)} (24h) · ${x.new72==null?"—":fmtSnow(x.new72,0)} (72h)<br><span style="color:#888">SNOTEL · ${x.updated? String(x.updated).slice(5,16).replace("-","/") : ""}</span><br><a href="#" class="sn-go" data-lat="${x.lat}" data-lon="${x.lon}" data-n="${encodeURIComponent(x.name+" SNOTEL")}" data-e="${x.elevFt}">Forecast here →</a>`).addTo(snotelLayer);
+  });
+  snotelLayer.addTo(bigMap);
+  $("#mapStatus").innerHTML = `Measured snow at ${j.stations?.length||0} SNOTEL stations · pins show new snow in the last 24h, or depth`;
+}
+document.addEventListener("click", e=>{ const a=e.target.closest?.(".sn-go"); if(!a) return; e.preventDefault(); const el=+a.dataset.e; location.hash="forecast"; load({name:decodeURIComponent(a.dataset.n), lat:+a.dataset.lat, lon:+a.dataset.lon, base:el, top:el+300}); });
+
+/* ================= FEATURES v6 ================= */
+/* ---------- Resort webcam links (link out; resorts own their images) ---------- */
+const CAM_LINKS = {
+  "Mt. Bachelor, OR": [["Mt. Bachelor webcams","https://www.mtbachelor.com/the-mountain/webcams/"]],
+  "Mt. Bachelor Nordic Center, OR": [["Mt. Bachelor webcams (incl. Nordic Center)","https://www.mtbachelor.com/the-mountain/webcams/"]],
+  "Timberline, OR": [["Timberline webcams","https://www.timberlinelodge.com/conditions"]],
+  "Mt. Washington Alpine, BC": [["Mt. Washington webcams","https://www.mountwashington.ca/mtn-cams.html"]],
+  "Hoodoo, OR": [["Hoodoo webcams","https://www.onthesnow.com/oregon/hoodoo-ski-area/webcams"]],
+  "Willamette Pass, OR": [["Willamette Pass webcams","https://www.onthesnow.com/oregon/willamette-pass/webcams"]],
+  "Mt. Hood Meadows, OR": [["Mt. Hood Meadows webcams","https://www.onthesnow.com/oregon/mt-hood-meadows/webcams"]],
+  "Mt. Ashland, OR": [["Mt. Ashland webcams","https://www.onthesnow.com/oregon/mount-ashland/webcams"]],
+  "Crystal Mountain, WA": [["Crystal webcams","https://www.onthesnow.com/washington/crystal-mountain-wa/webcams"]],
+  "Stevens Pass, WA": [["Stevens Pass webcams","https://www.onthesnow.com/washington/stevens-pass-resort/webcams"]],
+  "Mt. Baker, WA": [["Mt. Baker webcams","https://www.onthesnow.com/washington/mt-baker/webcams"]],
+  "Whistler Blackcomb, BC": [["Whistler webcams","https://www.onthesnow.com/british-columbia/whistler-blackcomb/webcams"]],
+};
+function camLinksHTML(){ const L0=S.loc; const links = CAM_LINKS[L0?.name]||[]; const road = OREGON(L0?.name||"");
+  if(!links.length && !road) return "";
+  return `<div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">${links.map(([t,u])=>`<a class="btn" style="text-decoration:none" href="${u}" target="_blank" rel="noopener">📷 ${t} ↗</a>`).join("")}${road? `<button class="btn" id="camMapBtn">🗺️ Cameras on map</button>`:""}</div>`; }
+function wireCamLinks(){ const b=$("#camMapBtn"); if(b) b.onclick=()=>{ const ch=document.querySelector('#mapLayers [data-l="lyCams"]'); if(ch && !ch.classList.contains("on")) ch.classList.add("on"); location.hash="maps"; setTimeout(()=>{ if(bigMap){ bigMap.setView([S.loc.lat,S.loc.lon],10); applyLayers(); } },350); }; }
+
+/* ---------- Slope aspect ---------- */
+const ASPECT_COLORS = [["N",[37,99,235]],["NE",[56,189,248]],["E",[52,211,153]],["SE",[250,204,21]],["S",[249,115,22]],["SW",[239,68,68]],["W",[168,85,247]],["NW",[99,102,241]]];
+let aspectLayer;
+function aspectPaint(s,a){ if(s<12) return null; const k=Math.round(a/45)%8; return [...ASPECT_COLORS[k][1], s>=30? 200 : 140]; }
+
+/* ---------- Satellite (NASA GIBS GOES-West GeoColor) ---------- */
+let satLayers=[], satTimer=null;
+function startSat(){
+  if(satTimer || !bigMap) return;
+  const base = Date.now()-35*60e3; const frames=[];
+  for(let k=5;k>=0;k--){ const t=new Date(base-k*10*60e3); t.setUTCMinutes(Math.floor(t.getUTCMinutes()/10)*10,0,0); frames.push(t); }
+  satLayers = frames.map(t=>L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/${t.toISOString().slice(0,19)}Z/GoogleMapsCompatible_Level7/{z}/{y}/{x}.jpg`, {opacity:0, maxNativeZoom:7, maxZoom:15, attribution:"Satellite: NASA GIBS / NOAA GOES-West"}).addTo(bigMap));
+  let k=0; const lab=$("#satTime");
+  satTimer = setInterval(()=>{ satLayers.forEach((l,i)=>l.setOpacity(i===k? .85 : 0)); if(lab) lab.textContent = "Satellite " + frames[k].toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}) + (k===frames.length-1? " (latest)" : ""); k=(k+1)%frames.length; }, 800);
+}
+function stopSat(){ clearInterval(satTimer); satTimer=null; satLayers.forEach(l=>l.remove()); satLayers=[]; const t=$("#satTime"); if(t) t.textContent=""; }
+
+/* ---------- Forecast radar (model precipitation, next 24h) ---------- */
+let fcrLayer=null, fcrTimer=null, fcrFor=null;
+async function startFcRadar(){
+  if(!bigMap) return; const c=bigMap.getCenter(); const key=`${c.lat.toFixed(1)},${c.lng.toFixed(1)}`;
+  if(fcrLayer && fcrFor===key){ fcrLayer.g.addTo(bigMap); if(!fcrTimer) playFc(); return; }
+  stopFcRadar(true); const lab=$("#fcrTime"); if(lab) lab.textContent="Loading forecast radar…";
+  const N=14, dLat=0.13, dLon=0.18, pts=[];
+  for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([c.lat+(a-(N-1)/2)*dLat, c.lng+(b-(N-1)/2)*dLon]);
+  let j; try{ j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=precipitation,temperature_2m&forecast_hours=24&timezone=auto`); }catch(e){ if(lab) lab.textContent="Forecast radar unavailable"; return; }
+  if(!document.querySelector('#mapLayers [data-l="lyFcRadar"]')?.classList.contains("on")) return;
+  if(!Array.isArray(j)) j=[j];
+  const g=L.layerGroup(); const rects=pts.map((p,i)=>L.rectangle([[p[0]-dLat/2,p[1]-dLon/2],[p[0]+dLat/2,p[1]+dLon/2]],{stroke:false, fillOpacity:0, interactive:false}).addTo(g));
+  fcrLayer={g, rects, data:j, times:j[0].hourly.time}; fcrFor=key; g.addTo(bigMap); playFc();
+}
+function fcColor(p,t){ if(p<0.1) return null; const snow=t<=0.5; const lv = p<0.5?0:p<1.5?1:p<3?2:3;
+  return snow? ["#bfdbfe","#60a5fa","#3b82f6","#a78bfa"][lv] : ["#bbf7d0","#4ade80","#facc15","#f97316"][lv]; }
+function playFc(){
+  if(!fcrLayer) return; let k=0; const T=fcrLayer.times.length; const lab=$("#fcrTime");
+  const step=()=>{ fcrLayer.rects.forEach((r,i)=>{ const H=fcrLayer.data[i]?.hourly; const p=H?.precipitation?.[k]??0, t=H?.temperature_2m?.[k]??5; const col=fcColor(p,t); r.setStyle(col? {fillColor:col, fillOpacity:Math.min(.75,.35+p/6)} : {fillOpacity:0}); });
+    const tt=fcrLayer.times[k]; if(lab) lab.innerHTML = `Forecast radar · <b>${dow(tt.slice(0,10))} ${hl(+tt.slice(11,13))}</b> <span style="color:#60a5fa">■</span> snow <span style="color:#4ade80">■</span> rain`;
+    k=(k+1)%T; };
+  step(); fcrTimer=setInterval(step, 650);
+}
+function stopFcRadar(keep){ clearInterval(fcrTimer); fcrTimer=null; if(fcrLayer){ fcrLayer.g.remove(); if(!keep){} } const t=$("#fcrTime"); if(t && !keep) t.textContent=""; }
+
+/* ---------- Powder finder map ---------- */
+let powderLayer=null;
+async function showPowder(){
+  if(!bigMap) return; let F; try{ F = await loadFinder(); }catch(e){ toast("Couldn't load the powder finder"); return; }
+  if(!document.querySelector('#mapLayers [data-l="lyPowder"]')?.classList.contains("on")) return;
+  if(powderLayer) powderLayer.remove(); powderLayer=L.layerGroup();
+  const k = "d"+S.win; const mx = Math.max(1, ...F.rows.map(r=>r[k]||0));
+  F.rows.forEach(r=>{ const v=r[k]||0; const sz = 26 + 26*Math.sqrt(v/mx);
+    const icon=L.divIcon({className:"", html:`<div class="pw-pin" style="width:${sz}px;height:${sz}px;background:${snowColor(v)==="transparent"? "rgba(148,163,184,.6)" : snowColor(v)}">${fmtSnow(v,0)}</div>`, iconSize:null});
+    L.marker([r.spot.lat, r.spot.lon], {icon}).bindPopup(`<b>${r.spot.name}</b><br>${S.win}-day snow: <b>${fmtSnow(v)}</b> (summit)<br>Last 24h: ${fmtSnow(r.last24||0)}<br><a href="#" class="pw-go" data-n="${encodeURIComponent(r.spot.name)}">Open forecast →</a>`).addTo(powderLayer); });
+  powderLayer.addTo(bigMap);
+  const best = [...F.rows].sort((a,b)=>(b[k]||0)-(a[k]||0))[0];
+  $("#mapStatus").innerHTML = best? `Most snow in ${S.win} days: <b>${best.spot.name.replace(/,\s*[A-Z]{2}$/,"")}</b> · ${fmtSnow(best[k])}` : "";
+}
+document.addEventListener("click", e=>{ const a=e.target.closest?.(".pw-go"); if(!a) return; e.preventDefault(); const n=decodeURIComponent(a.dataset.n); const sp=finderSpots().find(x=>x.name===n); if(sp){ location.hash="forecast"; load(sp); } });
+
+/* ---------- ODOT cameras on the map ---------- */
+let camLayer=null, camFor=null;
+async function showCams(){
+  if(!bigMap) return; const b=bigMap.getBounds(); const box=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v=>v.toFixed(2));
+  const key=box.map(v=>Math.round(v*4)/4).join(","); if(camLayer && camFor===key){ camLayer.addTo(bigMap); return; }
+  if(b.getEast()-b.getWest() > 6){ $("#mapStatus").textContent = "Zoom in to see road cameras"; return; }
+  let j; try{ j = await api(`/cams?bounds=${box.join(",")}`); }catch(e){ return; }
+  if(!document.querySelector('#mapLayers [data-l="lyCams"]')?.classList.contains("on")) return;
+  if(camLayer){ camLayer.remove(); camLayer._off?.(); } camFor=key;
+  const seen = new Set(), rc = Object.values(RESORT_CAMS).flat().filter(c=>c && isNum(c.lat) && !seen.has(c.id) && seen.add(c.id) && b.pad(.2).contains([c.lat,c.lon]));
+  const all = [...rc, ...(j.cams||[])]; camLayer = camCallouts(bigMap, all);
+  $("#mapStatus").textContent = `${all.length} cameras in view · tap one to see it, or a group to zoom in`;
+}
+
+/* ---------- Share a favorites list ---------- */
+const b64e = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const b64d = s => decodeURIComponent(escape(atob(s.replace(/-/g,"+").replace(/_/g,"/"))));
+async function shareFavs(){
+  const list = S.favs.length? S.favs : []; if(!list.length){ toast("Add some favorites first"); return; }
+  const url = `${location.origin}/?list=${b64e(JSON.stringify(list.slice(0,20).map(f=>[f.name, +f.lat.toFixed(4), +f.lon.toFixed(4), Math.round(f.base), Math.round(f.top)])))}`;
+  try{ if(navigator.share){ await navigator.share({title:"My Snowline spots", text:`${list.length} spots I watch on Snowline`, url}); return; } }catch(e){ if(e.name==="AbortError") return; }
+  try{ await navigator.clipboard.writeText(url); toast("Link copied"); }catch(e){ prompt("Copy this link", url); }
+}
+function checkSharedList(){
+  const q=new URLSearchParams(location.search).get("list"); if(!q) return;
+  let L0; try{ L0 = JSON.parse(b64d(q)).filter(x=>Array.isArray(x) && x.length===5).map(([name,lat,lon,base,top])=>({name:String(name).slice(0,80), lat:+lat, lon:+lon, base:+base, top:+top})).filter(x=>isFinite(x.lat)&&isFinite(x.lon)); }catch(e){ return; }
+  history.replaceState(null,"",location.pathname+location.hash); if(!L0.length) return;
+  const fresh = L0.filter(x=>!S.favs.some(f=>f.name===x.name));
+  $("#miniBox").innerHTML = `<div class="muted" style="margin-bottom:10px">Someone shared ${L0.length} spot${L0.length>1?"s":""} with you.</div><div class="list">${L0.map(x=>`<div class="li" style="min-height:40px"><span class="nm"><b>${x.name}</b></span>${S.favs.some(f=>f.name===x.name)? `<span class="muted">already saved</span>`:""}</div>`).join("")}</div>
+    <button class="btn primary wide" id="slAdd" style="margin-top:12px" ${fresh.length?"":"disabled"}>${fresh.length? `Add ${fresh.length} to my Favorites` : "You already have all of these"}</button>`;
+  $("#miniTitle").textContent = "Shared spots"; openSheet("miniSheet");
+  $("#slAdd").onclick = () => { S.favs = [...S.favs, ...fresh]; store.set("favs", S.favs); updateTop(); pushSync(); closeSheet("miniSheet"); toast(`Added ${fresh.length} spot${fresh.length>1?"s":""}`); if((location.hash||"")==="#favs") renderFavs(true); };
+}
+
+/* ---------- Sync across devices (no accounts) ---------- */
+const SYNC_KEYS = ["favs","waxkit","waxlog","alerts","units","repName","myReports","mode"];
+const syncCode = () => store.get("syncCode", null);
+function syncPayload(){ const d={}; SYNC_KEYS.forEach(k=>{ const v=store.get(k, undefined); if(v!==undefined) d[k]=v; }); return d; }
+let syncTimer=null;
+function syncSoon(){ if(!syncCode()) return; clearTimeout(syncTimer); syncTimer=setTimeout(syncPush, 1500); }
+async function syncPush(){ const code=syncCode(); if(!code) return; try{ const r = await api("/sync", {method:"PUT", headers:{"content-type":"application/json"}, body:JSON.stringify({code, data:syncPayload()})}); store.set("syncT", r.t); }catch(e){ if(e.status===404){ store.set("syncCode", null); } } }
+function applySync(d){ SYNC_KEYS.forEach(k=>{ if(d[k]!==undefined) localStorage.setItem("snowline_"+k, JSON.stringify(d[k])); });
+  S.favs = store.get("favs", []); S.units = store.get("units", S.units); S.mode = store.get("mode", S.mode); }
+async function syncPull(){ const code=syncCode(); if(!code) return false; try{ const r = await api(`/sync?code=${encodeURIComponent(code)}`); if(r.t > (store.get("syncT",0)||0)){ applySync(r.data||{}); store.set("syncT", r.t); updateTop(); if(S.data) render(); if((location.hash||"")==="#favs") renderFavs(true); return true; } }catch(e){} return false; }
+// any write to a synced key schedules a push
+{ const _set = store.set; store.set = function(k,v){ _set.call(store,k,v); if(SYNC_KEYS.includes(k)) syncSoon(); }; }
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") syncPull(); });
+function renderSyncBox(){
+  const el=$("#syncBox"); if(!el) return; const code=syncCode();
+  el.innerHTML = code? `<div class="muted">This device syncs favorites, wax box, wax log, alerts and settings with code:</div>
+      <div class="num" style="font-size:30px;letter-spacing:3px;margin:6px 0;color:var(--ice)">${code}</div>
+      <div class="muted" style="margin-bottom:10px">Enter it on your other phone or computer under Settings → Sync. Anyone with the code can see and change these, so keep it to yourself.</div>
+      <div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn" id="syCopy" style="flex:1">Copy code</button><button class="btn" id="syNow" style="flex:1">Sync now</button></div>
+      <button class="link" id="syOff" style="color:#ff6b6b;margin-top:8px">Stop syncing on this device</button>`
+    : `<div class="muted" style="margin-bottom:10px">Keep your favorites, wax box, wax log and alerts the same on every device. No account needed.</div>
+      <button class="btn primary wide" id="syNew">Create a sync code</button>
+      <div class="field" style="margin-top:12px">Already have a code?<div class="row" style="gap:8px;flex-wrap:nowrap"><input id="syIn" placeholder="ABCD-1234" autocapitalize="characters" style="min-width:0;flex:1"><button class="btn" id="syJoin">Join</button></div></div>`;
+  const on=(id,f)=>{ const b=$("#"+id); if(b) b.onclick=f; };
+  on("syNew", async()=>{ try{ const r = await api("/sync",{method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({data:syncPayload()})}); store.set("syncCode", r.code); store.set("syncT", r.t); renderSyncBox(); toast("Sync code created"); }catch(e){ toast("Couldn't create a code right now"); } });
+  on("syJoin", async()=>{ const c=$("#syIn").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/^(.{4})(.{4})$/,"$1-$2"); if(!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)){ toast("Codes look like ABCD-1234"); return; }
+    try{ const r = await api(`/sync?code=${c}`); applySync(r.data||{}); store.set("syncCode", c); store.set("syncT", r.t); renderSyncBox(); updateTop(); if(S.data) render(); toast("Synced with your other device"); }catch(e){ toast(e.status===404? "That code wasn't found" : "Couldn't sync right now"); } });
+  on("syCopy", async()=>{ try{ await navigator.clipboard.writeText(code); toast("Code copied"); }catch(e){} });
+  on("syNow", async()=>{ const pulled = await syncPull(); if(!pulled) await syncPush(); toast("Synced"); });
+  on("syOff", ()=>{ store.set("syncCode", null); renderSyncBox(); toast("Sync off on this device"); });
+}
+
+/* ================= FEATURES v7: OpenSnow-level layouts ================= */
+function km(a1,o1,a2,o2){ const R=6371, r=Math.PI/180, dA=(a2-a1)*r, dO=(o2-o1)*r; const h=Math.sin(dA/2)**2+Math.cos(a1*r)*Math.cos(a2*r)*Math.sin(dO/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+const provChip = (kind, when) => `<span class="pv pv-${kind}">${kind==="rep"? "Reported" : kind==="meas"? "Measured" : "Estimated"}</span>${when? `<span class="pv-t">${when}</span>`:""}`;
+
+/* ---------- status pill: Open / Opening Dec 4 / Closed ---------- */
+function statusPill(rep){
+  const R = rep?.resort; if(!R) return "";
+  if(R.status==="Open") return `<span class="st-pill st-open"><i></i>Open</span>`;
+  if(R.opening){ const d = new Date(`${R.opening} ${new Date().getFullYear()}`); const now = new Date(); if(d < new Date(now.getTime()-60*864e5)) d.setFullYear(d.getFullYear()+1);
+    if(d >= new Date(now.toDateString())) return `<span class="st-pill st-soon"><i></i>Opening ${R.opening.replace(/ 0(\d)/," $1")}</span>`; }
+  if(R.status==="Closed") return `<span class="st-pill st-closed"><i></i>Closed</span>`;
+  return "";
+}
+function renderStatus(){ const el = $("#ltStatus"); if(!el || !S.loc) return; el.innerHTML = statusPill(S.extras[S.loc.name]?.report); }
+
+/* ---------- alert bell on each spot ---------- */
+function spotRules(name){ return alertRules().filter(r=>r.spot===name); }
+function updateBell(){ const b=$("#bellBtn"); if(!b || !S.loc) return; b.classList.toggle("on", spotRules(S.loc.name).length>0); }
+function openBell(){
+  const L0 = S.loc; if(!L0) return; const known = finderSpots().some(x=>x.name===L0.name);
+  const presets = [{type:"overnight", inches:4, lab:`${imp()?'4"':'10 cm'}+ overnight`}, {type:"forecast", win:"d3", inches:6, lab:`${imp()?'6"':'15 cm'}+ in the next 3 days`}, {type:"forecast", win:"d5", inches:12, lab:`${imp()?'12"':'30 cm'}+ in the next 5 days`}];
+  const draw = () => { const rs = spotRules(L0.name);
+    $("#miniTitle").textContent = "Snow alerts";
+    $("#miniBox").innerHTML = `<div class="muted" style="margin-bottom:10px">${L0.name} · checked every time you open Snowline${store.get("pushOn")? " and around 6am on your lock screen" : ""}.</div>
+      <div class="chips">${presets.map((p,i)=>{ const on = rs.some(r=>r.type===p.type && (r.win||"d3")===(p.win||"d3") && Math.abs(r.inches-p.inches)<0.1); return `<button data-p="${i}" class="${on?"on":""}">${on?"✓ ":"+ "}${p.lab}</button>`; }).join("")}</div>
+      ${rs.length? `<div class="grp">Alerts for this spot</div><div class="list">${rs.map(r=>`<div class="li"><span class="nm"><b>${ruleLabel(r).replace(/^[^:]+:\s*/,"")}</b></span><button class="link" data-rm="${encodeURIComponent(JSON.stringify(r))}" style="color:#ff6b6b">Remove</button></div>`).join("")}</div>`:""}
+      ${known? "" : `<div class="muted" style="margin-top:10px">Adding an alert also saves this spot to your Favorites, so Snowline can check it.</div>`}
+      <button class="btn wide" id="bellAll" style="margin-top:12px">All alerts and lock-screen settings</button>`;
+    $("#miniBox").querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{ const p=presets[+b.dataset.p]; let r=alertRules(); const same = x=>x.spot===L0.name && x.type===p.type && (x.win||"d3")===(p.win||"d3") && Math.abs(x.inches-p.inches)<0.1;
+      if(r.some(same)) r=r.filter(x=>!same(x)); else { r.push({spot:L0.name, type:p.type, inches:p.inches, win:p.win||"d3"}); if(!S.favs.some(f=>f.name===L0.name) && !PRESETS.some(x=>x.name===L0.name)){ S.favs.unshift({...L0}); store.set("favs",S.favs); updateTop(); } toast("Alert added"); }
+      store.set("alerts", r); pushSync(); checkAlerts(); updateBell(); draw(); });
+    $("#miniBox").querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ const t=JSON.parse(decodeURIComponent(b.dataset.rm)); store.set("alerts", alertRules().filter(x=>JSON.stringify(x)!==JSON.stringify(t))); pushSync(); checkAlerts(); updateBell(); draw(); });
+    $("#bellAll").onclick=()=>{ closeSheet("miniSheet"); location.hash="alerts"; };
+  };
+  draw(); openSheet("miniSheet");
+}
+
+/* ---------- hourly chart with metric chips + sun & moon (day detail) ---------- */
+const HC_METRICS = [["temp","Temp"],["feels","Feels like"],["snow","Snow"],["precip","Precip %"],["wind","Wind"],["cloud","Cloud %"],["rh","Humidity %"]];
+function moonInfo(date){ const syn=29.530588853, ref=Date.UTC(2000,0,6,18,14)/864e5; const age=((date.getTime()/864e5-ref)%syn+syn)%syn; const ill=Math.round((1-Math.cos(2*Math.PI*age/syn))/2*100);
+  const nm = age<1.85?"New moon":age<5.54?"Waxing crescent":age<9.23?"First quarter":age<12.92?"Waxing gibbous":age<16.61?"Full moon":age<20.3?"Waning gibbous":age<23.99?"Last quarter":age<27.68?"Waning crescent":"New moon"; return {nm, ill}; }
+function hourlyChartHTML(C, SIM, d){
+  const m = S.hcMetric || "temp"; const vals=[];
+  for(let h=0;h<24;h++){ const q=at(C,SIM,d,h); if(!q?.c){ vals.push(null); continue; } const c=q.c, s=q.sim;
+    const tD = x => imp()? x*9/5+32 : x; const v = m==="temp"? tD(c.Te) : m==="feels"? (s&&isNum(s.feels)? tD(s.feels) : null) : m==="snow"? snowNum(c.snow||0) : m==="precip"? (isNum(C.pop?.[q.i])? C.pop[q.i] : null) : m==="wind"? +fmtWind(c.W) : m==="cloud"? c.CC : c.RH;
+    vals.push(isNum(v)? v : null); }
+  const ok = vals.filter(isNum); if(!ok.length) return "";
+  const W=330, H=96, bw=W/24; let lo=Math.min(...ok), hi=Math.max(...ok);
+  if(["snow","precip","cloud","rh","wind"].includes(m)) lo=0; if(m==="precip"||m==="cloud"||m==="rh") hi=100; if(hi-lo<1) hi=lo+1;
+  const col = m==="snow"? "#7cb8ff" : m==="precip"? "#3d8bfd" : m==="wind"? "#86efac" : m==="cloud"? "#94a3b8" : m==="rh"? "#5eead4" : "#5aa2ff";
+  const fmtV = v => m==="snow"? (imp()? v.toFixed(1)+'"' : v.toFixed(1)) : Math.round(v);
+  const bars = vals.map((v,h)=>{ if(!isNum(v)) return ""; const hh = Math.max(2,(v-lo)/(hi-lo)*(H-22)); return `<rect x="${(h*bw+1).toFixed(1)}" y="${(H-hh).toFixed(1)}" width="${(bw-2).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${col}"/>${h%3===0? `<text x="${(h*bw+bw/2).toFixed(1)}" y="${(H-hh-3).toFixed(1)}" font-size="8.5" text-anchor="middle" fill="var(--mute)">${fmtV(v)}</text>`:""}`; }).join("");
+  const ticks = [0,3,6,9,12,15,18,21].map(h=>`<text x="${(h*bw+bw/2).toFixed(1)}" y="${H+11}" font-size="9" text-anchor="middle" fill="var(--mute)">${hl(h)}</text>`).join("");
+  const st = sunTimes(d), mo = moonInfo(new Date(d+"T12:00:00"));
+  return `<div class="hc"><div class="chips hc-chips">${HC_METRICS.map(([k,l])=>`<button data-hc="${k}" class="${k===m?"on":""}">${l}${k==="temp"||k==="feels"? (imp()?" °F":" °C") : k==="wind"? " "+windU() : k==="snow"? (imp()?" in":" cm") : ""}</button>`).join("")}</div>
+    <svg viewBox="0 0 ${W} ${H+14}" width="100%" class="hc-svg">${bars}${ticks}</svg>
+    <div class="hc-sun"><span>☀️ Sunrise <b>${clock(st.rise)}</b></span><span>Sunset <b>${clock(st.set)}</b></span><span>🌗 ${mo.nm}, ${mo.ill}% lit</span></div></div>`;
+}
+function wireHourlyChart(C, SIM, el){ el.querySelectorAll("[data-hc]").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); S.hcMetric=b.dataset.hc; const box=el.querySelector(".hc"); if(box){ box.outerHTML = hourlyChartHTML(C,SIM,S.selDay); wireHourlyChart(C,SIM,el); } }); }
+
+/* ---------- mini snow map with play ---------- */
+let miniMap=null, miniTimer=null;
+let mmObs = null;
+function renderMiniMap(){
+  const card=$("#miniMapCard"); if(!card || !S.loc) return;
+  if(!card.innerHTML) card.innerHTML = `<div class="card-h"><h2>Snow map</h2></div><div id="miniMap"></div>`;
+  if(mmObs) mmObs.disconnect();
+  if(!("IntersectionObserver" in window)) return drawMiniMap();
+  mmObs = new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ mmObs.disconnect(); drawMiniMap(); } }, {rootMargin:"300px"}); mmObs.observe(card);
+}
+async function drawMiniMap(){
+  const card=$("#miniMapCard"); if(!card || !S.loc) return; const L0=S.loc;
+  try{ await needMap(); }catch(e){ card.remove(); return; } if(!$("#miniMapCard") || S.loc!==L0) return;
+  card.innerHTML = `<div class="card-h"><h2>Snow map</h2><button class="link" id="mmBig">Full map ↗</button></div><div id="miniMap"></div>${snowLegendHTML()}
+    <div class="mm-ctl"><button class="mm-play" id="mmPlay" aria-label="Play">▶</button><input type="range" id="mmSlide" min="0" max="6" value="6" aria-label="Day"><span class="mm-lbl" id="mmLbl">Loading…</span></div>`;
+  $("#mmBig").onclick = () => { location.hash="maps"; };
+  if(miniMap){ try{ miniMap.remove(); }catch(e){} miniMap=null; } clearInterval(miniTimer);
+  miniMap = L.map("miniMap", {zoomControl:false, attributionControl:false, dragging:!L.Browser.mobile, scrollWheelZoom:false, tap:false, zoomSnap:.25}).setView([L0.lat, L0.lon], 9.25);
+  // dark terrain underneath, snow in the middle, place names on top
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}",{maxZoom:13}).addTo(miniMap);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxZoom:13, opacity:.6}).addTo(miniMap);
+  miniMap.createPane("labels"); miniMap.getPane("labels").style.zIndex = 450; miniMap.getPane("labels").style.pointerEvents = "none";
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxZoom:13, pane:"labels"}).addTo(miniMap);
+  L.marker([L0.lat,L0.lon],{icon:L.divIcon({className:"mm-pin", html:"<i></i>", iconSize:[18,18]}), pane:"labels"}).addTo(miniMap);
+  const N=9, step=0.075, pts=[]; for(let a=0;a<N;a++) for(let b=0;b<N;b++) pts.push([L0.lat+(a-(N-1)/2)*step, L0.lon+(b-(N-1)/2)*step*1.35]);
+  let j; try{ j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p=>p[0].toFixed(3)).join(",")}&longitude=${pts.map(p=>p[1].toFixed(3)).join(",")}&hourly=temperature_2m,precipitation,freezing_level_height&timezone=auto&forecast_days=8`); }catch(e){ $("#mmLbl").textContent="Snow map unavailable"; return; }
+  if(S.loc!==L0) return; if(!Array.isArray(j)) j=[j];
+  const days = [...Array(7)].map((_,k)=>dateAdd(todayStr(),k));
+  const cum = j.map(r=>{ const H=r.hourly, ref=r.elevation; const nk=new Date(Date.now()+r.utc_offset_seconds*1000).toISOString().slice(0,13)+":00"; const i0=Math.max(0,H.time.findIndex(t=>t>=nk)); const per=days.map(()=>0);
+    for(let k=i0;k<H.time.length;k++){ const [d]=periodOf(H.time[k]); const di=days.indexOf(d); if(di<0) continue; const v=snowAt(H.precipitation[k],H.temperature_2m[k],H.freezing_level_height?.[k],ref,ref); if(v) per[di]+=v.snow; }
+    let s=0; return per.map(v=>s+=v); });
+  // smooth field instead of squares: interpolate the grid onto a canvas, one image per day
+  const bounds = [[pts[0][0]-step/2, pts[0][1]-step*1.35/2], [pts.at(-1)[0]+step/2, pts.at(-1)[1]+step*1.35/2]];
+  const frames = days.map((_,k)=>snowFieldURL(cum.map(c=>c[k]), N));
+  const overlay = L.imageOverlay(frames[6], bounds, {opacity:1, interactive:false, className:"mm-field"}).addTo(miniMap);
+  const show = k => { overlay.setUrl(frames[k]);
+    const here = cum[Math.floor(pts.length/2)][k]; $("#mmSlide").value=k; $("#mmLbl").innerHTML = `Snow through <b>${k===0?"tonight":dow(days[k])+" "+md(days[k])}</b> · ${fmtSnow(here,0)} here`; };
+  show(6); $("#mmSlide").oninput = e => { clearInterval(miniTimer); miniTimer=null; $("#mmPlay").textContent="▶"; show(+e.target.value); };
+  $("#mmPlay").onclick = () => { if(miniTimer){ clearInterval(miniTimer); miniTimer=null; $("#mmPlay").textContent="▶"; return; } let k=0; show(0); $("#mmPlay").textContent="❚❚"; miniTimer=setInterval(()=>{ k++; if(k>6){ clearInterval(miniTimer); miniTimer=null; $("#mmPlay").textContent="▶"; return; } show(k); }, 900); };
+  setTimeout(()=>miniMap && miniMap.invalidateSize(), 80);
+}
+/* Continuous snow colors: light blue → blue → violet → magenta, fading in from clear */
+const SNOW_RAMP = [[0.3,[125,211,252,0]],[1,[56,189,248,.55]],[3,[59,130,246,.7]],[6,[99,102,241,.75]],[12,[139,92,246,.8]],[24,[217,70,239,.82]],[40,[244,171,252,.85]]];
+function snowRGBAc(v){ if(!(v>0.3)) return [0,0,0,0]; const R=SNOW_RAMP; if(v>=R.at(-1)[0]) return R.at(-1)[1];
+  for(let i=1;i<R.length;i++) if(v<=R[i][0]){ const [a,ca]=R[i-1], [b,cb]=R[i], f=(v-a)/(b-a); return ca.map((x,j)=>x+(cb[j]-x)*f); } return R.at(-1)[1]; }
+function snowFieldURL(vals, N){
+  const W = 160, cv = document.createElement("canvas"); cv.width = cv.height = W; const ctx = cv.getContext("2d"), img = ctx.createImageData(W, W);
+  const g = (a,b) => vals[Math.min(N-1,Math.max(0,a))*N + Math.min(N-1,Math.max(0,b))] || 0;
+  for(let y=0;y<W;y++) for(let x=0;x<W;x++){
+    // grid row 0 is the south edge; canvas row 0 is the north edge
+    const fa = (W-1-y)/(W-1)*(N-1), fb = x/(W-1)*(N-1), a = Math.floor(fa), b = Math.floor(fb), da = fa-a, db = fb-b;
+    const v = g(a,b)*(1-da)*(1-db) + g(a+1,b)*da*(1-db) + g(a,b+1)*(1-da)*db + g(a+1,b+1)*da*db;
+    // feather the edges so the field fades into the map instead of ending in a hard square
+    const ex = Math.min(x, W-1-x)/(W*.18), ey = Math.min(y, W-1-y)/(W*.18), edge = Math.min(1, ex) * Math.min(1, ey), fe = edge*edge*(3-2*edge);
+    const c = snowRGBAc(v), o = (y*W+x)*4; img.data[o]=c[0]; img.data[o+1]=c[1]; img.data[o+2]=c[2]; img.data[o+3]=c[3]*255*fe;
+  }
+  ctx.putImageData(img, 0, 0); return cv.toDataURL();
+}
+function snowLegendHTML(){ const st = [1,3,6,12,24]; return `<div class="mm-leg"><span class="mm-bar" style="background:linear-gradient(90deg,${st.map(v=>`rgba(${snowRGBAc(v).slice(0,3).map(Math.round).join(",")},1)`).join(",")})"></span><span class="mm-ticks">${st.map(v=>`<i>${imp()? v+"″" : Math.round(v*2.54)}</i>`).join("")}</span></div>`; }
+
+/* ---------- nearby stations (Snow Report) ---------- */
+function stationChartSVG(s){
+  const H = (s.hourly||[]).filter(x=>isNum(x.d)); if(H.length<6) return "";
+  const W=300, Ht=56; const mn=Math.min(...H.map(x=>x.d)), mx=Math.max(...H.map(x=>x.d), mn+2);
+  const gains = H.map((x,i)=> i? Math.max(0, x.d-H[i-1].d) : 0); const gMax=Math.max(1,...gains);
+  const bw = W/H.length;
+  const bars = gains.map((g,i)=> g>0.4? `<rect x="${(i*bw+.5).toFixed(1)}" y="${(Ht-g/gMax*(Ht-14)).toFixed(1)}" width="${(bw-1).toFixed(1)}" height="${(g/gMax*(Ht-14)).toFixed(1)}" fill="#7cb8ff" rx="1.5"/>` : "").join("");
+  const line = H.map((x,i)=>`${(i*bw+bw/2).toFixed(1)},${(Ht-4-(x.d-mn)/(mx-mn)*(Ht-16)).toFixed(1)}`).join(" ");
+  const lab = (i)=>{ const t=H[i].t; const hh=+t.slice(6,8); return hl(hh); };
+  return `<svg viewBox="0 0 ${W} ${Ht+12}" width="100%"><polyline points="${line}" fill="none" stroke="#e6edf7" stroke-width="1.6" opacity=".8"/>${bars}
+    ${[0,Math.floor(H.length/2),H.length-1].map(i=>`<text x="${(i*bw+bw/2).toFixed(1)}" y="${Ht+11}" font-size="9" text-anchor="${i===0?"start":i===H.length-1?"end":"middle"}" fill="var(--mute)">${lab(i)}</text>`).join("")}</svg>
+    <div class="muted" style="font-size:11px">Line: snow depth · bars: hourly gains (new snow)</div>`;
+}
+function nearbyStationsHTML(st){
+  if(!st || st.length<2) return "";
+  return `<details class="nb"><summary>View ${st.length} nearby stations</summary><div class="list">${st.map(s=>`<div class="li" style="min-height:48px"><span class="nm"><b>${s.name}</b><small>${Math.round(s.km*0.621)} mi · ${Math.round(s.elevFt).toLocaleString()} ft${s.elevFt && S.loc? ` (${s.elevFt>=S.loc.top? "at or above summit" : Math.round((S.loc.top-s.elevFt)/100)*100+" ft below summit"})`:""}</small></span>
+    <span class="nb-v"><b>${isNum(s.depth)? fmtSnow(s.depth,0):"—"}</b><small>${isNum(s.new24)? "+"+fmtSnow(s.new24,0)+" 24h" : ""}${isNum(s.new72)&&s.new72>=1? " · +"+fmtSnow(s.new72,0)+" 72h":""}</small></span></div>`).join("")}</div><div class="muted" style="font-size:11px;margin-top:6px">USDA NRCS SNOTEL · measured snow depth</div></details>`;
+}
+
+/* ---------- cams card (spot page) + favorite cams ---------- */
+const favCams = () => store.get("favCams", []);
+// Resort cameras: live still images published on each resort's own webcam page, credited and linked back.
+// Each cam sits where it is on the mountain (placed from OpenStreetMap lift and lodge positions), so the cam map shows them in place.
+const BACH = (n, name, lat, lon) => ({ id:"mtb-"+n, name, img:`https://api.mtbachelor.com/api/v1/cams/mtn/${n}`, src:"Mt. Bachelor", live:true, page:`https://www.mtbachelor.com/the-mountain/webcams/webcam-modal/#${n===14? "snow-stake" : "live-cam-"+n}`, lat, lon });
+const TIMB = (f, name, lat, lon) => ({ id:"tl-"+f, name, img:`https://timberlinelodge.com/snowcameras/${f}.jpg`, src:"Timberline", page:"https://www.timberlinelodge.com/conditions", lat, lon });
+const BACH_CAMS = [BACH(14,"West Village snow stake",44.0011,-121.6807), BACH(1,"Base of Pine Marten Lift",44.0021,-121.6786), BACH(12,"Tumalo Mtn & top of Pine Marten",43.9905,-121.6862), BACH(9,"Pine Marten Lodge",43.9896,-121.6846), BACH(11,"Outback lift line",43.9951,-121.6972), BACH(3,"The Cone",43.9985,-121.6738), BACH(5,"Sunrise Base",43.9924,-121.6617), BACH(13,"West Village base & parking",44.0037,-121.6792), BACH(2,"Rock Bar patio",44.0026,-121.6801), BACH(16,"Nordic Center",44.0063,-121.6747)];
+const ROAD_CAM_FILTER = { "Mt. Bachelor, OR": /^Century Dr/i, "Mt. Bachelor Nordic Center, OR": /^Century Dr/i, "Meissner Nordic (Bend), OR": /^Century Dr/i };
+const RESORT_CAMS = {
+  "Mt. Bachelor, OR": BACH_CAMS,
+  "Mt. Bachelor Nordic Center, OR": [BACH_CAMS.find(c=>c.id==="mtb-16")],
+  "Meissner Nordic (Bend), OR": [{id:"meissner-lot", name:"Meissner Sno-Park", img:"https://teacup-trailcams.fly.dev/meissner/photos/latest", page:"https://meissnernordic.org/webcam/", src:"Meissner Nordic · every 2 h", lat:43.9843, lon:-121.5269}],
+  "Timberline, OR": [TIMB("snowstake","Snow stake",45.3318,-121.7102), TIMB("lodge","Timberline Lodge",45.3311,-121.7112), TIMB("FloodEast","Magic Mile",45.3400,-121.7101), TIMB("FloodSouth","Jeff Flood",45.3205,-121.7082), TIMB("palmerbottom","Palmer / Silcox",45.3436,-121.7091), TIMB("pucci","Pucci",45.3331,-121.7176), TIMB("brunotop","Bruno's",45.3006,-121.7468), TIMB("summit","Summit Pass",45.3020,-121.7431), TIMB("SummitBus","Summit Pass shuttle",45.3025,-121.7441)],
+};
+function camKey(c){ return c.id!=null? (String(c.id).includes("-")? c.id : "odot-"+c.id) : c.img; }
+async function loadSpotCams(L0){
+  if(!OREGON(L0.name)) return [];
+  const box=[L0.lon-0.4, L0.lat-0.3, L0.lon+0.4, L0.lat+0.3].map(v=>v.toFixed(2)).join(",");
+  try{ const j = await api(`/cams?bounds=${box}`); return (j.cams||[]).map(c=>({...c, mi:Math.round(km(L0.lat,L0.lon,c.lat,c.lon)*0.621*10)/10})).sort((a,b)=>a.mi-b.mi).slice(0,8); }catch(e){ return []; }
+}
+function camTile(c, big){ const fav = favCams().some(x=>camKey(x)===camKey(c)); const src = c.img + (c.img.includes("?")?"&":"?") + "t=" + Math.floor(Date.now()/3e5);
+  return `<figure class="cam ${big?"big":""}"><a href="${c.page||c.img}" target="_blank" rel="noopener" class="cam-a">${c.live? `<span class="cam-live">▶ Live</span>`:""}<img loading="lazy" src="${src}" alt="${c.name}" onerror="this.closest('figure').remove()"></a>
+    <figcaption><span><b>${c.name}</b><small>${c.src? c.src : `${c.route && !/^(city|county|local|other)$/i.test(c.route)? c.route+" · " : ""}${isNum(c.mi)? c.mi+" mi away" : "ODOT"}`}</small></span><button class="cam-star ${fav?"on":""}" data-cam="${encodeURIComponent(JSON.stringify({id:c.id,name:c.name,img:c.img,lat:c.lat,lon:c.lon,route:c.route,src:c.src,page:c.page,live:c.live}))}" aria-label="Favorite camera">${fav?"★":"☆"}</button></figcaption></figure>`; }
+function wireCamStars(root, again){ root.querySelectorAll("[data-cam]").forEach(b=>b.onclick=(e)=>{ e.preventDefault(); const c=JSON.parse(decodeURIComponent(b.dataset.cam)); let f=favCams(); if(f.some(x=>camKey(x)===camKey(c))) f=f.filter(x=>camKey(x)!==camKey(c)); else { f.unshift(c); toast("Camera saved to Favorites"); } store.set("favCams", f.slice(0,12)); again(); }); }
+async function renderCamCard(){
+  const card=$("#camCard"); if(!card || !S.loc) return; const L0=S.loc; const links = CAM_LINKS[L0.name]||[];
+  const road = (await loadSpotCams(L0)).filter(c=>!ROAD_CAM_FILTER[L0.name] || ROAD_CAM_FILTER[L0.name].test(c.name)); if(S.loc!==L0) return;
+  const rc = RESORT_CAMS[L0.name] || []; const cams = [...rc, ...road];
+  if(!cams.length && !links.length){ card.remove(); return; }
+  const view = store.get("camView","grid");
+  const resort = rc.length? "" : links.map(([t,u])=>`<a class="cam-resort" href="${u}" target="_blank" rel="noopener"><span class="cam-ic">📷</span><span><b>${t}</b><small>Snow stake, summit and lift cams on the resort's site</small></span><span style="color:var(--ice)">↗</span></a>`).join("");
+  const draw = () => { const v = store.get("camView","grid");
+    card.innerHTML = `<div class="card-h"><h2>Cams</h2>${cams.length? `<div class="seg sm" id="camSeg">${[["list","List"],["grid","Grid"]].concat(cams.some(c=>isNum(c.lat))? [["map","Map"]] : []).map(([k,l])=>`<button data-cv="${k}" class="${v===k?"on":""}">${l}</button>`).join("")}</div>`:""}</div>
+      ${resort}
+      ${cams.length? (v==="map"? `<div class="cmap-wrap" id="camWrap"><div id="camMini"></div><button class="cmap-fs" id="camFs" aria-label="Full screen map">⤢</button></div>` : `<div class="cams-${v}">${(S.camAll? cams : cams.slice(0,4)).map(c=>camTile(c, v==="list")).join("")}</div>${!S.camAll && cams.length > 4? `<button class="btn cam-more" id="camMore">Show all ${cams.length} cams</button>` : ""}`) : ""}
+      ${cams.length? `<div class="muted" style="font-size:11px;margin-top:6px">${rc.length? `Resort cams: <a href="${rc[0].page.split("webcam-modal")[0]}" target="_blank" rel="noopener">${rc[0].src} ↗</a>${rc[0].live? " · tap a cam for live video" : ""} · `:""}${road.length? "Road cams: ODOT TripCheck · ":""}☆ saves a camera to Favorites</div>`:""}`;
+    const more = card.querySelector("#camMore"); if(more) more.onclick = ()=>{ S.camAll = true; draw(); };
+    card.querySelectorAll("[data-cv]").forEach(b=>b.onclick=()=>{ store.set("camView", b.dataset.cv); draw(); });
+    wireCamStars(card, draw);
+    if(v==="map") needMap().then(()=>camMapInit(L0, rc, road), ()=>{});
+  };
+  draw();
+}
+
+/* ---------- Cam map: live pictures on a satellite map, with ski runs and lifts ---------- */
+const SAT_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const SAT_ATTR = "Imagery © Esri, Maxar, Earthstar Geographics";
+const PISTE_COL = { novice:"#22c55e", easy:"#22c55e", intermediate:"#3b82f6", advanced:"#0b0b0b", expert:"#0b0b0b", freeride:"#f59e0b", extreme:"#ef4444" };
+S.pistes = {};
+// One lookup per spot at a time: the map can redraw while runs are loading, and every redraw shares the same request.
+// The first lookup for a spot runs in the background on the server; until it's done the answer says pending,
+// so ask again a few times. Only a real answer is kept for this visit, so a later map open tries again.
+function loadPistes(L0){
+  const k = L0.lat.toFixed(2)+","+L0.lon.toFixed(2); if(S.pistes[k]) return S.pistes[k];
+  const q = `/pistes?lat=${L0.lat.toFixed(3)}&lon=${L0.lon.toFixed(3)}`;
+  const p = (async () => {
+    let j = await api(q).catch(()=>null);
+    for(let i=0; i<4 && (!j || j.pending); i++){ await new Promise(r=>setTimeout(r, 4000)); j = await api(q).catch(()=>null); }
+    if(!j || j.pending || (j.error && !(j.runs||[]).length)) delete S.pistes[k];
+    return j && !j.pending ? j : {runs:[], lifts:[]};
+  })();
+  return S.pistes[k] = p;
+}
+function drawPistes(m, j){
+  const g = L.layerGroup();
+  (j.runs||[]).forEach(r=>{
+    const pts = r.pts; if(!pts || pts.length<2) return;
+    if(r.area){ L.polygon(pts,{stroke:false, fillColor:PISTE_COL[r.diff]||"#94a3b8", fillOpacity:.12, interactive:false}).addTo(g); return; }
+    const nordic = r.type==="nordic", col = PISTE_COL[r.diff] || (nordic? "#a78bfa" : "#cbd5e1");
+    if(col==="#0b0b0b") L.polyline(pts,{color:"#fff", weight:4.5, opacity:.75, interactive:false}).addTo(g);   // white edge so black runs show on dark imagery
+    L.polyline(pts,{color:col, weight:nordic? 2.2 : 2.8, opacity:.95, dashArray: nordic? "5 5" : r.diff==="expert"? "7 4" : null})
+      .bindTooltip(`${r.name||"Unnamed"}${r.diff? " · "+r.diff : ""}${nordic? " (Nordic)" : ""}`,{sticky:true}).addTo(g);
+  });
+  (j.lifts||[]).forEach(l=>{
+    L.polyline(l.pts,{color:"#fff", weight:4, opacity:.6, interactive:false}).addTo(g);
+    L.polyline(l.pts,{color:"#111827", weight:2.2}).bindTooltip(l.name||"Lift",{sticky:true}).addTo(g);
+    if(l.name) L.marker(l.pts[l.pts.length-1],{interactive:false, icon:L.divIcon({className:"", html:`<div class="lift-lab">${esc(l.name)}</div>`, iconSize:null})}).addTo(g);
+  });
+  return g;
+}
+function esc(t){ return String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* =====================  Snow on the mountain  ===================== */
+// Forecast snow painted across the mountain over satellite imagery, with runs and lifts. ~170 forecast points, each
+// at its real elevation (see /api/mtnsnow), blended smoothly so totals climb with height like they do on the hill.
+const MS_STOPS = [[0,[0,0,0,0]],[0.3,[198,219,239,.0]],[1,[158,202,225,.55]],[3,[66,146,198,.7]],[6,[8,69,148,.78]],[8,[255,237,130,.8]],[10,[253,174,97,.82]],[12,[244,109,67,.85]],[18,[215,48,39,.88]],[24,[165,0,38,.9]],[30,[200,190,230,.9]],[36,[170,150,215,.92]],[48,[128,100,190,.93]],[60,[95,60,160,.94]],[72,[70,30,120,.95]]];
+function msColor(v){ if(!(v > 0.3)) return [0,0,0,0]; let i = 1; while(i < MS_STOPS.length-1 && v > MS_STOPS[i][0]) i++;
+  const [a, ca] = MS_STOPS[i-1], [b, cb] = MS_STOPS[i], f = clamp((v-a)/(b-a), 0, 1); return ca.map((x,k)=>x + (cb[k]-x)*f); }
+function msImage(G, n){
+  const W = 240, cv = document.createElement("canvas"); cv.width = cv.height = W; const g = cv.getContext("2d"), img = g.createImageData(W, W);
+  const at = (r,c)=>G[Math.max(0,Math.min(n-1,r))*n + Math.max(0,Math.min(n-1,c))];
+  for(let y=0; y<W; y++) for(let x=0; x<W; x++){
+    const fr = y/(W-1)*(n-1), fc = x/(W-1)*(n-1), r = Math.floor(fr), c = Math.floor(fc), dr = fr-r, dc = fc-c;
+    const v = at(r,c)*(1-dr)*(1-dc) + at(r,c+1)*(1-dr)*dc + at(r+1,c)*dr*(1-dc) + at(r+1,c+1)*dr*dc;
+    const rd = Math.hypot(x - W/2, y - W/2)/(W/2), edge = clamp((1.02 - rd)/0.3, 0, 1);   // soft, round fade at the edges
+    const [R,Gc,B,A] = msColor(v);
+    const o = (y*W + x)*4; img.data[o] = R; img.data[o+1] = Gc; img.data[o+2] = B; img.data[o+3] = A*255*edge;
+  }
+  g.putImageData(img, 0, 0); return cv.toDataURL();
+}
+async function openMtnSnow(){
+  const L0 = S.loc; if(!L0) return;
+  const d = document.createElement("div"); d.className = "ms-sheet";
+  d.innerHTML = `<div class="np-bar"><b>Snow on the mountain</b><button aria-label="Close">Done</button></div><div id="msMap"><div class="loading" style="padding-top:40%"><div class="spin"></div>Working out snow at every elevation…</div></div>
+    <div class="ms-panel"><div class="ms-row"><div><b>Forecast snow</b><span class="muted" id="msWhen"></span></div><div class="seg sm" id="msWin">${[["24h","24 h"],["3d","3 days"],["5d","5 days"]].map(([k,l])=>`<button data-k="${k}" class="${(S.msWin||"3d")===k?"on":""}">${l}</button>`).join("")}</div></div>
+    <div class="ms-scale">${[1,3,6,8,10,12,18,24,30,36,48].map(v=>`<span style="background:rgba(${msColor(v).slice(0,3).join(",")},1)">${imp()? v : Math.round(v*2.54)}</span>`).join("")}<em>${imp()? "in" : "cm"}</em></div>
+    <div class="ms-row ms-op"><span class="muted">Opacity</span><input type="range" id="msOp" min="20" max="100" value="${S.msOp||80}"><span class="muted" id="msHi"></span></div></div>`;
+  const close = ()=>{ d.remove(); document.body.style.overflow = ""; };
+  d.querySelector(".np-bar button").onclick = close; document.body.appendChild(d); document.body.style.overflow = "hidden";
+  try{ await needMap(); }catch(e){ d.querySelector("#msMap").innerHTML = `<div class="muted" style="padding:30px">Couldn't load the map.</div>`; return; }
+  let j; try{ j = await api(`/mtnsnow?lat=${L0.lat.toFixed(3)}&lon=${L0.lon.toFixed(3)}`); }catch(e){}
+  const box = d.querySelector("#msMap"); if(!document.body.contains(d)) return;
+  if(!j?.grids){ box.innerHTML = `<div class="muted" style="padding:30px">Couldn't get the mountain forecast right now. Try again in a minute.</div>`; return; }
+  box.innerHTML = ""; const m = L.map(box, {zoomControl:false, attributionControl:true, zoomSnap:0.25}).fitBounds(j.bounds, {padding:[0,0]});
+  m.setZoom(m.getZoom() + 0.25, {animate:false});
+  L.tileLayer(SAT_TILES, {maxZoom:17, attribution:"Esri imagery"}).addTo(m);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", {maxZoom:17, opacity:.8}).addTo(m);
+  let ov = null;
+  const draw = () => { const k = S.msWin || "3d", G = j.grids[k], mx = Math.max(...G);
+    if(ov) m.removeLayer(ov); ov = L.imageOverlay(msImage(G, j.n), j.bounds, {opacity:(S.msOp||80)/100, interactive:false}).addTo(m);
+    d.querySelector("#msWhen").textContent = `next ${k==="24h"? "24 hours" : k==="3d"? "3 days" : "5 days"}`;
+    d.querySelector("#msHi").textContent = mx >= 0.5? `up to ${fmtSnow(mx,0)}` : "little or none"; };
+  draw();
+  L.marker([L0.lat, L0.lon], {icon:L.divIcon({className:"", html:`<div class="ms-pin">${esc(dispName(L0.name))}</div>`, iconSize:null})}).addTo(m);
+  loadPistes(L0).then(pj=>{ if(pj && document.body.contains(d)) drawPistes(m, pj).addTo(m); }).catch(()=>{});
+  d.querySelectorAll("#msWin button").forEach(b=>b.onclick=()=>{ S.msWin = b.dataset.k; d.querySelectorAll("#msWin button").forEach(x=>x.classList.toggle("on", x===b)); draw(); });
+  d.querySelector("#msOp").oninput = e=>{ S.msOp = +e.target.value; ov?.setOpacity(S.msOp/100); };
+}
+function camSrc(c){ return c.img + (c.img.includes("?")?"&":"?") + "t=" + Math.floor(Date.now()/3e5); }
+// Group cams that would overlap on screen into one "N cams" callout; regroup on every zoom.
+function camCallouts(m, cams){
+  const layer = L.layerGroup().addTo(m);
+  const draw = () => {
+    layer.clearLayers(); const groups = [];
+    cams.forEach(c=>{ const p = m.latLngToLayerPoint([c.lat,c.lon]); const g = groups.find(g=>Math.abs(g.p.x-p.x)<92 && Math.abs(g.p.y-p.y)<70); if(g) g.c.push(c); else groups.push({p, c:[c]}); });
+    groups.forEach(g=>{
+      const n = g.c.length, lat = g.c.reduce((a,c)=>a+c.lat,0)/n, lon = g.c.reduce((a,c)=>a+c.lon,0)/n;
+      const html = n===1
+        ? `<div class="cco"><div class="cco-img">${g.c[0].live? `<span class="cco-live">Live</span>`:""}<img src="${camSrc(g.c[0])}" alt="" onerror="this.style.opacity=0"></div><span>${esc(g.c[0].name)}</span></div>`
+        : `<div class="cco multi"><div class="cco-grid">${g.c.slice(0,4).map(c=>`<img src="${camSrc(c)}" alt="" onerror="this.style.opacity=0">`).join("")}</div><span>${n} cams</span></div>`;
+      L.marker([lat,lon],{icon:L.divIcon({className:"cco-ic", html, iconSize:null}), zIndexOffset: n*10})
+        .on("click", ()=>{ if(n===1) camLightbox(g.c[0]); else if(m.getZoom() >= m.getMaxZoom()-1) camLightbox(g.c[0], g.c); else m.fitBounds(L.latLngBounds(g.c.map(c=>[c.lat,c.lon])).pad(.6), {maxZoom: m.getZoom()+3}); })
+        .addTo(layer);
+    });
+  };
+  m.on("zoomend", draw); draw(); layer._off = () => m.off("zoomend", draw); return layer;
+}
+function camLightbox(c, list){
+  let i = list? list.indexOf(c) : 0; const all = list || [c];
+  let box = $("#camBox"); if(!box){ box = document.createElement("div"); box.id = "camBox"; document.body.appendChild(box); }
+  const show = () => { const x = all[i];
+    box.innerHTML = `<div class="cb-in"><div class="cb-h"><span><b>${esc(x.name)}</b><small>${esc(x.src || x.route || "ODOT TripCheck")}</small></span><button class="cb-x" aria-label="Close">✕</button></div>
+      <img src="${camSrc(x)}" alt="${esc(x.name)}">
+      <div class="cb-f">${all.length>1? `<button class="btn" data-d="-1">‹</button><span class="muted">${i+1} of ${all.length}</span><button class="btn" data-d="1">›</button>` : ""}<a class="btn" href="${x.page||x.img}" target="_blank" rel="noopener" style="margin-left:auto;text-decoration:none">${x.live? "▶ Live video ↗" : "Source ↗"}</a></div></div>`;
+    box.querySelector(".cb-x").onclick = () => box.classList.remove("on");
+    box.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{ i = (i + +b.dataset.d + all.length) % all.length; show(); });
+  };
+  box.onclick = e => { if(e.target===box) box.classList.remove("on"); };
+  show(); box.classList.add("on");
+}
+async function camMapInit(L0, rc, road){
+  const el = $("#camMini"); if(!el) return;
+  const m = L.map(el,{zoomControl:false, attributionControl:true, maxZoom:17}); m.attributionControl.setPrefix(false);
+  L.tileLayer(SAT_TILES,{maxZoom:17, maxNativeZoom:17, attribution:SAT_ATTR}).addTo(m);
+  const placed = [...rc, ...road].filter(c=>isNum(c.lat) && isNum(c.lon));
+  const focus = rc.filter(c=>isNum(c.lat)).length? rc.filter(c=>isNum(c.lat)) : placed;   // open on the mountain; road cams appear as you zoom out
+  if(focus.length>1) m.fitBounds(L.latLngBounds(focus.map(c=>[c.lat,c.lon])).pad(.25), {maxZoom:14}); else m.setView(focus[0]? [focus[0].lat, focus[0].lon] : [L0.lat,L0.lon], 12);
+  camCallouts(m, placed);
+  const wrap = $("#camWrap"), fs = $("#camFs");
+  if(fs) fs.onclick = () => { const on = wrap.classList.toggle("full"); fs.textContent = on? "✕" : "⤢"; document.body.style.overflow = on? "hidden" : ""; setTimeout(()=>m.invalidateSize(),60); };
+  setTimeout(()=>m.invalidateSize(),60);
+  const j = await loadPistes(L0); if(!document.body.contains(el)) return;
+  if((j.runs||[]).length || (j.lifts||[]).length){ drawPistes(m, j).addTo(m); m.attributionControl.addAttribution("Runs & lifts © OpenStreetMap"); }
+}
+
+/* ---------- Resort site link ---------- */
+const RESORT_SITE = {
+  "Mt. Bachelor, OR": "https://www.mtbachelor.com/",
+  "Mt. Bachelor Nordic Center, OR": "https://www.mtbachelor.com/nordic/overview/",
+  "Meissner Nordic (Bend), OR": "https://meissnernordic.org/",
+  "Elk Lake Resort (Nordic), OR": "https://elklakeresort.com/",
+  "Methow Valley Trails, WA": "https://www.methowtrails.org/",
+  "Hoodoo, OR": "https://skihoodoo.com/",
+  "Willamette Pass, OR": "https://www.willamettepass.com/",
+  "Mt. Hood Meadows, OR": "https://www.skihood.com/",
+  "Timberline, OR": "https://www.timberlinelodge.com/",
+  "Mt. Ashland, OR": "https://www.mtashland.com/",
+  "Crystal Mountain, WA": "https://www.crystalmountainresort.com/",
+  "Stevens Pass, WA": "https://www.stevenspass.com/",
+  "Mt. Baker, WA": "https://www.mtbaker.us/",
+  "Whistler Blackcomb, BC": "https://www.whistlerblackcomb.com/",
+  "Birkie Trail (Cable, WI)": "https://www.birkie.com/trail/",
+  "Mt. Spokane, WA": "https://www.mtspokane.com/",
+  "Mission Ridge, WA": "https://www.missionridge.com/",
+  "Teacup Lake Nordic (Mt. Hood), OR": "https://www.teacupnordic.org/",
+  "Anthony Lakes, OR": "https://www.anthonylakes.com/",
+  "Mt. Washington Alpine, BC": "https://www.mountwashington.ca/",
+};
+const siteHost = u => new URL(u).hostname.replace(/^www\./,"");
+function resortSiteHTML(name){ const u = RESORT_SITE[name]; return u? `<a class="rs-link" href="${u}" target="_blank" rel="noopener">Resort site ↗</a>` : ""; }
+
+/* ---------- Trail maps: official maps, full screen with pinch zoom, saved for no-signal use ---------- */
+// PDFs load through Snowline's own address (see netlify.toml) so they can be drawn here and kept offline.
+const TM = (name, url, by) => ({ name, url, by });
+const BACH_WINTER = TM("Winter Map", "/tm/mtb/2025-11/FINAL_W2526_TrailMap_WithKey.pdf", "mtbachelor.com"),
+      BACH_NORDIC = TM("Nordic Trails", "/tm/mtb/2025-12/2526_MTBNordicMap_0.pdf", "mtbachelor.com"),
+      BACH_SPRING = TM("Spring Trail Map", "/tm/mtb/2025-05/Spring%20Operating%20Footprint.pdf", "mtbachelor.com");
+const TRAIL_MAPS = {
+  "Mt. Bachelor, OR": [BACH_WINTER, BACH_SPRING],
+  "Mt. Bachelor Nordic Center, OR": [BACH_NORDIC],
+  "Meissner Nordic (Bend), OR": [TM("Meissner ski & snowshoe trails", "/tm/usfs/deschutes/2021%20Meissner%20Nordic%20Map_UPDATED.pdf", "Deschutes National Forest & Meissner Nordic")],
+  "Methow Valley Trails, WA": [TM("Winthrop to Brown's Farm", "/tm/methow/wintertrails_winthroptobrownsfarm_2026.pdf", "methowtrails.org"), TM("Sun Mountain", "/tm/methow/wintertrails_sunmountain_2026.pdf", "methowtrails.org"), TM("Jack's to Brown's Farm", "/tm/methow/wintertrails_jackstobrownsfarm_2026.pdf", "methowtrails.org")],
+  "Birkie Trail (Cable, WI)": [TM("Birkie Trail pocket maps", "/tm/birkie/2025/10/Birkie-Pocket-Maps_Winter-2025-2026_101725.pdf", "birkie.com")],
+};
+const TM_CACHE = "sl-trailmaps";
+const tmThumbKey = u => "tmThumb:" + u;
+async function tmSaved(u){ try{ return !!(await (await caches.open(TM_CACHE)).match(u)); }catch(e){ return false; } }
+let pdfjsP;
+function loadPdfJs(){
+  return pdfjsP ||= new Promise((res, rej)=>{ const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    // A worker from another site can't start directly, so load its code and start it from this page.
+    s.onload = async () => { try{ const code = await fetch("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js?cors=1", {mode:"cors"}).then(r=>{ if(!r.ok) throw new Error("Map viewer didn't load"); return r.text(); });
+      pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(URL.createObjectURL(new Blob([code], {type:"text/javascript"}))); res(pdfjsLib); }catch(e){ pdfjsP = null; rej(e); } }; s.onerror = () => { pdfjsP = null; rej(new Error("Map viewer didn't load")); }; document.head.appendChild(s); });
+}
+async function tmBytes(u, onProg){
+  try{ const hit = await (await caches.open(TM_CACHE)).match(u); if(hit) return await hit.arrayBuffer(); }catch(e){}
+  const r = await fetch(u); if(!r.ok) throw new Error("The resort's server didn't send the map (" + r.status + ")");
+  const total = +r.headers.get("content-length") || 0;
+  if(!r.body || !onProg) return await r.arrayBuffer();
+  const rd = r.body.getReader(), parts = []; let got = 0;
+  for(;;){ const {done, value} = await rd.read(); if(done) break; parts.push(value); got += value.length; onProg(got, total); }
+  const out = new Uint8Array(got); let o = 0; for(const p of parts){ out.set(p, o); o += p.length; } return out.buffer;
+}
+// Render one PDF page as large as the phone can safely hold (iOS caps a canvas near 16 million pixels).
+async function tmDoc(buf){ const lib = await loadPdfJs(); return lib.getDocument({data: new Uint8Array(buf.slice(0))}).promise; }
+async function tmRender(buf, pageNo, maxPx){ return tmRenderDoc(await tmDoc(buf), pageNo, maxPx); }
+async function tmRenderDoc(doc, pageNo, maxPx){
+  const page = await doc.getPage(Math.min(pageNo, doc.numPages)); const v1 = page.getViewport({scale:1});
+  const scale = Math.min(maxPx / Math.max(v1.width, v1.height), Math.sqrt(15e6 / (v1.width*v1.height)));
+  const vp = page.getViewport({scale}); const cv = document.createElement("canvas"); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+  const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0,0,cv.width,cv.height);
+  // "print" draws in one go instead of frame by frame, so it finishes even if the app is in the background.
+  await page.render({canvasContext:g, viewport:vp, intent:"print"}).promise; return {cv, pages: doc.numPages};
+}
+function tmThumbFrom(cv, u){ try{ const w = 520, t = document.createElement("canvas"); t.width = w; t.height = Math.round(cv.height * w / cv.width); t.getContext("2d").drawImage(cv,0,0,t.width,t.height); const d = t.toDataURL("image/jpeg",.72); localStorage.setItem(tmThumbKey(u), d); return d; }catch(e){ return null; } }
+async function tmSave(tm){
+  const r = await fetch(tm.url); if(!r.ok) throw new Error("Download failed (" + r.status + ")");
+  const blob = await r.blob(); await (await caches.open(TM_CACHE)).put(tm.url, new Response(blob, {headers:{"Content-Type": blob.type || "application/pdf"}}));
+  await loadPdfJs();   // keep the viewer itself for no-signal use too
+  if(!localStorage.getItem(tmThumbKey(tm.url))){ try{ const {cv} = await tmRender(await blob.arrayBuffer(), 1, 1400); tmThumbFrom(cv, tm.url); }catch(e){} }
+  return blob.size;
+}
+async function tmUnsave(tm){ try{ await (await caches.open(TM_CACHE)).delete(tm.url); }catch(e){} }
+const fmtMB = b => (b/1048576).toFixed(b < 10485760? 1 : 0) + " MB";
+
+async function renderTrailMaps(){
+  const card = $("#tmCard"); if(!card || !S.loc) return; const L0 = S.loc;
+  const maps = TRAIL_MAPS[L0.name] || [], site = RESORT_SITE[L0.name];
+  if(!maps.length && !site){ card.remove(); return; }
+  const saved = await Promise.all(maps.map(t=>tmSaved(t.url))); if(S.loc!==L0) return;
+  card.innerHTML = `<div class="card-h"><h2>Trail Maps</h2>${maps.length? `<span class="muted">official maps</span>` : ""}</div>
+    ${maps.length? `<div class="tm-row">${maps.map((t,i)=>{ const th = localStorage.getItem(tmThumbKey(t.url));
+      return `<div class="tm-tile"><button class="tm-open" data-i="${i}">${th? `<img src="${th}" alt="">` : `<span class="tm-ph">🗺️<small>Tap to open</small></span>`}</button>
+        <div class="tm-cap"><b>${esc(t.name)}</b><button class="tm-dl ${saved[i]?"on":""}" data-s="${i}">${saved[i]? "✓ Saved offline" : "⤓ Download offline"}</button></div></div>`; }).join("")}</div>`
+    : `<a class="cam-resort" href="${site}" target="_blank" rel="noopener"><span class="cam-ic">🗺️</span><span><b>Trail map on ${siteHost(site)}</b><small>The resort's current lift and trail map</small></span><span style="color:var(--ice)">↗</span></a>`}
+    ${maps.length? `<div class="muted" style="font-size:11px;margin-top:6px">From ${[...new Set(maps.map(t=>t.by))].join(", ")}. Downloaded maps open with no signal.</div>` : ""}`;
+  card.querySelectorAll(".tm-open").forEach(b=>b.onclick=()=>tmViewer(maps[+b.dataset.i]));
+  card.querySelectorAll(".tm-dl").forEach(b=>b.onclick=async()=>{ const t = maps[+b.dataset.s];
+    if(b.classList.contains("on")){ if(confirm(`Remove the offline copy of ${t.name}?`)){ await tmUnsave(t); renderTrailMaps(); } return; }
+    b.disabled = true; b.textContent = "Downloading…";
+    try{ const n = await tmSave(t); toast(`${t.name} saved for offline (${fmtMB(n)})`); }catch(e){ toast(e.message || "Download failed"); }
+    renderTrailMaps(); });
+}
+async function tmViewer(tm){
+  let v = $("#tmView"); if(!v){ v = document.createElement("div"); v.id = "tmView"; document.body.appendChild(v); }
+  v.innerHTML = `<div class="tv-h"><span><b>${esc(tm.name)}</b><small>${esc(S.loc?.name.replace(/,\s*\w\w$/,"")||"")}</small></span><button class="cb-x" id="tvX" aria-label="Close">✕</button></div>
+    <div id="tvMap"><div class="tv-msg" id="tvMsg">Loading map…</div></div>
+    <div class="tv-f"><span id="tvPg"></span><button class="btn" id="tvDl"></button><a class="btn" style="text-decoration:none" href="${tm.url}" target="_blank" rel="noopener">Original ↗</a></div>`;
+  v.classList.add("on"); document.body.style.overflow = "hidden";
+  let m, url, page = 1, buf;
+  const close = () => { v.classList.remove("on"); document.body.style.overflow = ""; if(m) m.remove(); if(url) URL.revokeObjectURL(url); v.innerHTML = ""; renderTrailMaps(); };
+  $("#tvX").onclick = close;
+  const setDl = async () => { const b = $("#tvDl"); if(!b) return; const on = await tmSaved(tm.url); b.textContent = on? "✓ Saved offline" : "⤓ Download offline"; b.disabled = on;
+    b.onclick = async () => { b.disabled = true; b.textContent = "Saving…"; try{ const n = await tmSave(tm); toast(`Saved for offline (${fmtMB(n)})`); }catch(e){ toast(e.message||"Download failed"); } setDl(); }; };
+  setDl();
+  const msg = t => { const el = $("#tvMsg"); if(el) el.textContent = t; };
+  try{
+    buf = await tmBytes(tm.url, (got, tot) => msg(tot? `Loading map… ${Math.round(got/tot*100)}%` : `Loading map… ${fmtMB(got)}`));
+    msg("Drawing map…"); const doc = await tmDoc(buf); let gen = 0;
+    // Draw a quick sharp-enough version first, then swap in a detailed one for zooming in.
+    const toURL = async cv => URL.createObjectURL(await new Promise(r=>cv.toBlob(r, "image/jpeg", .88)));
+    const draw = async () => {
+      const my = ++gen; msg("Drawing map…"); await needMap();
+      const {cv, pages} = await tmRenderDoc(doc, page, 1600); if(my!==gen || !$("#tvMap")) return;
+      if(page===1 && !localStorage.getItem(tmThumbKey(tm.url))) tmThumbFrom(cv, tm.url);
+      if(url) URL.revokeObjectURL(url); url = await toURL(cv);
+      const host = $("#tvMap"); if(m){ m.remove(); m = null; } host.innerHTML = "";
+      const b = [[0,0],[cv.height, cv.width]];
+      m = L.map(host,{crs:L.CRS.Simple, minZoom:-6, maxZoom:3, zoomSnap:0, attributionControl:false, zoomControl:false, maxBoundsViscosity:.8});
+      const ov = L.imageOverlay(url, b).addTo(m); m.fitBounds(b); m.setMinZoom(m.getZoom()-.5); m.setMaxBounds(L.latLngBounds(b).pad(.15));
+      const pg = $("#tvPg"); if(pg) pg.innerHTML = pages>1? `<button class="btn" data-p="-1" ${page<=1?"disabled":""}>‹</button> Page ${page} of ${pages} <button class="btn" data-p="1" ${page>=pages?"disabled":""}>›</button>` : `<span class="muted">Pinch to zoom</span>`;
+      pg?.querySelectorAll("[data-p]").forEach(x=>x.onclick=()=>{ page += +x.dataset.p; draw(); });
+      const hi = await tmRenderDoc(doc, page, 3600).catch(()=>null); if(!hi || my!==gen || !m) return;
+      const u2 = await toURL(hi.cv); if(my!==gen || !m){ URL.revokeObjectURL(u2); return; }
+      ov.setUrl(u2); URL.revokeObjectURL(url); url = u2;
+    };
+    await draw();
+  }catch(e){ msg((navigator.onLine? "" : "You're offline and this map isn't downloaded. ") + (e.message || "The map didn't load.")); }
+}
+
+/* ---------- Favorites view switcher ---------- */
+const FAV_VIEWS = [["snow","Snow"],["forecast","Forecast"],["report","Report"],["weather","Weather"],["cams","Cams"]];
+S.favRep = {};
+async function favReport(sp){
+  const k=sp.name, X=S.favRep[k]; if(X && Date.now()-X.at < 15*60e3) return X;
+  const q=`lat=${sp.lat.toFixed(4)}&lon=${sp.lon.toFixed(4)}`;
+  const [obs, rep] = await Promise.all([api(`/obs?${q}`).catch(()=>null), api(`/report?spot=${encodeURIComponent(sp.name)}`).catch(()=>null)]);
+  return S.favRep[k] = {at:Date.now(), obs, rep};
+}
+function favBodyHTML(view, sp, r){
+  if(view==="forecast"){ const dn=(r.dn||[]).slice(0,5); if(!dn.length) return "";
+    return `<div class="ff">${dn.map(x=>`<div class="ff-d"><b>${x.d===todayStr()?"Today":dow(x.d)}</b>
+      <div class="ff-s"><span class="${x.day>=0.5?"y":""}">${fmtSnow(x.day,0)}</span><span class="${x.night>=0.5?"y":""}">${fmtSnow(x.night,0)}</span></div>
+      <small>${fmtT(x.hi)} / ${fmtT(x.lo)}</small></div>`).join("")}</div><div class="ff-k"><span>day</span><span>night</span> snow · summit</div>`; }
+  if(view==="weather"){ const n=r.now; if(!n) return "";
+    const c={P:n.P, frac:n.T<=0.5?1:0, CC:n.CC}; const hr=new Date().getHours();
+    return `<div class="fw"><div class="fw-now">${wxIcon(c,hr,34)}<div><b class="num">${fmtT(n.T)}</b><small>${SKY_TEXT[skyKind(c)]}</small></div><div class="fw-w"><b>${fmtWind(n.W)} ${windU()}</b><small>${compass(n.WD)} · summit</small></div></div>
+      <div class="fw-days">${(r.dn||[]).slice(0,5).map(x=>`<div><b>${x.d===todayStr()?"Today":dow(x.d)}</b>${wxIcon({P:x.day+x.night>0.5?1:0, frac:x.hi<=1?1:0, CC:x.cc},13,22)}<small>${fmtT(x.hi)}<br>${fmtT(x.lo)}</small></div>`).join("")}</div></div>`; }
+  if(view==="report"){ const X=S.favRep[sp.name]; if(!X) return `<div class="skel" style="height:64px"></div>`;
+    const st=(X.obs?.stations||[])[0], R=X.rep?.resort; const near = st && st.km<=SNOTEL_MAX_KM;
+    const nw = R && isNum(R.new24) ? [R.new24, provChip("rep", R.date)] : near && isNum(st.new24) ? [st.new24, provChip("meas", st.name)] : [r.last24, provChip("est")];
+    return `<div class="fr"><div><b class="num">${fmtSnow(nw[0],0)}</b><small>New snow</small></div><div><b class="num">${R&&isNum(R.base)? fmtSnow(R.base,0) : near&&isNum(st.depth)? fmtSnow(st.depth,0) : "—"}</b><small>${R&&isNum(R.base)? "Base depth" : "Snow depth"}</small></div><div><b>${R&&R.lifts&&S.mode==="alpine"? `${R.liftsOpen}/${R.lifts}` : near&&isNum(st.new72)? fmtSnow(st.new72,0) : "—"}</b><small>${R&&R.lifts&&S.mode==="alpine"? "Lifts open" : "New 72h"}</small></div></div>
+      <div class="fr-src">${nw[1]}${statusPill(X.rep)}</div>`; }
+  if(view==="cams"){ const mine=favCams().filter(c=>km(sp.lat,sp.lon,c.lat,c.lon)<=12); const X=S.favRep[sp.name]; const auto=[...(RESORT_CAMS[sp.name]||[]), ...(X?.cams||[])].filter(c=>!mine.some(m=>camKey(m)===camKey(c))).slice(0, Math.max(0,2-mine.length));
+    const list=[...mine, ...auto]; const links=CAM_LINKS[sp.name]||[];
+    if(!list.length && !links.length) return `<div class="muted">No cameras near this spot yet.</div>`;
+    return `${list.length? `<div class="cams-grid">${list.slice(0,4).map(c=>camTile({...c, mi:Math.round(km(sp.lat,sp.lon,c.lat,c.lon)*0.621*10)/10})).join("")}</div>`:""}${(RESORT_CAMS[sp.name]? [] : links).map(([t,u])=>`<a class="cam-resort" href="${u}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><span class="cam-ic">📷</span><span><b>${t}</b></span><span style="color:var(--ice)">↗</span></a>`).join("")}`; }
+  return null;
+}
+async function prepFavView(view, list){
+  if(view==="report") await Promise.all(list.map(sp=>favReport(sp).catch(()=>null)));
+  if(view==="cams") await Promise.all(list.filter(sp=>OREGON(sp.name)).map(async sp=>{ const X=S.favRep[sp.name] ||= {at:0}; if(!X.cams) X.cams = await loadSpotCams(sp); }));
+}
+
+/* ---------- Offline ---------- */
+if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+function updateOnline(){ document.body.classList.toggle("offline", !navigator.onLine); const p=$("#offPill"); if(p) p.classList.toggle("on", !navigator.onLine); }
+addEventListener("online", ()=>{ updateOnline(); if(S.loc) load(S.loc); }); addEventListener("offline", updateOnline);
+
+/* ---------- Powder card (shareable image) ---------- */
+
+/* ---------- Storm recap card: what Snowline said vs what fell ---------- */
+function recapData(){
+  const v = extrasFor(S.loc).verify; const rs = (v?.resort?.storms||[]).find(x=>x.snowline!=null && !x.ongoing);
+  if(rs){ const said = rs.snowline, miss = said - rs.reported, close = Math.abs(miss) <= Math.max(2, .25*rs.reported), nailed = Math.abs(miss) <= Math.max(1, .1*rs.reported);
+    return {st:{obsSnow: rs.reported, start: rs.start, end: rs.end}, said, who:"Snowline said", fell:`${v.resort.name} reported`, verdict: nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "IT OVERDELIVERED" : "IT CAME UP SHORT",
+      nailed, close, range: rs.start===rs.end? `${dow(rs.start)} ${md(rs.start)}` : `${dow(rs.start)}–${dow(rs.end)} ${md(rs.start)}`, station: null, source: `${v.resort.name}'s own snow report`, record: v.resort.record}; }
+  const st = (v?.storms||[]).filter(x=>!x.ongoing)[0]; if(!st) return null;
+  const said = isNum(st.snowline?.s)? st.snowline.s : st.fcstSnow, who = isNum(st.snowline?.s)? "Snowline said" : "Forecast said";
+  const miss = said - st.obsSnow, close = Math.abs(miss) <= Math.max(2, .25*st.obsSnow), nailed = Math.abs(miss) <= Math.max(1, .1*st.obsSnow);
+  const verdict = nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "IT OVERDELIVERED" : "IT CAME UP SHORT";
+  const range = st.start===st.end? `${dow(st.start)} ${md(st.start)}` : `${dow(st.start)}–${dow(st.end)} ${md(st.start)}`;
+  return {st, said, who, verdict, nailed, close, range, station: v.station.name, record: v.record};
+}
+async function drawRecapCard(fmt="post"){
+  const R = recapData(), W=1080, H = fmt==="story"? 1920 : 1350, top = fmt==="story"? 240 : 0;
+  const cv=document.createElement("canvas"); cv.width=W; cv.height=H; const g=cv.getContext("2d"); try{ await document.fonts.ready; }catch(_){}
+  const good = R.close || R.st.obsSnow > R.said;
+  const sky=g.createLinearGradient(0,0,0,H); sky.addColorStop(0, good? "#0f3b3a" : "#2a1d4f"); sky.addColorStop(.55,"#0a1220"); sky.addColorStop(1,"#030508"); g.fillStyle=sky; g.fillRect(0,0,W,H);
+  let seed = 11; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+  for(let i=0;i<120;i++){ g.globalAlpha=.2+rnd()*.5; g.fillStyle="#fff"; g.beginPath(); g.arc(rnd()*W, rnd()*H, .8+rnd()*rnd()*4, 0, 7); g.fill(); } g.globalAlpha=1;
+  try{ const logo=new Image(); logo.src="/icon.svg"; await logo.decode(); g.drawImage(logo,72,top+64,76,76); }catch(_){}
+  g.fillStyle="#fff"; g.font="700 40px 'Space Grotesk', Inter, sans-serif"; g.fillText("Snowline", 166, top+116);
+  g.fillStyle="#9fb0cc"; g.font="700 34px Inter, sans-serif"; g.fillText("STORM RECAP", 72, top+230);
+  g.fillStyle="#fff"; g.font="800 76px 'Space Grotesk', Inter, sans-serif"; g.fillText(R.verdict, 72, top+320, 940);
+  g.fillStyle="#c7d2e4"; g.font="600 40px Inter, sans-serif"; g.fillText(`${S.loc.name} · ${R.range}`, 72, top+385, 940);
+  // two big numbers side by side
+  const col = (x, label, val, c1, c2) => { g.fillStyle="#8fa1bf"; g.font="600 34px Inter, sans-serif"; g.fillText(label, x, top+500);
+    const gr=g.createLinearGradient(0,top+520,0,top+760); gr.addColorStop(0,c1); gr.addColorStop(1,c2); g.fillStyle=gr; g.font="800 230px 'Space Grotesk', Inter, sans-serif"; g.fillText(fmtSnow(val,0).replace('"',"″"), x-8, top+740, 470); };
+  col(72, R.who, R.said, "#e0f2fe", "#38bdf8"); col(580, R.fell || "What fell", R.st.obsSnow, "#ffffff", good? "#6ee7b7" : "#c4b5fd");
+  // bars
+  const mx = Math.max(R.said, R.st.obsSnow, 1), by = top+900, bh = 46, bwMax = 936;
+  [[R.said,"#38bdf8"],[R.st.obsSnow, good? "#6ee7b7" : "#a78bfa"]].forEach(([v,c],i)=>{ g.fillStyle="#1b2438"; g.beginPath(); g.roundRect(72, by+i*76, bwMax, bh, 23); g.fill(); g.fillStyle=c; g.beginPath(); g.roundRect(72, by+i*76, Math.max(46, v/mx*bwMax), bh, 23); g.fill(); });
+  g.fillStyle="#9fb0cc"; g.font="500 30px Inter, sans-serif"; g.fillText(R.source? `As reported in ${R.source}` : `Measured at the ${R.station} snow gauge${isNum(R.st.obsWater)? ` · ${R.st.obsWater.toFixed(2)}″ of water` : ""}`, 72, by+200, 940);
+  if(R.record && R.record.storms>1){ g.fillStyle="#fff"; g.font="700 40px 'Space Grotesk', Inter, sans-serif"; g.fillText(`${R.record.within} of ${R.record.storms} storms within 2″ this season`, 72, by+280, 940); }
+  g.fillStyle="#6b7a94"; g.font="500 26px Inter, sans-serif"; g.fillText(`Free snow forecasts · ${location.host}`, 72, H-(fmt==="story"? 150 : 52));
+  return cv;
+}
+async function openRecapSheet(){
+  const R = recapData(); if(!R) return; openSheet("shareSheet"); const box=$("#shareBox"); let fmt = store.get("shareFmt","post"), url=null, file=null;
+  const place = S.loc.name.replace(/, [A-Z]{2}$/,""), link = location.origin + location.pathname + `?s=${encodeURIComponent(S.loc.name)}`;
+  const msg = R.st.obsSnow > R.said + 2? `${fmtSnow(R.st.obsSnow,0)} fell at ${place}! Even more than the ${fmtSnow(R.said,0)} forecast ❄️` : `${R.who} ${fmtSnow(R.said,0)} for ${place}, and ${fmtSnow(R.st.obsSnow,0)} fell. ${R.close? "Called it 🎯" : ""}`.trim();
+  const draw = async () => { box.innerHTML = `<div class="loading"><div class="spin"></div>Making your recap…</div>`;
+    const cv = await drawRecapCard(fmt); const blob = await new Promise(r=>cv.toBlob(r,"image/png")); if(url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob); file = new File([blob], "snowline-storm-recap.png", {type:"image/png"});
+    box.innerHTML = `<div class="seg sm" id="shFmt" style="margin-bottom:10px"><button data-f="post" class="${fmt==="post"?"on":""}">Post</button><button data-f="story" class="${fmt==="story"?"on":""}">Story</button></div>
+      <img src="${url}" alt="Storm recap" style="width:100%;${fmt==="story"? "max-height:58vh;object-fit:contain;" : ""}border-radius:16px;display:block;background:#05080f">
+      <textarea id="shMsg" rows="2" class="sh-msg">${esc(msg)}</textarea>
+      <div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:8px"><button class="btn primary" id="shImg" style="flex:1">Send to friends</button><button class="btn" id="shLink" style="flex:0 0 auto">Copy link</button></div>`;
+    box.querySelectorAll("#shFmt button").forEach(b=>b.onclick=()=>{ fmt=b.dataset.f; store.set("shareFmt",fmt); draw(); });
+    $("#shImg").onclick = async () => { const text = `${$("#shMsg").value.trim()}\n${link}`; try{ if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], text}); else if(navigator.share) await navigator.share({text, url:link}); else { const a=document.createElement("a"); a.href=url; a.download=file.name; a.click(); } }catch(e){} };
+    $("#shLink").onclick = async () => { try{ await navigator.clipboard.writeText(`${$("#shMsg").value.trim()} ${link}`); toast("Message and link copied"); }catch(e){ toast(link); } }; };
+  draw();
+}
+/* ---------- Share card: made to get friends fired up ---------- */
+function shareStory(){
+  const {C, SIM} = S.ctx; const daily = C.consDays.map(d=>d.day+d.night).slice(0,10);
+  // the biggest storm in the next 7 days (consecutive days with 1"+), else the snowiest day
+  const storms = []; let cur = null;
+  daily.forEach((v,k)=>{ if(v>=1){ if(!cur) cur={s:k,e:k,tot:0}; cur.e=k; cur.tot+=v; } else if(cur){ storms.push(cur); cur=null; } }); if(cur) storms.push(cur);
+  const st = storms.filter(x=>x.s<7).sort((a,b)=>b.tot-a.tot)[0] || null;
+  let bk = 0; for(let k=0;k<7;k++) if(daily[k]>daily[bk]) bk=k;
+  const tot = st? st.tot : daily[bk], big = st? Math.max(...daily.slice(st.s, st.e+1)) : daily[bk], bigK = st? daily.indexOf(big, st.s) : bk;
+  const when = st? (st.e>st.s? `${dow(C.days[st.s])}–${dow(C.days[st.e])}` : dayLabel(C.days[st.s])) : dayLabel(C.days[bk]);
+  const ten = windowTotal(daily, 10);
+  const headline = tot>=18? "IT'S GONNA DUMP" : tot>=10? "POW DAY INCOMING" : tot>=5? "SNOW ON THE WAY" : tot>=1.5? "FRESH SNOW COMING" : "SKI DAY AHEAD";
+  const x = daySummary(C,SIM,C.days[bigK]);
+  return {daily, st, tot, big, bigK, when, ten, headline, x};
+}
+async function drawPowderCard(fmt="post"){
+  const {C, e} = S.ctx, W=1080, H = fmt==="story"? 1920 : 1350, top = fmt==="story"? 220 : 0;
+  const cv=document.createElement("canvas"); cv.width=W; cv.height=H; const g=cv.getContext("2d");
+  try{ await document.fonts.ready; }catch(_){}
+  const T = shareStory(), hot = T.tot>=10;
+  // night sky
+  const sky=g.createLinearGradient(0,0,0,H); sky.addColorStop(0, hot? "#241a4d" : "#132a52"); sky.addColorStop(.5,"#0b1226"); sky.addColorStop(1,"#030508"); g.fillStyle=sky; g.fillRect(0,0,W,H);
+  const glow=g.createRadialGradient(W*.75, top+380, 20, W*.75, top+380, 620); glow.addColorStop(0, hot? "rgba(192,132,252,.35)" : "rgba(56,189,248,.28)"); glow.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle=glow; g.fillRect(0,0,W,H);
+  // falling snow (fixed seed so the card looks the same every time)
+  let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+  const flakes = Math.round(60 + Math.min(T.tot, 30)*8);
+  for(let i=0;i<flakes;i++){ const r = .8 + rnd()*rnd()*5, y = rnd()*H*.82; g.globalAlpha = .25 + rnd()*.6; g.fillStyle="#fff"; g.beginPath(); g.arc(rnd()*W, y, r, 0, 7); g.fill(); }
+  g.globalAlpha = 1;
+  // mountains with snowy tops
+  const base = top + (fmt==="story"? 1300 : 1180);   // peaks stay below the numbers
+  const ridge = (pts, c1, c2) => { const gr=g.createLinearGradient(0,base-260,0,H); gr.addColorStop(0,c1); gr.addColorStop(1,c2); g.fillStyle=gr; g.beginPath(); g.moveTo(0,H); pts.forEach(([x,y])=>g.lineTo(x,base+y)); g.lineTo(W,H); g.fill(); };
+  ridge([[0,40],[180,-60],[330,20],[520,-210],[700,-40],[860,-120],[1080,-20]], "#2a3d6b", "#0b1226");
+  g.fillStyle="#eaf2ff"; g.beginPath(); g.moveTo(520,base-210); g.lineTo(588,base-150); g.lineTo(560,base-158); g.lineTo(530,base-135); g.lineTo(500,base-160); g.lineTo(458,base-152); g.fill();
+  g.beginPath(); g.moveTo(860,base-120); g.lineTo(912,base-80); g.lineTo(884,base-86); g.lineTo(856,base-70); g.lineTo(826,base-92); g.fill();
+  ridge([[0,120],[240,30],[420,110],[640,10],[880,100],[1080,40]], "#16244a", "#05080f");
+  // brand
+  try{ const logo = new Image(); logo.src="/icon.svg"; await logo.decode(); g.drawImage(logo, 72, top+64, 76, 76); }catch(_){}
+  g.fillStyle="#fff"; g.font="700 40px 'Space Grotesk', Inter, sans-serif"; g.fillText("Snowline", 166, top+116);
+  // headline
+  g.font="800 50px 'Space Grotesk', Inter, sans-serif"; const hw = g.measureText(T.headline).width + 56;
+  const pill = g.createLinearGradient(72,0,72+hw,0); pill.addColorStop(0, hot? "#f472b6" : "#38bdf8"); pill.addColorStop(1, hot? "#a78bfa" : "#6366f1");
+  g.fillStyle = pill; g.beginPath(); g.roundRect(72, top+190, hw, 84, 42); g.fill(); g.fillStyle="#fff"; g.fillText(T.headline, 100, top+250);
+  // the number
+  const num = fmtSnow(T.tot, T.tot<10 && T.tot%1>=.25? 1 : 0).replace('"',"″");
+  g.font="800 330px 'Space Grotesk', Inter, sans-serif"; const nw = g.measureText(num).width;
+  const ng = g.createLinearGradient(0, top+330, 0, top+640); ng.addColorStop(0,"#ffffff"); ng.addColorStop(1, hot? "#c4b5fd" : "#7dd3fc"); g.fillStyle = ng;
+  g.shadowColor = hot? "rgba(167,139,250,.55)" : "rgba(56,189,248,.45)"; g.shadowBlur = 60; g.fillText(num, 60, top+610, 960); g.shadowBlur = 0;
+  g.fillStyle="#e6edf7"; g.font="700 56px 'Space Grotesk', Inter, sans-serif"; g.fillText(T.when, 72, top+700, 940);
+  g.fillStyle="#9fb0cc"; g.font="600 40px Inter, sans-serif"; g.fillText(`at ${S.loc.name}`, 72, top+760, 940);
+  // facts row
+  const facts = [ T.st && T.st.e>T.st.s? [`${fmtSnow(T.big,0)}`, `biggest day · ${dow(C.days[T.bigK])}`] : null, [`${fmtSnow(T.ten,0)}`, "next 10 days"], T.x? [`${T.x.best.avg.toFixed(1)}`, `${S.mode==="alpine"? "ski" : MODE_NAME[S.mode].toLowerCase()} score`] : null ].filter(Boolean).slice(0,3);
+  facts.forEach(([v,l],i)=>{ const fx = 72 + i*330; g.fillStyle="#fff"; g.font="800 64px 'Space Grotesk', Inter, sans-serif"; g.fillText(v, fx, top+880); g.fillStyle="#8fa1bf"; g.font="500 28px Inter, sans-serif"; g.fillText(l, fx, top+922, 300); });
+  // 10-day bars, storm days lit
+  const n = 10, bw = 70, gap = (W - 144 - n*bw)/(n-1), by = H - (fmt==="story"? 250 : 150), mx = Math.max(4, ...T.daily);
+  T.daily.forEach((v,i)=>{ const h = Math.max(8, v/mx*(fmt==="story"? 300 : 210)), x = 72 + i*(bw+gap), inStorm = T.st && i>=T.st.s && i<=T.st.e;
+    const bg = g.createLinearGradient(0, by-h, 0, by); bg.addColorStop(0, v<0.5? "#2a3350" : inStorm? (hot? "#e879f9" : "#7dd3fc") : "#4b6b9a"); bg.addColorStop(1, v<0.5? "#1a2033" : inStorm? (hot? "#8b5cf6" : "#3b82f6") : "#2b3f63");
+    g.fillStyle = bg; g.beginPath(); g.roundRect(x, by-h, bw, h, 12); g.fill();
+    if(v>=1){ g.fillStyle = inStorm? "#fff" : "#c3cfe3"; g.font="700 28px 'Space Grotesk', Inter, sans-serif"; g.textAlign="center"; g.fillText(Math.round(snowNum(v))+"", x+bw/2, by-h-14); }
+    g.textAlign="center"; g.fillStyle = inStorm? "#fff" : "#7d8aa3"; g.font="700 26px Inter, sans-serif"; g.fillText(LETTER[new Date(C.days[i]+"T12:00:00Z").getUTCDay()], x+bw/2, by+40); g.textAlign="left"; });
+  g.fillStyle="#6b7a94"; g.font="500 26px Inter, sans-serif"; g.fillText(`Free snow forecasts · ${location.host}`, 72, H - (fmt==="story"? 150 : 52));
+  return cv;
+}
+async function openShareSheet(){
+  if(!S.ctx || !S.loc) return; openSheet("shareSheet"); const box=$("#shareBox");
+  const L0=S.loc, preset=PRESETS.some(p=>p.name===L0.name);
+  const link = location.origin + location.pathname + (preset? `?s=${encodeURIComponent(L0.name)}` : `?n=${encodeURIComponent(L0.name)}&lat=${L0.lat.toFixed(4)}&lon=${L0.lon.toFixed(4)}&b=${Math.round(L0.base)}&t=${Math.round(L0.top)}`);
+  const T = shareStory(), place = L0.name.replace(/, [A-Z]{2}$/,"");
+  const hype = T.tot>=10? `🚨 ${fmtSnow(T.tot,0)} coming to ${place} ${T.when}! Who's in? ❄️` : T.tot>=1.5? `❄️ ${fmtSnow(T.tot,0)} on the way to ${place} ${T.when}. Let's go?` : `${place} looks good ${T.when}. Who wants to ski?`;
+  let fmt = store.get("shareFmt","post"), file = null, url = null;
+  const draw = async () => {
+    box.innerHTML = `<div class="loading"><div class="spin"></div>Making your card…</div>`;
+    const cv = await drawPowderCard(fmt); const blob = await new Promise(r=>cv.toBlob(r,"image/png")); if(url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob);
+    file = new File([blob], `snowline-${place.toLowerCase().replace(/[^a-z0-9]+/g,"-")}.png`, {type:"image/png"});
+    box.innerHTML = `<div class="seg sm" id="shFmt" style="margin-bottom:10px"><button data-f="post" class="${fmt==="post"?"on":""}">Post</button><button data-f="story" class="${fmt==="story"?"on":""}">Story</button></div>
+      <img src="${url}" alt="Snow card" style="width:100%;${fmt==="story"? "max-height:58vh;object-fit:contain;" : ""}border-radius:16px;display:block;background:#05080f">
+      <textarea id="shMsg" rows="2" class="sh-msg">${esc(hype)}</textarea>
+      <div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:8px"><button class="btn primary" id="shImg" style="flex:1">Send to friends</button><button class="btn" id="shLink" style="flex:0 0 auto">Copy link</button></div>
+      <div class="muted" style="margin-top:8px;font-size:11.5px">The message and a link to this forecast go with the picture.</div>`;
+    box.querySelectorAll("#shFmt button").forEach(b=>b.onclick=()=>{ fmt=b.dataset.f; store.set("shareFmt",fmt); draw(); });
+    $("#shImg").onclick = async () => { const text = `${$("#shMsg").value.trim()}\n${link}`;
+      try{ if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], text});
+        else if(navigator.share) await navigator.share({text, url:link});
+        else { const a=document.createElement("a"); a.href=url; a.download=file.name; a.click(); await navigator.clipboard?.writeText(text); toast("Card saved · message copied"); } }catch(e){} };
+    $("#shLink").onclick = async () => { try{ await navigator.clipboard.writeText(`${$("#shMsg").value.trim()} ${link}`); toast("Message and link copied"); }catch(e){ toast(link); } };
+  };
+  draw();
+}
+
+/* ================= Sheets ================= */
+var openSheet = function(id){ $("#"+id).classList.add("on"); document.body.style.overflow="hidden"; if(id==="setSheet") renderSyncBox(); };
+var closeSheet = function(id){ $("#"+id).classList.remove("on"); if(!document.querySelector(".sheet.on")) document.body.style.overflow=""; };
+// Sheets join the history, so the phone's back button / gesture closes them instead of leaving the app.
+const _openSheet = openSheet, _closeSheet = closeSheet;
+openSheet = function(id){ const was = document.querySelector(".sheet.on"); _openSheet(id); if(!was && history.state?.sheet !== id) history.pushState({sheet:id}, "", location.href); };
+closeSheet = function(id, fromPop){ _closeSheet(id); if(!fromPop && history.state?.sheet && !document.querySelector(".sheet.on")) history.back(); };
+addEventListener("popstate", ()=>{ const open = [...document.querySelectorAll(".sheet.on")]; if(open.length && !history.state?.sheet) open.forEach(s=>closeSheet(s.id, true)); });
+
+document.querySelectorAll(".sheet").forEach(sh=>{
+  sh.addEventListener("click", e=>{ if(e.target===sh) closeSheet(sh.id); });
+  sh.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>closeSheet(sh.id));
+  const b = sh.querySelector(".sheet-b"); let y0=null, dy=0;
+  b.addEventListener("touchstart",e=>{ if(b.scrollTop<=0 && !e.target.closest("#map,input,select")){ y0=e.touches[0].clientY; dy=0; b.style.transition="none"; } else y0=null; },{passive:true});
+  b.addEventListener("touchmove",e=>{ if(y0==null) return; dy=Math.max(0,e.touches[0].clientY-y0); b.style.transform=`translateY(${dy}px)`; },{passive:true});
+  b.addEventListener("touchend",()=>{ if(y0==null) return; b.style.transition=""; b.style.transform=""; if(dy>90) closeSheet(sh.id); y0=null; });
+});
+
+/* ================= Location sheet ================= */
+function spotRow(sp, opts={}){
+  const nordic = sp.xc || /Nordic|Trails|Lodge|XC|Birkie/i.test(sp.name);
+  return `<button class="li" data-spot="${encodeURIComponent(sp.name)}">${opts.rank?`<span class="rk">${opts.rank}</span>`:""}<span class="nm"><b>${sp.name}${nordic?'<span class="tag">XC</span>':""}</b><small>${Math.round(sp.base).toLocaleString()}–${Math.round(sp.top).toLocaleString()} ft</small></span>${S.loc?.name===sp.name?'<span style="color:var(--ice)">●</span>':""}</button>`;
+}
+/* Central Oregon first: the spots most people here look for, plus easy search by everyday names */
+const CO_RESORTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Elk Lake Resort (Nordic), OR", "Hoodoo, OR", "Willamette Pass, OR"];
+// One-time tidy: favorites used to be added newest-first. Put the Central Oregon areas in their usual order
+// (Bachelor, Bachelor Nordic, Meissner, Elk Lake…), everything else after them as before. Reorder anytime in Favorites → Edit.
+if(!store.get("favOrder1") && Array.isArray(S.favs) && S.favs.length > 1){
+  const rank = f => { const i = CO_RESORTS.indexOf(f.name); return i < 0? 100 : i; };
+  S.favs = S.favs.map((f,i)=>[f,i]).sort((a,b)=>rank(a[0])-rank(b[0]) || a[1]-b[1]).map(x=>x[0]); store.set("favs", S.favs);
+  setTimeout(()=>{ try{ syncSoon(); pushSync(); updateTop(); }catch(e){} }, 2000);   // keep synced devices and alerts in the same order
+}
+store.set("favOrder1", 1);
+const SPOT_AKA = {
+  "Mt. Bachelor, OR": "mount bachelor mt bachelor mtb bachelor butte bend ski resort sunrise west village pine marten summit",
+  "Mt. Bachelor Nordic Center, OR": "mount bachelor nordic mt bachelor nordic cross country xc skate classic bachelor nordic lodge west village",
+  "Meissner Nordic (Bend), OR": "virginia meissner sno park snopark nordic cross country xc skate bend swampy wanoga",
+  "Elk Lake Resort (Nordic), OR": "elk lake resort nordic cross country xc skate classic loop cascade lakes bend",
+  "Hoodoo, OR": "hoodoo ski area santiam pass sisters",
+  "Willamette Pass, OR": "willamette pass odell lake crescent",
+  "Tumalo Mountain, OR": "tumalo mtn dutchman flat sno park backcountry tour bc",
+  "Ball Butte, OR": "ball butte dutchman flat backcountry tour bc",
+  "Broken Top, OR": "broken top dutchman flat backcountry tour bc",
+  "Tam McArthur Rim, OR": "tam mcarthur rim three creek lake sisters backcountry tour bc",
+  "South Sister, OR": "south sister three sisters devils lake backcountry tour bc",
+  "Paulina Peak, OR": "paulina peak newberry crater la pine backcountry tour bc",
+  "Mt. Hood Meadows, OR": "mount hood meadows mt hood", "Timberline, OR": "timberline lodge mount hood mt hood",
+  "Teacup Lake Nordic (Mt. Hood), OR": "teacup nordic mount hood mt hood cross country xc",
+  "Mt. Ashland, OR": "mount ashland", "Mt. Baker, WA": "mount baker", "Mt. Spokane, WA": "mount spokane",
+  "Birkie Trail (Cable, WI)": "american birkebeiner birkie cable hayward telemark",
+  "Methow Valley Trails, WA": "methow mazama winthrop cross country xc"
+};
+const normQ = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\bsainte?\b/g, "st").replace(/\bmount\b/g, "mt").replace(/\bmtn\b/g, "mountain").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+function matchSpots(q){
+  const words = normQ(q).split(" ").filter(Boolean); if(!words.length) return [];
+  const seen = new Set(), all = [...S.favs, ...PRESETS].filter(p=> !seen.has(p.name) && seen.add(p.name));
+  return all.map(p=>{ const hay = normQ(p.name + " " + (SPOT_AKA[p.name]||""));
+      if(!words.every(w=> hay.split(" ").some(h=>h.startsWith(w)))) return null;
+      const name = normQ(p.name); let sc = name.startsWith(words[0])? 3 : name.includes(words[0])? 2 : 1;
+      if(CO_RESORTS.includes(p.name)) sc += 1; if(S.favs.some(f=>f.name===p.name)) sc += 1;
+      return {p, sc}; }).filter(Boolean).sort((a,b)=>b.sc-a.sc).slice(0, 8).map(x=>x.p);
+}
+function bindSpotRows(root){
+  root.querySelectorAll("[data-spot]").forEach(b=>b.onclick=()=>{ const n=decodeURIComponent(b.dataset.spot); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); closeSheet("locSheet"); if(location.hash && location.hash!=="#forecast" && location.hash!=="#maps" && location.hash!=="#outlook") location.hash="forecast"; load(sp); });
+}
+function renderLocList(){
+  const groups = {}; PRESETS.filter(p=>!CO_RESORTS.includes(p.name) && !p.bc).forEach(p=>{ const r = regionOf2(p.name); (groups[r] ||= []).push(p); });
+  groups["Central Oregon"] = CO_RESORTS.map(n=>PRESETS.find(p=>p.name===n)).filter(Boolean);
+  groups["Central Oregon backcountry"] = PRESETS.filter(p=>p.bc);
+  const order = ["Central Oregon","Central Oregon backcountry","Pacific NW","Rockies","California","Midwest","Other"];
+  $("#locList").innerHTML =
+    (S.favs.length? `<div class="grp">★ Favorites</div><div class="list">${S.favs.map(f=>spotRow(f)).join("")}</div>`:"") +
+    order.filter(r=>groups[r]).map(r=>`<div class="grp">${r}</div><div class="list">${groups[r].map(p=>spotRow(p)).join("")}</div>`).join("");
+  $("#locList").querySelectorAll("[data-spot]").forEach(b=>b.onclick=()=>{ const n=decodeURIComponent(b.dataset.spot); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); closeSheet("locSheet"); if(location.hash && location.hash!=="#forecast" && location.hash!=="#maps" && location.hash!=="#outlook") location.hash="forecast"; load(sp); });
+}
+$("#locBtn").onclick = () => { renderLocList(); $("#q").value=""; $("#res").innerHTML=""; $("#locList").hidden=false; openSheet("locSheet"); };
+$("#setBtn").onclick = () => openSheet("setSheet");
+$("#ltBtn").onclick = () => $("#locBtn").click();
+$("#shareBtn").onclick = () => openShareSheet();
+$("#bellBtn").onclick = () => openBell();
+$("#favBtn").onclick = () => { if(!S.loc) return; const i = S.favs.findIndex(f=>f.name===S.loc.name); if(i>=0) S.favs.splice(i,1); else S.favs.push({...S.loc}); store.set("favs",S.favs); updateTop(); pushSync(); toast(i>=0? "Removed from Favorites" : "Saved to Favorites"); };
+
+/* ---------- Search: Snowline spots, then every named ski area (OpenSkiMap), then towns and peaks ---------- */
+const STATES = {AL:"alabama",AK:"alaska",AZ:"arizona",AR:"arkansas",CA:"california",CO:"colorado",CT:"connecticut",DE:"delaware",FL:"florida",GA:"georgia",HI:"hawaii",ID:"idaho",IL:"illinois",IN:"indiana",IA:"iowa",KS:"kansas",KY:"kentucky",LA:"louisiana",ME:"maine",MD:"maryland",MA:"massachusetts",MI:"michigan",MN:"minnesota",MS:"mississippi",MO:"missouri",MT:"montana",NE:"nebraska",NV:"nevada",NH:"new hampshire",NJ:"new jersey",NM:"new mexico",NY:"new york",NC:"north carolina",ND:"north dakota",OH:"ohio",OK:"oklahoma",OR:"oregon",PA:"pennsylvania",RI:"rhode island",SC:"south carolina",SD:"south dakota",TN:"tennessee",TX:"texas",UT:"utah",VT:"vermont",VA:"virginia",WA:"washington",WV:"west virginia",WI:"wisconsin",WY:"wyoming",
+  AB:"alberta",BC:"british columbia",MB:"manitoba",NB:"new brunswick",NL:"newfoundland",NS:"nova scotia",ON:"ontario",QC:"quebec",SK:"saskatchewan",YT:"yukon",NT:"northwest territories"};
+const Q_ALIAS = { slc:"salt lake city", jh:"jackson hole", lcc:"little cottonwood", bcc:"big cottonwood", pc:"park city", cda:"coeur d alene", st:"st", saint:"st", ste:"st", sainte:"st", mtn:"mountain", xcountry:"xc" };
+const KIND_W = { xc:"n", nordic:"n", classic:"n", skate:"n", skating:"n", langlauf:"n", resort:"a", resorts:"a", alpine:"a", downhill:"a", lifts:"a" };
+const STOP_W = new Set(["near","in","by","around","at","the","of","ski","skiing","area","areas","center","centre","trail","trails","cross","country","place","places","to"]);
+const BEND = [44.058, -121.315];
+const AREAS = { rows:null, p:null, src:"" };
+function loadAreas(){ return AREAS.p ||= fetch("/skiareas.json").then(r=>r.ok? r.json() : {rows:[]}).then(j=>{ AREAS.src = j.source||"";
+  AREAS.rows = (j.rows||[]).map(r=>{ const [name,lat,lon,kind,cc,reg,loc,lo,hi] = r;
+    return {name, lat, lon, kind, cc, reg, loc, lo, hi, nt: normQ(name).split(" "), ot: normQ(`${loc} ${reg} ${STATES[reg]||""}`).split(" ").filter(Boolean)}; });
+  return AREAS.rows; }).catch(()=> (AREAS.rows = [])); }
+function lev(a, b){ if(Math.abs(a.length-b.length)>2) return 9; const d = Array.from({length:a.length+1}, (_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j;
+  for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++){ d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1]) d[i][j]=Math.min(d[i][j], d[i-2][j-2]+1); }
+  return d[a.length][b.length]; }
+function tokScore(q, toks){ let best = 0;
+  for(const h of toks){ if(!h) continue;
+    if(h===q) return 4; if(h.startsWith(q)) { best = Math.max(best, 3); continue; }
+    if(q.length>=4){ const tol = q.length>=7? 2 : 1; if(lev(q, h)<=tol || (h.length>q.length && lev(q, h.slice(0,q.length))<=1)) best = Math.max(best, 2); } }
+  return best; }
+function parseQ(q){
+  let words = normQ(q).split(" ").filter(Boolean).flatMap(w=> (Q_ALIAS[w]||w).split(" "));
+  if(/\bcross country\b/.test(normQ(q))) words.push("xc");
+  let kind = null; words.forEach(w=>{ if(KIND_W[w]) kind = KIND_W[w]; });
+  const req = words.filter(w=> !KIND_W[w] && !STOP_W.has(w));
+  return { kind, req, place: req.join(" ") };
+}
+function matchAreas(P){
+  if(!AREAS.rows || !P.req.length) return [];
+  const out = [], byPlace = [], nordicMode = S.mode==="skate" || S.mode==="classic";
+  for(const a of AREAS.rows){
+    if(P.kind && !a.kind.includes(P.kind)) continue;
+    if(/^duplicate\b/i.test(a.name)) continue;
+    let sc = 0, inName = 0, fuzzy = false;
+    for(const w of P.req){ const n = tokScore(w, a.nt), o = tokScore(w, a.ot); if(!n && !o){ sc = -1; break; } if(Math.max(n,o)===2) fuzzy = true; if(n>=o){ sc += n*2; inName++; } else sc += o; }
+    if(sc < 0) continue;
+    if(normQ(a.name).startsWith(P.req.join(" "))) sc += 3;
+    if(nordicMode? a.kind.includes("n") : a.kind.includes("a")) sc += 1;
+    const d = km(BEND[0], BEND[1], a.lat, a.lon); if(d < 250) sc += 2; else if(a.cc==="US"||a.cc==="CA") sc += 1;
+    (inName? out : byPlace).push({a, sc, d, fuzzy});
+  }
+  let list = out.length? out : byPlace; if(list.some(x=>!x.fuzzy)) list = list.filter(x=>!x.fuzzy);   // spelling guesses only when nothing matches as typed
+  matchAreas.byPlace = !out.length && byPlace.length > 0;
+  return list.sort((x,y)=> y.sc-x.sc || x.d-y.d).slice(0, 10).map(x=>x.a);
+}
+const areaKind = a => a.kind==="an"? "Resort + Nordic" : a.kind==="n"? "Nordic" : "Resort";
+const areaWhere = a => [a.loc && a.loc!==a.name? a.loc : "", (a.cc==="US"||a.cc==="CA")? a.reg : [a.reg, a.cc].filter(Boolean).join(", ")].filter(Boolean).join(", ");
+const areaEl = a => isNum(a.lo)&&isNum(a.hi)&&a.hi-a.lo>20? ` · ${Math.round(a.lo*FT).toLocaleString()}–${Math.round(a.hi*FT).toLocaleString()} ft` : "";
+function areaRow(a, i, dist){ return `<button class="li" data-area="${i}"><span class="nm"><b>${esc(a.name)}${a.kind.includes("n")? '<span class="tag">XC</span>' : ""}</b><small>${areaKind(a)} · ${esc(areaWhere(a))}${areaEl(a)}${dist!=null? ` · ${Math.round(dist*0.621)} mi` : ""}</small></span></button>`; }
+async function pickArea(a){
+  closeSheet("locSheet"); if(location.hash && !["#forecast","#maps","#outlook"].includes(location.hash)) location.hash = "forecast";
+  let lo = a.lo, hi = a.hi;
+  if(!isNum(lo)){ try{ const j = await getJSON(`https://api.open-meteo.com/v1/elevation?latitude=${a.lat}&longitude=${a.lon}`); lo = j.elevation[0]; }catch(e){ lo = 1500; } }
+  if(!isNum(hi) || hi-lo < 30) hi = lo + (a.kind==="n"? 120 : 450);
+  const st = (a.cc==="US"||a.cc==="CA")? a.reg : (a.reg || a.cc);
+  const loc = { name: st && !a.name.endsWith(st)? `${a.name}, ${st}` : a.name, lat:a.lat, lon:a.lon, base: Math.round(lo*FT), top: Math.round(hi*FT), xc: a.kind.includes("n") || undefined };
+  if(a.kind==="n" && S.mode==="alpine"){ setMode(store.get("xcMode","skate")); toast("Switched to Nordic for this trail system"); }
+  load(loc);
+}
+let qT, qSeq = 0;
+$("#q").oninput = e => { clearTimeout(qT); const q = e.target.value.trim(), seq = ++qSeq;
+  if(q.length<2){ $("#res").innerHTML=""; $("#locList").hidden=false; return; }
+  $("#locList").hidden = true;
+  const P = parseQ(q), mine = matchSpots(P.req.join(" ") || q);
+  const words = n => normQ(n).split(" ").filter(w=>w.length>=4);
+  const near = (p, list) => list.some(m=>{ const d = km(m.lat, m.lon, p.lat, p.lon); return d < 3 || (p.name && d < 45 && words(p.name).some(w=>words(m.name).includes(w))); });
+  let areas = [], nearby = [], places = [], nearName = "";
+  const draw = () => { if(seq!==qSeq) return;
+    const A = [...areas, ...nearby.map(x=>x.a)];
+    let h = mine.length? `<div class="grp">Snowline spots</div><div class="list">${mine.map(p=>spotRow(p)).join("")}</div>` : "";
+    if(areas.length) h += `<div class="grp">Ski areas</div><div class="list">${areas.map((a,i)=>areaRow(a,i)).join("")}</div>`;
+    if(nearby.length) h += `<div class="grp">${P.kind==="n"? "Nordic areas" : P.kind==="a"? "Ski resorts" : "Ski areas"} near ${esc(nearName)}</div><div class="list">${nearby.map((x,i)=>areaRow(x.a, areas.length+i, x.d)).join("")}</div>`;
+    if(places.length) h += `<div class="grp">Towns and peaks</div><div class="list">${places.map((x,i)=>`<button class="li" data-i="${i}"><span class="nm"><b>${esc(x.name)}</b><small>${[x.admin1,x.country_code].filter(Boolean).join(", ")} · ${Math.round((x.elevation||0)*FT).toLocaleString()} ft · pick a point</small></span></button>`).join("")}</div>`;
+    if(!h) h = `<div class="muted" style="padding:10px 2px">${AREAS.rows? "No matches yet. Try a town name, like “Bozeman xc” or “ski near Salt Lake City”." : "Searching…"}</div>`;
+    if(A.length && AREAS.src) h += `<div class="muted" style="font-size:11px;margin:10px 2px 0">Ski areas from OpenSkiMap.org · © OpenStreetMap contributors</div>`;
+    $("#res").innerHTML = h; bindSpotRows($("#res"));
+    $("#res").querySelectorAll("[data-area]").forEach(b=>b.onclick=()=>pickArea(A[+b.dataset.area]));
+    $("#res").querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{ const x=places[+b.dataset.i]; closeSheet("locSheet"); openPicker(x.latitude, x.longitude, `${x.name}${x.admin1?", "+x.admin1:""}`, Math.round((x.elevation||0)*FT)); });
+  };
+  draw();
+  loadAreas().then(()=>{ if(seq!==qSeq) return; areas = matchAreas(P).filter(a=>!near(a, mine)); draw(); });
+  qT = setTimeout(async()=>{ try{
+    if(!P.place) return;
+    const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(P.place)}&count=6&language=en&format=json`); await loadAreas();
+    if(seq!==qSeq) return;
+    // Of the places with this name, pick the one with the most ski areas around it (Sun Valley, Idaho over Sun Valley, Nevada)
+    const around = x => AREAS.rows.reduce((n,a)=> n + (Math.abs(a.lat-x.latitude)<1.2 && Math.abs(a.lon-x.longitude)<1.6 && km(x.latitude,x.longitude,a.lat,a.lon)<130 && (!P.kind || a.kind.includes(P.kind))? 1 : 0), 0);
+    const g = (j.results||[]).map(x=>{ const n = around(x); return {x, n: n + (n && x.longitude < -102? 50 : 0)}; }).sort((a,b)=> b.n-a.n || (b.x.population||0)-(a.x.population||0)).map(o=>o.x);   // the mountain West wins ties
+    let town = g[0];
+    // "sun valley nordic", "tahoe xc": center on the ski area with that name when there is one
+    if(P.kind && !areas.length){ const hit = matchAreas({kind:null, req:P.req}); if(hit[0] && !matchAreas.byPlace) town = {name: hit[0].name, admin1: STATES[hit[0].reg]? hit[0].reg : "", latitude: hit[0].lat, longitude: hit[0].lon}; }
+    if(town && !(mine.length && !P.kind) && (P.kind || !areas.length || matchAreas.byPlace)){ nearName = `${town.name}${town.admin1? ", "+town.admin1 : ""}`;
+      if(matchAreas.byPlace) areas = [];   // "bozeman xc": one list, nearest first
+      nearby = AREAS.rows.filter(a=> (!P.kind || a.kind.includes(P.kind)) && !areas.includes(a) && !near(a, mine)).map(a=>({a, d: km(town.latitude, town.longitude, a.lat, a.lon)})).filter(x=>x.d<130).sort((x,y)=>x.d-y.d).slice(0, 8); }
+    places = g.filter(x=> !mine.some(p=>near({lat:x.latitude, lon:x.longitude}, [p]))).slice(0, nearby.length? 3 : 6);
+    draw();
+  }catch(err){} }, 280);
+};
+setTimeout(()=>{ $("#locBtn").addEventListener("click", ()=>loadAreas(), {once:true}); }, 0);   // fetch the index the first time the picker opens
+
+/* ================= Map picker ================= */
+let map, pin;
+async function setPin(lat, lon, name, elFt){
+  $("#pLL").value = lat.toFixed(4)+","+lon.toFixed(4); if(name) $("#pName").value = name;
+  if(pin) pin.setLatLng([lat,lon]); else pin = L.circleMarker([lat,lon],{radius:9,color:"#7dd3fc",fillColor:"#38bdf8",fillOpacity:.85}).addTo(map);
+  let el = elFt;
+  if(el==null){ try{ const j = await getJSON(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`); el = Math.round(j.elevation[0]*FT); }catch(e){ el = 5000; } }
+  $("#pBase").value = el; $("#pTop").value = el + 1500;
+}
+function openPicker(lat, lon, name, elFt){
+  if(!(window.L && window.L.map)){ openSheet("mapModal"); needMap().then(()=>openPicker(lat, lon, name, elFt), ()=>toast("Couldn't load the map.")); return; }
+  openSheet("mapModal");
+  setTimeout(()=>{
+    if(!map){ map = L.map("map").setView([lat??44,lon??-121.5], lat? 10 : 6);
+      L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxZoom:15, attribution:"© OpenStreetMap, SRTM | © OpenTopoMap"}).addTo(map);
+      map.on("click", e=>setPin(e.latlng.lat, e.latlng.lng, "Custom spot", null)); }
+    map.invalidateSize();
+    if(lat!=null){ map.setView([lat,lon], 11); setPin(lat, lon, name, elFt); }
+  }, 260);
+}
+$("#mapBtn").onclick = () => { closeSheet("locSheet"); openPicker(S.loc?.lat, S.loc?.lon, null, null); };
+$("#mapClose").onclick = () => closeSheet("mapModal");
+$("#pGo").onclick = () => { const [lat,lon] = $("#pLL").value.split(",").map(Number); if(!isNum(lat)) return;
+  let base=+$("#pBase").value, top=+$("#pTop").value; if(!(top>base)) top = base+500;
+  closeSheet("mapModal"); load({name:$("#pName").value||"Custom spot", lat, lon, base, top}); };
+
+/* ================= Controls ================= */
+function seg(id, attr, key, cb){ const el=$(id); el.querySelectorAll("button").forEach(b=>{ b.classList.toggle("on", String(S[key])===b.dataset[attr]); b.onclick=()=>{ S[key] = key==="win"? +b.dataset[attr] : b.dataset[attr]; store.set(key,S[key]); el.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); cb(); }; }); }
+seg("#modeSeg","m","mode",()=>{ S.autoBC = false; applyBand(); if(S.mode==="bc") bcAcknowledge(); render(); });
+applyBand();
+$("#ltSub").onclick = e => { const b = e.target.closest("[data-band]"); if(!b) return; const k = b.dataset.band, def = ({skate:"base", classic:"base", alpine:"mid", bc:"summit"})[S.mode];
+  store.set("band_"+S.mode, k===def? null : k); applyBand(); render(); }; seg("#bandSeg","b","band",render); seg("#unitSeg","u","units",()=>{ render(); if(location.hash==="#maps") renderFinder(); });
+seg("#mapWin","w","win",()=>{ render(); tlStop(); S.tl.h = Math.min(S.grid?.maxH||240, S.win*24); if(S.tl.mode!=="fc") setTlMode("fc"); else paintField(); });
+document.querySelectorAll("#mapLayers button").forEach(b=>b.onclick=()=>{ b.classList.toggle("on"); applyLayers(); });
+
+// boot
+const last = store.get("last", null);
+const qp = new URLSearchParams(location.search);
+const nearPreset = (la, lo) => PRESETS.filter(p=>!p.bc).map(p=>({p, d:km(la,lo,p.lat,p.lon)})).sort((a,b)=>a.d-b.d).find(x=>x.d<=4)?.p;   // a link from Route Forecast lands on the named Nordic area when it's close
+const linked = qp.get("s") ? PRESETS.find(p=>p.name===qp.get("s")) : (qp.get("lat") ? (nearPreset(+qp.get("lat"), +qp.get("lon")) || {name:qp.get("n")||"Shared spot", lat:+qp.get("lat"), lon:+qp.get("lon"), base:+qp.get("b")||5000, top:+qp.get("t")||6500}) : null);
+const linkMode = qp.get("m"); if(["alpine","skate","classic"].includes(linkMode)){ S.mode = linkMode; store.set("mode", linkMode); document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===linkMode)); }
+if(linked) history.replaceState(null, "", location.pathname + location.hash);
+updateOnline();
+const startLoc = linked || last || PRESETS[0];
+S.loc = startLoc; updateTop(); showView(); load(startLoc); checkAlerts();
+
+setTimeout(()=>{ checkSharedList(); syncPull(); }, 600);
+if(!store.get("welcomed") && !linked && !last && !S.favs.length) setTimeout(openWelcome, 700); else if(!store.get("welcomed")) store.set("welcomed", 1);
+$("#setInstall").onclick = () => { closeSheet("setSheet"); openInstall(); };
+$("#setWelcome").onclick = () => { closeSheet("setSheet"); openWelcome(); };
+$("#setStatus").onclick = () => { closeSheet("setSheet"); openStatus(); };
+/* Owner tools (health notices, data source status) stay hidden unless turned on on this device:
+   open the app once with ?owner=1, or tap "Settings" 5 times quickly (works inside the Home Screen app too). */
+{ const showOwner = () => { $("#ownerBox").hidden = !store.get("owner", false); };
+  const qs = new URLSearchParams(location.search); if(qs.has("owner")){ store.set("owner", qs.get("owner")!=="0"); qs.delete("owner"); history.replaceState(null, "", location.pathname + (qs.toString()? "?"+qs : "") + location.hash); }
+  showOwner(); let n = 0, t0 = 0;
+  $("#setTitle").onclick = () => { const now = Date.now(); n = now - t0 < 600? n+1 : 1; t0 = now; if(n >= 5){ n = 0; store.set("owner", !store.get("owner", false)); showOwner(); toast(store.get("owner")? "Owner tools on" : "Owner tools off"); } }; }
+{ const ht = $("#healthTog"); const paint = () => { const on = store.get("health", false); ht.classList.toggle("on", on); ht.setAttribute("aria-checked", on); }; paint();
+  ht.onclick = () => { if(!store.get("pushOn")){ toast("Turn on lock-screen notifications in Alerts first"); return; } store.set("health", !store.get("health", false)); paint(); pushSync(); toast(store.get("health")? "Health notices on" : "Health notices off"); }; }
