@@ -1001,14 +1001,19 @@ async function fetchEns(m, loc, ref){
 const MEM = new Map(); const MEM_TTL = 20*60e3;
 let renderTimer;
 function scheduleRender(loc){ clearTimeout(renderTimer); renderTimer = setTimeout(()=>{ if(S.loc===loc && S.data){ const y=scrollY; render(); scrollTo(0,y); saveSnap(loc); } }, 350); }
+/* Each spot only offers the modes that make sense there, so Alpine and Nordic never mix:
+   an alpine resort shows Alpine + Tour, a Nordic center shows Skate + Classic, anywhere else shows all four. */
+const ALPINE_ONLY = new Set(["Mt. Bachelor, OR", "Hoodoo, OR"]);
+const isNordicArea = loc => /Nordic|Sno-?Park|Trails\b|XC|Elk Lake|Birkie/i.test(loc?.name||"") && !ALPINE_ONLY.has(loc?.name);
+function modesFor(loc){ if(!loc) return ["alpine","skate","classic","bc"]; if(ALPINE_ONLY.has(loc.name)) return ["alpine","bc"]; if(isNordicArea(loc)) return ["skate","classic"]; return ["alpine","skate","classic","bc"]; }
+function showModes(loc){ const ok = modesFor(loc); document.querySelectorAll("#modeSeg button").forEach(b=>{ b.hidden = !ok.includes(b.dataset.m); b.style.display = b.hidden? "none" : ""; }); }
 function syncModeFor(loc){
   const isTour = !!loc.bc;
   if(isTour && S.mode!=="bc"){ S.prevMode = S.mode; S.autoBC = true; setMode("bc"); }
   else if(!isTour && S.mode==="bc" && S.autoBC){ S.autoBC = false; setMode(S.prevMode || "alpine"); }
-  // Nordic-only areas open in your Nordic mode; Mt. Bachelor (alpine) opens in Alpine
-  const nordicOnly = /Nordic|Sno-?Park|Trails|XC/i.test(loc.name||"") && !/^Mt\. Bachelor, OR$/.test(loc.name);
-  if(nordicOnly && S.mode==="alpine") setMode(store.get("lastNordic","skate"));
-  else if(loc.name==="Mt. Bachelor, OR" && (S.mode==="skate" || S.mode==="classic")) setMode("alpine");
+  const ok = modesFor(loc);
+  if(!ok.includes(S.mode)){ const ln = store.get("lastNordic","skate"); setMode(ok.includes(ln)? ln : ok[0]); }
+  showModes(loc);
   if(S.mode==="skate" || S.mode==="classic") store.set("lastNordic", S.mode);
 }
 /* Elevation follows the sport: Nordic forecasts the trails (base), Alpine mid-mountain, Tour the summit. Tapping the forecast-point line overrides it per sport. */
@@ -4461,8 +4466,8 @@ const BACH_WINTER = TM("Winter Map", "/tm/mtb/2025-11/FINAL_W2526_TrailMap_WithK
       BACH_NORDIC = TM("Nordic Trails", "/tm/mtb/2025-12/2526_MTBNordicMap_0.pdf", "mtbachelor.com"),
       BACH_SPRING = TM("Spring Trail Map", "/tm/mtb/2025-05/Spring%20Operating%20Footprint.pdf", "mtbachelor.com");
 const TRAIL_MAPS = {
-  "Mt. Bachelor, OR": [BACH_WINTER, BACH_NORDIC, BACH_SPRING],
-  "Mt. Bachelor Nordic Center, OR": [BACH_NORDIC, BACH_WINTER],
+  "Mt. Bachelor, OR": [BACH_WINTER, BACH_SPRING],
+  "Mt. Bachelor Nordic Center, OR": [BACH_NORDIC],
   "Meissner Nordic (Bend), OR": [TM("Meissner ski & snowshoe trails", "/tm/usfs/deschutes/2021%20Meissner%20Nordic%20Map_UPDATED.pdf", "Deschutes National Forest & Meissner Nordic")],
   "Methow Valley Trails, WA": [TM("Winthrop to Brown's Farm", "/tm/methow/wintertrails_winthroptobrownsfarm_2026.pdf", "methowtrails.org"), TM("Sun Mountain", "/tm/methow/wintertrails_sunmountain_2026.pdf", "methowtrails.org"), TM("Jack's to Brown's Farm", "/tm/methow/wintertrails_jackstobrownsfarm_2026.pdf", "methowtrails.org")],
   "Birkie Trail (Cable, WI)": [TM("Birkie Trail pocket maps", "/tm/birkie/2025/10/Birkie-Pocket-Maps_Winter-2025-2026_101725.pdf", "birkie.com")],
