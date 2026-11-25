@@ -730,6 +730,8 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 #snowCard + .a2hs, .a2hs{margin-top:0}
 #ltStatus:empty{display:none}.lt{padding-bottom:4px}
 .vn-i{display:inline-block;width:1.5em}
+.pb-box{position:fixed;inset:0;pointer-events:none;z-index:60}.pb-box i{position:fixed;font-style:normal;color:#e0f2fe;text-shadow:0 0 8px rgba(125,211,252,.8);opacity:0;animation:pbf 1.6s ease-out forwards}
+@keyframes pbf{0%{opacity:0;transform:translate(0,0) rotate(0)}15%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(200deg)}}
 </style>
 </head>
 <body>
@@ -1374,7 +1376,7 @@ function render(){
   const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast();
+  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
   { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
@@ -2872,6 +2874,19 @@ function agreeHTML(C, N, winTot, conf){
 
 
 
+
+
+/* Powder-day burst: a quick shower of flakes from the verdict the first time you open an 8+ day (once per spot per day). */
+function powderBurst(){
+  const v = document.querySelector("#app .verdict"), chip = v?.querySelector(".v-sc, .sc, .chip"); if(!v || !chip) return;
+  const sc = parseFloat(chip.textContent); if(!(sc >= 8)) return;
+  const key = "burst_" + S.loc.name + "_" + todayStr(); if(store.get(key) || matchMedia("(prefers-reduced-motion: reduce)").matches) return; store.set(key, 1);
+  const r = v.getBoundingClientRect(), box = document.createElement("div"); box.className = "pb-box";
+  for(let i=0; i<26; i++){ const f = document.createElement("i"); f.textContent = i%3? "❄" : "✦";
+    f.style.cssText = `left:${r.left + Math.random()*r.width}px;top:${r.top + 10}px;font-size:${10 + Math.random()*12}px;animation-delay:${Math.random()*0.35}s;--dx:${(Math.random()-0.5)*90}px;--dy:${120 + Math.random()*160}px`;
+    box.appendChild(f); }
+  document.body.appendChild(box); setTimeout(()=>box.remove(), 2200);
+}
 
 /* =====================  Snowflake forecast + falling snow  ===================== */
 // A snowflake's shape is set by the temperature (and moisture) of the cloud it grows in. One small extra request per spot
