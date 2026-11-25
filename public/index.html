@@ -719,6 +719,16 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 .ms-panel{padding:12px 16px calc(14px + var(--sab,0px));background:#111113;border-top:1px solid #1f1f22}.ms-row{display:flex;justify-content:space-between;align-items:center;gap:10px}.ms-row b{display:block;font-size:15px}.ms-row .muted{font-size:12.5px}
 .ms-scale{display:flex;align-items:stretch;margin:10px 0 8px;border-radius:6px;overflow:hidden}.ms-scale span{flex:1;text-align:center;font:700 10.5px Inter,sans-serif;color:#0b0b0d;padding:3px 0}.ms-scale em{font-style:normal;font-size:11px;color:#8e8e93;padding:3px 0 3px 6px}
 .ms-op input{flex:1;accent-color:#60a5fa}.ms-pin{background:#fff;color:#000;font:700 12px Inter,sans-serif;padding:3px 8px;border-radius:99px;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;transform:translate(-50%,-50%)}
+
+/* ---- Layout polish (Nov 25) ---- */
+.v-notes{margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:6px}
+.v-note{font-size:13px;line-height:1.4;color:#c9d4e3;padding-left:2px}.v-note b{color:#fff}
+.v-note.rain b{color:#6ee7b7}.v-note.gold b{color:#c4b5fd}.v-note.crust b{color:#7dd3fc}
+.zn-svg{max-width:232px}.zn-best{margin:2px 0 2px}.zn-more{margin-top:6px}
+#modeSeg{padding:3px}#modeSeg button{padding:8px 0;font-size:14px}
+.ms-card{padding:0 !important;background:none !important;border:0 !important}.ms-open.ms-in{width:100%;margin:0}
+#snowCard + .a2hs, .a2hs{margin-top:0}
+#ltStatus:empty{display:none}.lt{padding-bottom:4px}
 </style>
 </head>
 <body>
@@ -1306,9 +1316,10 @@ function render(){
   S.shownLoc = S.loc.name;
   const glance = glanceHTML(C, slNow);
   $("#app").innerHTML = `
-  ${a2hsHTML()}${modelNote}
+  ${modelNote}
   <div id="nwsAlerts"></div><div id="ncStrip"></div>
-  ${verdict}<div id="rcptStrip"></div>${callouts.slice(0,2).join("")}
+  ${(()=>{ const notes = callouts.slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length) : h; });
+     return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="rcptStrip"></div>
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
@@ -1317,9 +1328,9 @@ function render(){
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
-    <button class="ms-open" onclick="openMtnSnow()"><span class="ms-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l6-11 4 7 3-4 5 8z"/><path d="M8 11l1.5-2 1.5 2"/></svg></span><span><b>See it on the mountain</b><small>Forecast snow by elevation, on the map</small></span><span class="ms-go">›</span></button>
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
+  ${a2hsHTML()}
   ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
   ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
   <section class="card" id="nowCard"></section>
@@ -1340,7 +1351,7 @@ function render(){
     <section class="card" id="repCard"></section>`)}
   ${grp("g-plan", "Plan your day", `<section class="card" id="workCard"></section><section class="card" id="roadCard"></section>
     ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
-  ${grp("g-storm", "Storm & elevation", `<section class="card flk-card" id="flkRow">${flakeHTML(C, e)}</section><section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
+  ${grp("g-storm", "Storm & elevation", `<section class="card ms-card"><button class="ms-open ms-in" onclick="openMtnSnow()"><span class="ms-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l6-11 4 7 3-4 5 8z"/><path d="M8 11l1.5-2 1.5 2"/></svg></span><span><b>See it on the mountain</b><small>Forecast snow by elevation, on the map</small></span><span class="ms-go">›</span></button></section><section class="card flk-card" id="flkRow">${flakeHTML(C, e)}</section><section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
   ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
   ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
@@ -3184,7 +3195,7 @@ function renderZones(){
     <div class="zn-best"><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"}</span><div><b>${best.n}</b> · ${esc(best.r.lab.toLowerCase())}</div></div>
     ${svg}
     ${(()=>{ const row = z=>`<div class="zn-li"><div><b>${z.n}</b><small>${esc(z.sub)} · faces ${AZN(z.az)}</small><small class="zn-l">${esc(z.r.lab)}</small></div>${scoreChip(z.r.sc)}</div>`, L = [...Z].sort((a,b)=>b.r.sc-a.r.sc);
-      return `<div class="zn-list">${L.slice(0,3).map(row).join("")}</div>${L.length>3? `<details class="nb zn-more"><summary>All sides</summary><div class="zn-list">${L.slice(3).map(row).join("")}</div></details>` : ""}`; })()}
+      return `<details class="nb zn-more"><summary>Every side, ranked</summary><div class="zn-list">${L.map(row).join("")}</div></details>`; })()}
     <div class="muted mt-foot">Snowline's estimate. Each side of the mountain is simulated for its sun, warmth and height, then adjusted for wind: slopes downwind of recent snow and wind collect it, upwind slopes get blown firm. Sides are approximate.</div>`;
   el.querySelectorAll(".zn-seg button").forEach(b=>b.onclick=()=>{ S.zoneHr = +b.dataset.h; renderZones(); });
 }
@@ -4258,7 +4269,7 @@ async function renderCamCard(){
   const draw = () => { const v = store.get("camView","grid");
     card.innerHTML = `<div class="card-h"><h2>Cams</h2>${cams.length? `<div class="seg sm" id="camSeg">${[["list","List"],["grid","Grid"]].concat(cams.some(c=>isNum(c.lat))? [["map","Map"]] : []).map(([k,l])=>`<button data-cv="${k}" class="${v===k?"on":""}">${l}</button>`).join("")}</div>`:""}</div>
       ${resort}
-      ${cams.length? (v==="map"? `<div class="cmap-wrap" id="camWrap"><div id="camMini"></div><button class="cmap-fs" id="camFs" aria-label="Full screen map">⤢</button></div>` : `<div class="cams-${v}">${(S.camAll? cams : cams.slice(0,6)).map(c=>camTile(c, v==="list")).join("")}</div>${!S.camAll && cams.length > 6? `<button class="btn cam-more" id="camMore">Show all ${cams.length} cams</button>` : ""}`) : ""}
+      ${cams.length? (v==="map"? `<div class="cmap-wrap" id="camWrap"><div id="camMini"></div><button class="cmap-fs" id="camFs" aria-label="Full screen map">⤢</button></div>` : `<div class="cams-${v}">${(S.camAll? cams : cams.slice(0,4)).map(c=>camTile(c, v==="list")).join("")}</div>${!S.camAll && cams.length > 4? `<button class="btn cam-more" id="camMore">Show all ${cams.length} cams</button>` : ""}`) : ""}
       ${cams.length? `<div class="muted" style="font-size:11px;margin-top:6px">${rc.length? `Resort cams: <a href="${rc[0].page.split("webcam-modal")[0]}" target="_blank" rel="noopener">${rc[0].src} ↗</a>${rc[0].live? " · tap a cam for live video" : ""} · `:""}${road.length? "Road cams: ODOT TripCheck · ":""}☆ saves a camera to Favorites</div>`:""}`;
     const more = card.querySelector("#camMore"); if(more) more.onclick = ()=>{ S.camAll = true; draw(); };
     card.querySelectorAll("[data-cv]").forEach(b=>b.onclick=()=>{ store.set("camView", b.dataset.cv); draw(); });
