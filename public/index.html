@@ -21,6 +21,7 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://snowline-forecast.netlify.app/og-image.png">
+<link rel="preload" as="script" href="/app.js?v=__APPV__">
 <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
 <link rel="preconnect" href="https://ensemble-api.open-meteo.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -732,6 +733,12 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 .vn-i{display:inline-block;width:1.5em}
 .pb-box{position:fixed;inset:0;pointer-events:none;z-index:60}.pb-box i{position:fixed;font-style:normal;color:#e0f2fe;text-shadow:0 0 8px rgba(125,211,252,.8);opacity:0;animation:pbf 1.6s ease-out forwards}
 @keyframes pbf{0%{opacity:0;transform:translate(0,0) rotate(0)}15%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(200deg)}}
+.us-say{font-size:15px;line-height:1.45;margin:0 0 12px;color:var(--text)}
+.us-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.us-kpi div{background:var(--card2);border-radius:12px;padding:10px;text-align:center}
+.us-kpi b{display:block;font:700 22px "Space Grotesk",Inter,sans-serif}.us-kpi span{font-size:11px;color:var(--mute)}
+.us-days{display:flex;align-items:flex-end;gap:3px;height:44px;margin:4px 0 6px}.us-days i{flex:1;background:var(--ice);border-radius:3px 3px 1px 1px;opacity:.85}
+.us-list{display:grid;gap:6px;margin-bottom:6px}.us-r{display:grid;grid-template-columns:minmax(0,1.3fr) 1fr 42px;align-items:center;gap:8px;font-size:13px}
+.us-r span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.us-r i{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--ice) var(--w),var(--card2) var(--w))}.us-r b{text-align:right;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -806,7 +813,7 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
   <div class="field">Falling snow<div class="seg" id="fallSeg"><button data-f="1">On</button><button data-f="0">Off</button></div><div class="muted" style="font-size:12px;margin-top:6px">When it's snowing at your spot, flakes drift behind the forecast at the real intensity and wind.</div></div>
   <div class="field">Units<div class="seg" id="unitSeg"><button data-u="imp">Inches · °F · ft</button><button data-u="met">cm · °C · m</button></div></div>
   <div id="ownerBox" hidden><div class="row" style="justify-content:space-between;align-items:center;gap:12px;margin-top:16px"><div><b>App health notices</b><div class="muted">A notification if one of Snowline's data sources breaks, and when it's fixed. Needs lock-screen notifications on.</div></div><button class="tog" id="healthTog" role="switch" aria-label="App health notices"><i></i></button></div>
-  <button class="link" id="setStatus" style="margin-top:6px;padding-left:0">Data source status</button></div>
+  <button class="link" id="setStatus" style="margin-top:6px;padding-left:0">Data source status</button><button class="link" id="setUsage" style="margin-top:2px;padding-left:0;display:block">How people use Snowline</button></div>
   <div class="row" style="gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn" id="setInstall" style="flex:1">📲 Add to Home Screen</button><button class="btn" id="setWelcome" style="flex:1">👋 Welcome tour</button></div>
   <h3 style="margin:18px 0 6px">Sync across devices</h3><div id="syncBox"></div>
   <h3 style="margin:18px 0 6px">How Snowline works</h3>

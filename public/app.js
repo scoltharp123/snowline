@@ -544,7 +544,7 @@ function render(){
   const inner = d => d.querySelectorAll('[id^="sb-"]').forEach(x=>renderSection(x.id.slice(3)));
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
-  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
+  renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); usageMark("spots", S.loc?.name); usageMark("modes", S.mode); setTimeout(usageObserve, 300); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
   { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
@@ -4173,3 +4173,67 @@ $("#setStatus").onclick = () => { closeSheet("setSheet"); openStatus(); };
   $("#setTitle").onclick = () => { const now = Date.now(); n = now - t0 < 600? n+1 : 1; t0 = now; if(n >= 5){ n = 0; store.set("owner", !store.get("owner", false)); showOwner(); toast(store.get("owner")? "Owner tools on" : "Owner tools off"); } }; }
 { const ht = $("#healthTog"); const paint = () => { const on = store.get("health", false); ht.classList.toggle("on", on); ht.setAttribute("aria-checked", on); }; paint();
   ht.onclick = () => { if(!store.get("pushOn")){ toast("Turn on lock-screen notifications in Alerts first"); return; } store.set("health", !store.get("health", false)); paint(); pushSync(); toast(store.get("health")? "Health notices on" : "Health notices off"); }; }
+
+/* ---------- Why people use Snowline: anonymous, one tiny beacon of counts per visit ----------
+   No IDs or cookies. Counts which spot/mode, which cards sat in the upper-middle of the screen for a moment,
+   which explanations (ⓘ) and sheets were opened, Home Screen vs browser, new vs returning, hour and visit length.
+   Owner devices and automated browsers never send. The owner reads it in Settings → "How people use Snowline". */
+const US = { t0: Date.now(), first: true, spots:{}, modes:{}, cards:{}, opens:{}, tips:{}, sent:{} };
+const usageOff = () => { try{ return !!store.get("owner", false) || navigator.webdriver || /bot|crawl|spider|lighthouse/i.test(navigator.userAgent) || location.hostname==="localhost" || location.hostname==="127.0.0.1"; }catch(e){ return true; } };
+function usageMark(f, k){ if(k && US[f] && String(k).length <= 60) US[f][k] = 1; }
+let usIO = null;
+function usageObserve(){ try{ if(!("IntersectionObserver" in window)) return;
+  usIO?.disconnect();
+  usIO = new IntersectionObserver(es => es.forEach(en => { const el = en.target;
+    if(en.isIntersecting){ clearTimeout(el._ut); el._ut = setTimeout(() => usageMark("cards", el.id), 800); } else clearTimeout(el._ut); }),
+    { rootMargin: "-12% 0px -40% 0px" });
+  document.querySelectorAll("#app section.card[id]").forEach(el => usIO.observe(el)); }catch(e){} }
+document.addEventListener("click", ev => { const t = ev.target.closest?.("[data-tip]"); if(t) usageMark("tips", t.dataset.tip); }, true);
+{ const o = openSheet; openSheet = function(id){ usageMark("opens", id); return o.apply(this, arguments); }; }
+function usageSend(){ if(usageOff()) return;
+  const diff = f => { const o = {}, s = US.sent[f] ||= {}; for(const k in US[f]) if(!s[k]){ o[k] = 1; s[k] = 1; } return o; };
+  const sec = (Date.now() - US.t0) / 1000, dur = sec < 30? "<30s" : sec < 120? "30s-2m" : sec < 300? "2-5m" : "5m+";
+  const b = { v:1, first: US.first, home: matchMedia("(display-mode: standalone)").matches || navigator.standalone === true,
+    ret: !!store.get("seenBefore", false), hour: new Date().getHours(), dur: US.first? dur : undefined,
+    spots: diff("spots"), modes: diff("modes"), cards: diff("cards"), opens: diff("opens"), tips: diff("tips") };
+  if(!b.first && !["spots","modes","cards","opens","tips"].some(f => Object.keys(b[f]).length)) return;
+  try{ if(navigator.sendBeacon("/api/usage", new Blob([JSON.stringify(b)], { type: "text/plain" }))) US.first = false; }catch(e){}
+  store.set("seenBefore", true); }
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "hidden"){ usageSend(); US.hid = Date.now(); }
+  else if(US.hid && Date.now() - US.hid > 30*60e3){ Object.assign(US, { t0: Date.now(), first: true, spots:{}, modes:{}, cards:{}, opens:{}, tips:{}, sent:{} });
+    usageMark("spots", S.loc?.name); usageMark("modes", S.mode); } });
+
+const CARD_NAMES = { snowCard:"Snow summary", nowCard:"Right now", mtnCard:"Wind holds & crowds", glideCard:"Glide & wax", hourCard:"Hourly",
+  dailyCard:"Daily", zoneCard:"Best side of the mountain", camCard:"Webcams", fxCard:"Forecaster write-up", groomCard:"Grooming", reportCard:"Resort report",
+  stakeCard:"Snow stake", tmCard:"Trail map", openCard:"Trails open", repCard:"Rider reports", workCard:"Plan your day", roadCard:"Roads & passes",
+  birkiePanel:"Birkie", seasonCard:"Season so far", modelsCard:"Models & odds", mxCard:"Live at Meissner", bcCard:"Avalanche", elevCard:"Snow by height", accumCard:"Running total" };
+const OPEN_NAMES = { dhSheet:"A day's details", tipSheet:"Explanations", setSheet:"Settings", locSheet:"Search spots", miniSheet:"Mini map", repSheet:"Send a report", welcomeSheet:"Welcome tour", installSheet:"Add to Home Screen", lrSheet:"Lifts & runs", shareSheet:"Share" };
+const MODE_NAMES = { alpine:"Alpine", bc:"Backcountry", skate:"Skate", classic:"Classic" };
+async function openUsage(){
+  $("#tipTitle").textContent = "How people use Snowline"; $("#tipBox").innerHTML = `<div class="loading"><div class="spin"></div>Adding up visits…</div>`; openSheet("tipSheet");
+  try{ const r = await api("/usage?days=14"), V = Math.max(1, r.visits), pct = n => Math.round(100 * n / V) + "%";
+    const top = (o, names, n = 8) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, n);
+    const bars = (rows, names) => rows.length? `<div class="us-list">${rows.map(([k, v]) => `<div class="us-r"><span>${esc(names?.[k] || dispName?.(k) || k)}</span><i style="--w:${Math.min(100, 100 * v / V)}%"></i><b>${pct(v)}</b></div>`).join("")}</div>` : `<p class="muted">Nothing yet.</p>`;
+    const mx = Math.max(1, ...r.days.map(d => d.visits));
+    const H = r.hour || {}, part = (a, b) => Object.entries(H).filter(([h]) => +h >= a && +h < b).reduce((s, [, v]) => s + v, 0);
+    const when = [["Before 7am", part(0, 7)], ["7–10am", part(7, 10)], ["10am–3pm", part(10, 15)], ["3–7pm", part(15, 19)], ["Evening", part(19, 24)]];
+    const quick = (r.dur?.["<30s"] || 0) / V, topCard = top(r.cards, CARD_NAMES, 3).filter(([k]) => k !== "snowCard")[0], topSpot = top(r.spots, null, 1)[0];
+    const say = !r.visits? "No visits counted yet. Visits from this device don't count, so check back after others have used it." :
+      `${quick > .5? "Most visits are quick checks under 30 seconds, so the top of the screen is doing most of the work." : "People tend to stay and read, so the cards further down matter."}`
+      + (topSpot? ` ${esc(dispName?.(topSpot[0]) || topSpot[0])} is the most-checked spot.` : "")
+      + (topCard? ` After the snow summary, ${esc(CARD_NAMES[topCard[0]] || topCard[0])} gets looked at most.` : "");
+    $("#tipBox").innerHTML = `<p class="us-say">${say}</p>
+      <div class="us-kpi"><div><b>${r.visits}</b><span>visits · 14 days</span></div><div><b>${pct(r.returning)}</b><span>came back</span></div><div><b>${pct(r.home)}</b><span>from Home Screen</span></div></div>
+      <div class="us-days">${r.days.map(d => `<i title="${d.day}: ${d.visits}" style="height:${Math.max(3, 100 * d.visits / mx)}%"></i>`).join("")}</div>
+      <div class="grp">What they look at</div>${bars(top(r.cards, CARD_NAMES, 10), CARD_NAMES)}
+      <div class="grp">Spots</div>${bars(top(r.spots, null, 6))}
+      <div class="grp">Ski style</div>${bars(top(r.modes, MODE_NAMES, 4), MODE_NAMES)}
+      <div class="grp">What they tap to understand</div>${bars(top(r.tips, null, 8), Object.fromEntries(Object.keys(r.tips||{}).map(k => { try{ return [k, TIPS[k]?.()[0] || k]; }catch(e){ return [k, k]; } })))}
+      <div class="grp">What they open</div>${bars(top(r.opens, OPEN_NAMES, 6), OPEN_NAMES)}
+      <div class="grp">When</div>${bars(when.filter(w => w[1]))}
+      <div class="grp">How long</div>${bars(["<30s","30s-2m","2-5m","5m+"].map(k => [k, r.dur?.[k] || 0]).filter(w => w[1]), {"<30s":"Under 30 seconds","30s-2m":"30 sec – 2 min","2-5m":"2–5 min","5m+":"Over 5 min"})}
+      <p class="muted" style="font-size:12px;margin-top:14px">Anonymous counts only: no names, IDs or locations. Each visit counts a card once if it was on screen for a moment. Your own devices with owner tools on aren't counted.</p>`;
+  }catch(e){ $("#tipBox").innerHTML = `<p>Couldn't load usage right now.</p>`; }
+}
+$("#setUsage") && ($("#setUsage").onclick = () => { closeSheet("setSheet"); openUsage(); });
