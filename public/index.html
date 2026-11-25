@@ -713,6 +713,12 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 .sl-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px}.sl-h h3{margin:0}.sl-h .seg button{font-size:12px;padding:5px 9px}
 .sl-say{font-size:13px;color:#c9d4e3;margin:6px 0 8px;line-height:1.4}.sl-box{height:260px !important}
 .sl-leg{flex-wrap:wrap;gap:6px 14px}.sl-leg .dot{margin-right:4px}.sl-leg .ln{display:inline-block;width:16px;height:2px;background:rgba(125,211,252,.55);vertical-align:3px;margin-right:4px;border-radius:2px}.sl-leg .ln.thick{height:4px;background:#93c5fd;vertical-align:2px}
+.ms-open{display:flex;align-items:center;gap:12px;width:calc(100% - 28px);margin:12px 14px 0;padding:11px 12px;border-radius:14px;border:1px solid #26262b;background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(215,48,39,.10));color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ms-ic{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#1b2540;color:#93c5fd;flex:none}.ms-open b{display:block;font-size:14px}.ms-open small{font-size:12px;color:#8e8e93}.ms-go{margin-left:auto;font-size:22px;color:#8e8e93}
+.ms-sheet{position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;padding-top:var(--sat)}#msMap{flex:1;background:#0b0b0d}
+.ms-panel{padding:12px 16px calc(14px + var(--sab,0px));background:#111113;border-top:1px solid #1f1f22}.ms-row{display:flex;justify-content:space-between;align-items:center;gap:10px}.ms-row b{display:block;font-size:15px}.ms-row .muted{font-size:12.5px}
+.ms-scale{display:flex;align-items:stretch;margin:10px 0 8px;border-radius:6px;overflow:hidden}.ms-scale span{flex:1;text-align:center;font:700 10.5px Inter,sans-serif;color:#0b0b0d;padding:3px 0}.ms-scale em{font-style:normal;font-size:11px;color:#8e8e93;padding:3px 0 3px 6px}
+.ms-op input{flex:1;accent-color:#60a5fa}.ms-pin{background:#fff;color:#000;font:700 12px Inter,sans-serif;padding:3px 8px;border-radius:99px;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;transform:translate(-50%,-50%)}
 </style>
 </head>
 <body>
@@ -1311,6 +1317,7 @@ function render(){
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
+    <button class="ms-open" onclick="openMtnSnow()"><span class="ms-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l6-11 4 7 3-4 5 8z"/><path d="M8 11l1.5-2 1.5 2"/></svg></span><span><b>See it on the mountain</b><small>Forecast snow by elevation, on the map</small></span><span class="ms-go">›</span></button>
     <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
   ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
@@ -4298,6 +4305,53 @@ function drawPistes(m, j){
   return g;
 }
 function esc(t){ return String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* =====================  Snow on the mountain  ===================== */
+// Forecast snow painted across the mountain over satellite imagery, with runs and lifts. ~170 forecast points, each
+// at its real elevation (see /api/mtnsnow), blended smoothly so totals climb with height like they do on the hill.
+const MS_STOPS = [[0,[0,0,0,0]],[0.3,[198,219,239,.0]],[1,[158,202,225,.55]],[3,[66,146,198,.7]],[6,[8,69,148,.78]],[8,[255,237,130,.8]],[10,[253,174,97,.82]],[12,[244,109,67,.85]],[18,[215,48,39,.88]],[24,[165,0,38,.9]],[30,[200,190,230,.9]],[36,[170,150,215,.92]],[48,[128,100,190,.93]],[60,[95,60,160,.94]],[72,[70,30,120,.95]]];
+function msColor(v){ if(!(v > 0.3)) return [0,0,0,0]; let i = 1; while(i < MS_STOPS.length-1 && v > MS_STOPS[i][0]) i++;
+  const [a, ca] = MS_STOPS[i-1], [b, cb] = MS_STOPS[i], f = clamp((v-a)/(b-a), 0, 1); return ca.map((x,k)=>x + (cb[k]-x)*f); }
+function msImage(G, n){
+  const W = 240, cv = document.createElement("canvas"); cv.width = cv.height = W; const g = cv.getContext("2d"), img = g.createImageData(W, W);
+  const at = (r,c)=>G[Math.max(0,Math.min(n-1,r))*n + Math.max(0,Math.min(n-1,c))];
+  for(let y=0; y<W; y++) for(let x=0; x<W; x++){
+    const fr = y/(W-1)*(n-1), fc = x/(W-1)*(n-1), r = Math.floor(fr), c = Math.floor(fc), dr = fr-r, dc = fc-c;
+    const v = at(r,c)*(1-dr)*(1-dc) + at(r,c+1)*(1-dr)*dc + at(r+1,c)*dr*(1-dc) + at(r+1,c+1)*dr*dc;
+    const rd = Math.hypot(x - W/2, y - W/2)/(W/2), edge = clamp((1.02 - rd)/0.3, 0, 1);   // soft, round fade at the edges
+    const [R,Gc,B,A] = msColor(v);
+    const o = (y*W + x)*4; img.data[o] = R; img.data[o+1] = Gc; img.data[o+2] = B; img.data[o+3] = A*255*edge;
+  }
+  g.putImageData(img, 0, 0); return cv.toDataURL();
+}
+async function openMtnSnow(){
+  const L0 = S.loc; if(!L0) return;
+  const d = document.createElement("div"); d.className = "ms-sheet";
+  d.innerHTML = `<div class="np-bar"><b>Snow on the mountain</b><button aria-label="Close">Done</button></div><div id="msMap"><div class="loading" style="padding-top:40%"><div class="spin"></div>Working out snow at every elevation…</div></div>
+    <div class="ms-panel"><div class="ms-row"><div><b>Forecast snow</b><span class="muted" id="msWhen"></span></div><div class="seg sm" id="msWin">${[["24h","24 h"],["3d","3 days"],["5d","5 days"]].map(([k,l])=>`<button data-k="${k}" class="${(S.msWin||"3d")===k?"on":""}">${l}</button>`).join("")}</div></div>
+    <div class="ms-scale">${[1,3,6,8,10,12,18,24,30,36,48].map(v=>`<span style="background:rgba(${msColor(v).slice(0,3).join(",")},1)">${imp()? v : Math.round(v*2.54)}</span>`).join("")}<em>${imp()? "in" : "cm"}</em></div>
+    <div class="ms-row ms-op"><span class="muted">Opacity</span><input type="range" id="msOp" min="20" max="100" value="${S.msOp||80}"><span class="muted" id="msHi"></span></div></div>`;
+  const close = ()=>{ d.remove(); document.body.style.overflow = ""; };
+  d.querySelector(".np-bar button").onclick = close; document.body.appendChild(d); document.body.style.overflow = "hidden";
+  try{ await needMap(); }catch(e){ d.querySelector("#msMap").innerHTML = `<div class="muted" style="padding:30px">Couldn't load the map.</div>`; return; }
+  let j; try{ j = await api(`/mtnsnow?lat=${L0.lat.toFixed(3)}&lon=${L0.lon.toFixed(3)}`); }catch(e){}
+  const box = d.querySelector("#msMap"); if(!document.body.contains(d)) return;
+  if(!j?.grids){ box.innerHTML = `<div class="muted" style="padding:30px">Couldn't get the mountain forecast right now. Try again in a minute.</div>`; return; }
+  box.innerHTML = ""; const m = L.map(box, {zoomControl:false, attributionControl:true, zoomSnap:0.25}).fitBounds(j.bounds, {padding:[0,0]});
+  m.setZoom(m.getZoom() + 0.25, {animate:false});
+  L.tileLayer(SAT_TILES, {maxZoom:17, attribution:"Esri imagery"}).addTo(m);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", {maxZoom:17, opacity:.8}).addTo(m);
+  let ov = null;
+  const draw = () => { const k = S.msWin || "3d", G = j.grids[k], mx = Math.max(...G);
+    if(ov) m.removeLayer(ov); ov = L.imageOverlay(msImage(G, j.n), j.bounds, {opacity:(S.msOp||80)/100, interactive:false}).addTo(m);
+    d.querySelector("#msWhen").textContent = `next ${k==="24h"? "24 hours" : k==="3d"? "3 days" : "5 days"}`;
+    d.querySelector("#msHi").textContent = mx >= 0.5? `up to ${fmtSnow(mx,0)}` : "little or none"; };
+  draw();
+  L.marker([L0.lat, L0.lon], {icon:L.divIcon({className:"", html:`<div class="ms-pin">${esc(dispName(L0.name))}</div>`, iconSize:null})}).addTo(m);
+  loadPistes(L0).then(pj=>{ if(pj && document.body.contains(d)) drawPistes(m, pj).addTo(m); }).catch(()=>{});
+  d.querySelectorAll("#msWin button").forEach(b=>b.onclick=()=>{ S.msWin = b.dataset.k; d.querySelectorAll("#msWin button").forEach(x=>x.classList.toggle("on", x===b)); draw(); });
+  d.querySelector("#msOp").oninput = e=>{ S.msOp = +e.target.value; ov?.setOpacity(S.msOp/100); };
+}
 function camSrc(c){ return c.img + (c.img.includes("?")?"&":"?") + "t=" + Math.floor(Date.now()/3e5); }
 // Group cams that would overlap on screen into one "N cams" callout; regroup on every zoom.
 function camCallouts(m, cams){
