@@ -1336,11 +1336,11 @@ function render(){
   <section class="card" id="nowCard"></section>
   ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="mtnCard"></section>` : ""}
   ${!isAlp() && S.mode!=="bc"? `<section class="card" id="glideCard"></section>` : ""}
-  <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
-  <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div><button class="link dl-lr" id="lrOpen">Long range · weeks 1–5 and the season ›</button></section>
+  <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast${tipI("hourly")}</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
+  <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast${tipI("daily")}</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div><button class="link dl-lr" id="lrOpen">Long range · weeks 1–5 and the season ›</button></section>
   ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="zoneCard"></section>` : ""}
   <section class="card" id="camCard"></section>
-  <section class="card" id="fxCard"><div class="card-h"><h2>Snowline Forecaster</h2><span class="muted" id="discSrc">from the models</span></div>
+  <section class="card" id="fxCard"><div class="card-h"><h2>Snowline Forecaster${tipI("forecaster")}</h2><span class="muted" id="discSrc">from the models</span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read the full forecast</button></section>
   <div class="more-h" id="moreH">More for this spot</div>
   ${grp("g-mtn", "On the mountain", `${isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
@@ -1353,7 +1353,7 @@ function render(){
     ${S.mode==="skate"? `<section class="card" id="birkiePanel"></section>`:""}`)}
   ${grp("g-storm", "Storm & elevation", `<section class="card ms-card"><button class="ms-open ms-in" onclick="openMtnSnow()"><span class="ms-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l6-11 4 7 3-4 5 8z"/><path d="M8 11l1.5-2 1.5 2"/></svg></span><span><b>See it on the mountain</b><small>Forecast snow by elevation, on the map</small></span><span class="ms-go">›</span></button></section><section class="card flk-card" id="flkRow">${flakeHTML(C, e)}</section><section class="card" id="stormCard"></section><section class="card" id="elevCard"></section><section class="card" id="elevCharts"><div class="card-h"><h2>Snow by elevation</h2></div><div id="sb-elev"></div></section><section class="card" id="miniMapCard"></section><section class="card" id="afdCard" hidden></section>`)}
   ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
-  ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
+  ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds${tipI("models")}</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
   <div class="promise"><b>Free forever · no ads · no account</b><span>Your favorites and settings stay on your phone.</span><a href="/accuracy">How accurate is Snowline? ›</a></div>
   <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
@@ -1396,16 +1396,16 @@ function renderSection(id){
     else if(tab==="box") renderWaxBox(pane); else renderWaxLog(pane); }
   if(id==="models"){
     ["daily","accum","prob"].forEach(k=>{ if(S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
-    el.innerHTML = `<div class="muted" style="margin-bottom:8px">Bars show the Snowline blend; whiskers show the ensemble 10–90% range.</div><div class="chartbox"><canvas id="cDaily"></canvas></div>
-      <h3>Model by model</h3><div class="muted" style="margin-bottom:8px">Daily snow at ${fmtEl(e)}. Untick a model to drop it from the blend.</div><div class="tablewrap"><table id="mTable"></table></div><div class="modelstatus" id="mStatus"></div>
-      <h3>Running total</h3><div class="chartbox"><canvas id="cAccum"></canvas></div>
+    el.innerHTML = `<div class="muted" style="margin-bottom:8px">Bars are Snowline's forecast for each day. The thin lines show the realistic low-to-high range.</div><div class="chartbox"><canvas id="cDaily"></canvas></div>
+      <h3>Model by model${tipI("models")}</h3><div class="muted" style="margin-bottom:8px">Each weather model's daily snow at ${fmtEl(e)}. Untick one to leave it out of Snowline's forecast.</div><div class="tablewrap"><table id="mTable"></table></div><div class="modelstatus" id="mStatus"></div>
+      <h3>Running total${tipI("accum")}</h3><div class="muted" style="margin-bottom:8px" id="accumSay">Snow adding up day by day.</div><div class="chartbox"><canvas id="cAccum"></canvas></div>
       <div class="card-h" style="margin-top:14px"><h3 style="margin:0">Chance of snow${tipI("chance")}</h3>${winSegHTML()}</div><div class="probgrid" id="probs"></div><div class="chartbox" style="height:170px;margin-top:10px"><canvas id="cProb"></canvas></div>`;
     el.insertAdjacentHTML("beforeend", learnedHTML());
     renderDailyChart(C); renderModelTable(C); renderAccum(C); renderProbs(C); wireWinSeg(el, ()=>renderSection("models"));
     const lt=$("#learnTog"); if(lt) lt.onchange=()=>{ S.learnOn=lt.checked; store.set("learnOn",S.learnOn); render(); }; }
   if(id==="elev"){
     ["elev","sl"].forEach(k=>{ if(S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
-    el.innerHTML = `<div class="card-h"><span class="muted">Snow from valley to summit (band = model range)</span>${winSegHTML()}</div><div class="chartbox tall"><canvas id="cElev"></canvas></div>
+    el.innerHTML = `<div class="card-h"><h3 style="margin:0">Snow by height${tipI("elevchart")}</h3>${winSegHTML()}</div><p class="sl-say" id="elevSay"></p><div class="chartbox tall"><canvas id="cElev"></canvas></div>
       <div class="sl-h"><h3>Snow level${tipI("snowlevel")}</h3><div class="seg sm" id="slDays">${[3,5,7].map(d=>`<button data-d="${d}" class="${(S.slDays||5)===d?"on":""}">${d} days</button>`).join("")}</div></div>
       <p class="sl-say" id="slSay"></p>
       <div class="chartbox sl-box"><canvas id="cSL"></canvas></div>
@@ -1517,7 +1517,7 @@ function renderDayDetail(C, SIM, el){
   el.innerHTML = `<div class="daydetail"><div class="kv">
     <div><div class="l">Total · confidence</div><div class="v">${fmtSnow(cd.day+cd.night)} <span class="badge b-${conf.lvl}">${conf.label}</span></div></div>
     <div><div class="l">Odds of 6"+</div><div class="v">${memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length)+"%" : "—"}</div></div>
-    <div><div class="l">Quality</div><div class="v">${ratio? `${Math.round(ratio)}:1 · ${ratio>=15?"blower":ratio>=11?"average":"dense"}` : "—"}</div></div>
+    <div><div class="l">Quality</div><div class="v">${ratio? `${ratio>=15?"Light & fluffy":ratio>=11?"Average":"Heavy & dense"} <small class="muted">${Math.round(ratio)}:1</small>${tipI("ratio")}` : "—"}</div></div>
     <div><div class="l">Max gust</div><div class="v">${fmtWind(cd.gmax)} ${windU()}</div></div>
     ${S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
     ${x? `<div class="full"><div class="l">Surface · best window</div><div class="v">${x.am?`AM ${x.am.icon} ${x.am.label}`:""}${x.am&&x.pm?" → ":""}${x.pm?`PM ${x.pm.icon} ${x.pm.label}`:""}<br><b>${hl(x.best.from)}–${hl(x.best.to)}</b> ${scoreChip(x.best.avg)} · ${x.best.sim.light.icon} ${x.best.sim.light.label}</div></div>`:""}
@@ -1691,7 +1691,7 @@ function renderDailyChart(C){
   S.charts.daily = new Chart($("#cDaily"), { type:"bar", data:{ labels, datasets:[
     {label:"Day (6a–6p)", data:day, backgroundColor:"#38bdf8", stack:"s", borderRadius:3},
     {label:"Night (6p–6a)", data:night, backgroundColor:"#6366f1", stack:"s", borderRadius:3},
-    {label:"Ensemble median", type:"line", data:p50, showLine:false, pointBackgroundColor:"#a78bfa", pointRadius:3, stack:"e"}
+    {label:"Middle of all runs", type:"line", data:p50, showLine:false, pointBackgroundColor:"#a78bfa", pointRadius:3, stack:"e"}
   ]}, options:o, plugins:[whisk] });
 }
 
@@ -1705,7 +1705,7 @@ function renderModelTable(C){
     h += `<tr class="${S.enabled[m.id]&&has?'':'off'}"><td class="m"><label class="chip"><input type="checkbox" data-m="${m.id}" ${S.enabled[m.id]?'checked':''} ${has?'':'disabled'}><span class="dot" style="background:${m.c}"></span>${m.name}</label></td>${row}<td><b>${has&&isNum(t5)?fmtSnow(t5):'—'}</b></td><td><b>${has&&isNum(t10)?fmtSnow(t10):'—'}</b></td></tr>`;
   }
   const cd = C.consDays;
-  h += `<tr class="cons"><td class="m">Consensus</td>${days.map((d,k)=>{const v=cd[k].day+cd[k].night; return `<td><span class="cell" style="background:${snowColor(v)}">${v<0.1?"0":fmtSnow(v).replace('"','')}</span></td>`}).join("")}<td>${fmtSnow(windowTotal(cd.map(x=>x.day+x.night),5))}</td><td>${fmtSnow(windowTotal(cd.map(x=>x.day+x.night),10))}</td></tr>`;
+  h += `<tr class="cons"><td class="m">Snowline</td>${days.map((d,k)=>{const v=cd[k].day+cd[k].night; return `<td><span class="cell" style="background:${snowColor(v)}">${v<0.1?"0":fmtSnow(v).replace('"','')}</span></td>`}).join("")}<td>${fmtSnow(windowTotal(cd.map(x=>x.day+x.night),5))}</td><td>${fmtSnow(windowTotal(cd.map(x=>x.day+x.night),10))}</td></tr>`;
   $("#mTable").innerHTML = h;
   const missing = MODELS.filter(m=>!D.models[m.id]).map(m=>m.name);
   $("#mStatus").textContent = missing.length? `Not available for this location: ${missing.join(", ")} (HRRR and NBM cover the US only).` : "All models loaded.";
@@ -1716,8 +1716,11 @@ function renderAccum(C){
   const D=S.data; const start=C.nowIdx, end=Math.min(C.time.length, start+24*10);
   const labels = C.time.slice(start,end).map(t=>t.slice(11,13)==="00"? dow(t.slice(0,10)) : "");
   const ds = MODELS.filter(m=>D.models[m.id]).map(m=>{ let s=0; const arr=[]; for(let i=start;i<end;i++){ const v=C.per[m.id][i]; if(v){ s+=v.snow; arr.push(snowNum(s)); } else arr.push(null); } return {label:m.name, data:arr, borderColor:m.c, borderWidth:S.enabled[m.id]?1.6:0.6, pointRadius:0, spanGaps:false, borderDash:S.enabled[m.id]?[]:[3,3]}; });
-  let s=0; ds.push({label:"Consensus", data:C.cons.slice(start,end).map(c=>{ if(c) s+=c.snow; return snowNum(s); }), borderColor:"#ffffff", borderWidth:3, pointRadius:0});
-  const o = chartBase(); o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.grid.display=false; o.plugins.tooltip.enabled=false;
+  ds.forEach(d=>{ d.borderWidth = 1.2; d.borderColor = "rgba(148,163,184,.45)"; d.pointRadius = 0; });
+  let s=0; ds.push({label:"Snowline forecast", data:C.cons.slice(start,end).map(c=>{ if(c) s+=c.snow; return snowNum(s); }), borderColor:"#7dd3fc", borderWidth:3.5, pointRadius:0});
+  { const tot = ds[ds.length-1].data.filter(isNum).pop() || 0, u = imp()? '"' : " cm"; let half = null; ds[ds.length-1].data.forEach((v,i)=>{ if(half==null && v >= tot/2 && tot > 0.5) half = i; });
+    const el = $("#accumSay"); if(el) el.textContent = tot < 0.5? "Little or no snow adding up over the next 10 days." : `About ${Math.round(tot*10)/10 >= 3? Math.round(tot) : Math.round(tot*10)/10}${u} over the next 10 days${half!=null && labels[half]!==undefined? `, half of it by ${dow(C.time[start+half].slice(0,10))}` : ""}. Thin gray lines are the individual models.`; }
+  const o = chartBase(); o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.grid.display=false; o.plugins.tooltip.enabled=false; o.plugins.legend = {display:false};
   S.charts.accum = new Chart($("#cAccum"), {type:"line", data:{labels, datasets:ds}, options:o});
 }
 
@@ -1725,7 +1728,8 @@ function renderProbs(C){
   const thr = imp()? [1,6,12,24] : [3,15,30,60]; // display units
   const tot5 = ensWindowTotals(C, Math.min(S.win,10)).map(snowNum);
   const unit = imp()? '"' : " cm";
-  $("#probs").innerHTML = tot5.length? thr.map(t=>{ const p=Math.round(100*tot5.filter(v=>v>=t).length/tot5.length); return `<div class="prob"><div class="k">≥ ${t}${unit} in ${S.win} days</div><div class="v">${p}%</div><div class="bar"><i style="width:${p}%"></i></div></div>`; }).join("") : `<div class="sub">Ensemble data isn't available for this location right now.</div>`;
+  $("#probs").innerHTML = tot5.length? thr.map(t=>{ const p=Math.round(100*tot5.filter(v=>v>=t).length/tot5.length); return `<div class="prob"><div class="k">≥ ${t}${unit} in ${S.win} days</div><div class="v">${p}%</div><div class="bar"><i style="width:${p}%"></i></div></div>`; }).join("") : `<div class="sub">The odds aren't available for this spot right now. Check back in a bit.</div>`;
+  { const box = $("#cProb")?.parentElement; if(box) box.style.display = C.ensDays.length? "" : "none"; }
   if(!C.ensDays.length) return;
   const labels = C.days.map((d,k)=>k===0?"Today":dow(d));
   const mk = (t,col)=>({label:`≥${t}${unit}`, data:C.days.map((d,k)=>{ const v=C.ensDays.filter(m=>m.cnt[k]>0).map(m=>snowNum(m.tot[k])); return v.length? Math.round(100*v.filter(x=>x>=t).length/v.length):null; }), borderColor:col, backgroundColor:col+"33", fill:true, pointRadius:2, tension:.3});
@@ -1754,10 +1758,12 @@ function renderElevChart(C0){
   o.plugins.tooltip = {mode:"nearest", intersect:false, axis:"y", callbacks:{ title: it => `${Math.round(it[0].parsed.y).toLocaleString()} ${imp()? "ft" : "m"}`, label: it => ` ${it.dataset.label}: ${fmtSnow(imp()? it.parsed.x : it.parsed.x/2.54, 0)}` }};
   const pts = arr => arr.map((v,i)=>({x:v, y: imp()? levels[i] : levels[i]/FT}));
   S.charts.elev = new Chart($("#cElev"), {type:"line", data:{datasets:[
-    {label:"Model max", data:pts(mx), borderColor:"transparent", backgroundColor:"rgba(125,211,252,.15)", pointRadius:0, fill:"+1"},
-    {label:"Model min", data:pts(mn), borderColor:"transparent", pointRadius:0, fill:false},
-    {label:"Consensus", data:pts(cons), borderColor:"#7dd3fc", borderWidth:3, pointRadius:2, fill:false, tension:.3}
-  ]}, options:o, plugins:[marks]});
+    {label:"Highest model", data:pts(mx), borderColor:"transparent", backgroundColor:"rgba(125,211,252,.15)", pointRadius:0, fill:"+1"},
+    {label:"Lowest model", data:pts(mn), borderColor:"transparent", pointRadius:0, fill:false},
+    {label:"Snowline forecast", data:pts(cons), borderColor:"#7dd3fc", borderWidth:3, pointRadius:2, fill:false, tension:.3}
+  ]}, options:{...o, plugins:{...o.plugins, legend:{...(o.plugins.legend||{}), labels:{...(o.plugins.legend?.labels||{}), filter: it => it.text === "Snowline forecast"}}}}, plugins:[marks]});
+  { const near = ft => { let k = 0; levels.forEach((l,i)=>{ if(Math.abs(l-ft) < Math.abs(levels[k]-ft)) k = i; }); return cons[k]; }, u = imp()? '"' : " cm", f = v => (v < 1? (Math.round(v*10)/10) : Math.round(v)) + u;
+    const el = $("#elevSay"); if(el) el.textContent = `Next ${N} days: about ${f(near(L.top))} at the summit, ${f(near(bandElev()*FT))} where you are, and ${f(near(L.base))} at the base.`; }
 }
 
 function renderSL(C){
@@ -2470,11 +2476,11 @@ function renderStorm(C, SIM, e){
       ? `<b>Expect soft, slow trails while it snows</b> (about ${fmtSnow(dayTot)} during the day)${maxG>=60? ", with wind drifting the open sections" : ""}. The best ${S.mode==="skate"? "skating" : "classic skiing"} is <b>${dow(after)}</b>, once the trails are groomed.`
       : `<b>Most of it falls overnight.</b> ${dow(after)} morning should bring fresh snow on the trails; it skis best once it's groomed${S.mode==="classic"? " and the tracks are set" : ""}.`);
   const rainNote = st.rainMm > 3 ? ` · <span style="color:${PT.rain}">some rain at this elevation</span>` : "";
-  el.innerHTML = `<div class="card-h"><h2>Storm Timeline</h2><span class="muted">${fmtEl(e)}</span></div>
+  el.innerHTML = `<div class="card-h"><h2>Storm Timeline${tipI("storm")}</h2><span class="muted">${fmtEl(e)}</span></div>
     <div class="storm-h"><div><div class="muted">Next storm</div><b>${tLabel(C,st.a)} → ${tLabel(C,st.b)}</b></div><div style="text-align:right"><div class="num" style="font-size:30px;color:var(--ice)">${fmtSnow(st.tot)}</div><div class="muted">storm total</div></div></div>
     <div class="kv" style="margin:10px 0">
       <div><div class="l">Peak rate</div><div class="v">${fmtSnow(st.peak.v,1)}/hr · ${tLabel(C,st.peak.i)}</div></div>
-      <div><div class="l">Quality</div><div class="v">${Math.round(ratio)}:1 · ${ratio>=15?"blower":ratio>=11?"average":"dense"}</div></div>
+      <div><div class="l">Quality</div><div class="v">${ratio>=15?"Light & fluffy":ratio>=11?"Average":"Heavy & dense"} <small class="muted">${Math.round(ratio)}:1</small>${tipI("ratio")}</div></div>
       <div><div class="l">Wind</div><div class="v">gusts to ${fmtWind(maxG)} ${windU()}</div></div>
     </div>
     <div class="callout" style="margin:0 0 12px">${verdict}${rainNote}</div>
@@ -3180,7 +3186,7 @@ function renderZones(){
   if(!Z.length){ el.remove(); return; }
   const best = [...Z].sort((a,b)=>b.r.sc-a.r.sc)[0], R = 118, cx = 130, cy = 130;
   const spread = best.r.sc - Math.min(...Z.map(z=>z.r.sc));
-  if(spread < 0.4){ el.innerHTML = `<div class="card-h"><h2>Where to ski</h2></div><div class="zn-same"><div><b>About the same on every side</b><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"} · ${esc(best.r.lab.toLowerCase())}</span></div>${scoreChip(best.r.sc)}</div><div class="muted" style="font-size:11.5px;margin-top:6px">When one side of the mountain skis noticeably better, a map of every side shows here.</div>`; return; }
+  if(spread < 0.4){ el.innerHTML = `<div class="card-h"><h2>Where to ski${tipI("zones")}</h2></div><div class="zn-same"><div><b>About the same on every side</b><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"} · ${esc(best.r.lab.toLowerCase())}</span></div>${scoreChip(best.r.sc)}</div><div class="muted" style="font-size:11.5px;margin-top:6px">When one side of the mountain skis noticeably better, a map of every side shows here.</div>`; return; }
   const arc = (a0, a1, r0, r1) => { const p = (a, r) => [cx + r*Math.sin(a*Math.PI/180), cy - r*Math.cos(a*Math.PI/180)]; const [x0,y0] = p(a0,r1), [x1,y1] = p(a1,r1), [x2,y2] = p(a1,r0), [x3,y3] = p(a0,r0); return `M${x0},${y0} A${r1},${r1} 0 0 1 ${x1},${y1} L${x2},${y2} A${r0},${r0} 0 0 0 ${x3},${y3}Z`; };
   const ring = Z.filter(z=>z.az!=null), sum = Z.find(z=>z.az==null);
   const svg = `<svg viewBox="0 -4 260 266" class="zn-svg" role="img" aria-label="Mt. Bachelor snow quality by side of the mountain">
@@ -3191,7 +3197,7 @@ function renderZones(){
       <text x="${tx}" y="${ty-3}" text-anchor="middle" class="zn-t">${z.n}</text><text x="${tx}" y="${ty+12}" text-anchor="middle" class="zn-s">${z.r.sc.toFixed(1)}</text>`; }).join("")}
     ${sum? `<circle cx="${cx}" cy="${cy}" r="46" fill="${scoreColor(sum.r.sc)}" stroke="${sum===best? "#fff" : "#111113"}" stroke-width="${sum===best? 2.5 : 2}"/><text x="${cx}" y="${cy-3}" text-anchor="middle" class="zn-t">Summit</text><text x="${cx}" y="${cy+12}" text-anchor="middle" class="zn-s">${sum.r.sc.toFixed(1)}</text>` : ""}
     <text x="${cx}" y="8" text-anchor="middle" class="zn-n">N ↑</text></svg>`;
-  el.innerHTML = `<div class="card-h"><h2>Where to ski</h2><div class="seg sm zn-seg">${[[10,"Morning"],[14,"Afternoon"]].map(([v,l])=>`<button data-h="${v}" class="${v===h?"on":""}">${l}</button>`).join("")}</div></div>
+  el.innerHTML = `<div class="card-h"><h2>Where to ski${tipI("zones")}</h2><div class="seg sm zn-seg">${[[10,"Morning"],[14,"Afternoon"]].map(([v,l])=>`<button data-h="${v}" class="${v===h?"on":""}">${l}</button>`).join("")}</div></div>
     <div class="zn-best"><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"}</span><div><b>${best.n}</b> · ${esc(best.r.lab.toLowerCase())}</div></div>
     ${svg}
     ${(()=>{ const row = z=>`<div class="zn-li"><div><b>${z.n}</b><small>${esc(z.sub)} · faces ${AZN(z.az)}</small><small class="zn-l">${esc(z.r.lab)}</small></div>${scoreChip(z.r.sc)}</div>`, L = [...Z].sort((a,b)=>b.r.sc-a.r.sc);
@@ -3222,7 +3228,7 @@ function renderGlide(){
   const w = wax(SIM[run[0].i], C.cons[run[0].i]);
   const all = run.length === G.length;
   const head = all? `${word[best]} glide all day` : best===3? `Fastest ${hl(run[0].h)}–${hl(run[run.length-1].h+1)}` : best===2? `Medium glide at best, ${hl(run[0].h)}–${hl(run[run.length-1].h+1)}` : `Slow all day`;
-  el.innerHTML = `<div class="card-h"><h2>Glide</h2><span class="muted">${dayWord(d)} · ${fmtEl(S.ctx.e)}</span></div>
+  el.innerHTML = `<div class="card-h"><h2>Glide${tipI("glide")}</h2><span class="muted">${dayWord(d)} · ${fmtEl(S.ctx.e)}</span></div>
     <div class="gl-h"><b>${head}</b><span class="muted">${esc(run[0].g.t)}${w? ` · wax: ${esc(w.glide.split(" (")[0].toLowerCase())}` : ""}</span></div>
     <div class="gl-strip">${G.map(x=>`<div class="gl-c" title="${esc(x.g.t)}"><i style="background:${col[x.g.r]}"></i><span>${hl(x.h)}</span></div>`).join("")}</div>
     <div class="gl-key"><span><i style="background:#38bdf8"></i>Fast</span><span><i style="background:#fde68a"></i>Medium</span><span><i style="background:#fca5a5"></i>Slow / sticky</span></div>`;
@@ -3268,6 +3274,17 @@ function renderMeissner(){
 /* ---------- Small ⓘ explainers: one shared sheet, nothing extra on the cards ---------- */
 const tipI = k => `<button class="tipb" data-tip="${k}" aria-label="What this means">ⓘ</button>`;
 const TIPS = {
+  elevchart: () => ["Snow by height", `<p>How much snow falls at each height on the mountain over the days you pick. Up the side is elevation, across is snow.</p><p>The <b>line</b> is Snowline's forecast. The <b>shaded band</b> is the range between the lowest and highest weather model. <b>Base</b>, <b>Summit</b> and <b>You</b> (the elevation you picked) are marked.</p>`],
+  hourly: () => ["Hourly forecast", `<p>Each column is one hour at the elevation shown. Top to bottom: <b>chance of rain or snow</b>, <b>temperature</b>, <b>new snow</b> that hour (blank means none), and <b>wind</b> (direction it's coming from, then speed).</p><p>Swipe sideways for later hours. Tap "Detailed hourly forecast" for gusts, snow level and more.</p>`],
+  daily: () => ["Daily forecast", `<p>One row per day: the <b>high and low</b>, the <b>ski score</b> (0–10, how good it should ski; tap any score for how it works), and the <b>snow range</b>, from a quiet case to a big one.</p><p>Tap a day to open its hour-by-hour details.</p>`],
+  forecaster: () => ["Snowline Forecaster", `<p>A written summary of what's coming, put together automatically from the weather models. Think of it as the short version a forecaster would tell you: when the next storm arrives, how much, and the best days to go.</p><p>The <b>Meteorologists' discussion</b> further down is the National Weather Service's own write-up.</p>`],
+  storm: () => ["Storm timeline", `<p><b>When</b> the next storm starts and ends, and the <b>total</b> it should bring at this elevation.</p><p><b>Peak rate</b> is the heaviest hour of snowfall. <b>Quality</b> says how light the snow is, and <b>Wind</b> shows the strongest gusts during the storm (strong wind packs snow and can close lifts).</p>`],
+  ratio: () => ["Snow quality", `<p>How much snow you get from the same amount of water. <b>15:1 or more</b> is light, fluffy powder. Around <b>10–12:1</b> is average. <b>Under 10:1</b> is heavy, wet snow that's great for the base but harder to ski.</p>`],
+  byelev: () => ["By elevation", `<p>The same forecast at three heights on the mountain: <b>top, middle and base</b>, side by side for each day. It shows how much more snow falls up high, how much colder it is, and whether the base gets rain while the top gets snow.</p>`],
+  models: () => ["The weather models", `<p>Snowline blends about a dozen of the world's weather models (American, European, Canadian, German, Japanese and more), giving more weight to the ones that have been most accurate here.</p><p>This table shows what each one says on its own. When they agree, confidence is high. When one is far off from the rest, Snowline leans on the others.</p>`],
+  accum: () => ["Running total", `<p>Snow adding up over the next days. The line is Snowline's forecast and the shading is the realistic low-to-high range. Read across to any day to see the total by then.</p>`],
+  zones: () => ["Where to ski", `<p>Each side of Mt. Bachelor faces a different way, so sun, warmth and wind treat it differently. Snowline estimates the snow quality on each side, then marks the best one.</p><p><b>Downwind</b> sides collect blowing snow and get deeper. <b>Upwind</b> sides get blown firm. <b>Sunny</b> sides soften first and can crust up later.</p>`],
+  glide: () => ["Glide", `<p>How fast your skis should run each hour, from temperature, humidity, sun and new snow. <b>Blue</b> is fast. <b>Yellow</b> is medium. <b>Red</b> is slow or sticky (very cold snow, fresh cold snow, or wet snow near freezing).</p><p>The wax suggestion matches the fastest part of the day.</p>`],
   mtnest: () => ["How these are estimated", `<p><b>Wind holds</b> come from the forecast wind near each lift's top. Every 30 minutes all season, Snowline saves Bachelor's lift status next to the wind, so each lift's tipping point is learned from what really happened${S.liftwx?.days? ` (${S.liftwx.days} days so far)` : ""}.</p><p><b>Crowds</b> come from the day of the week, school holidays, fresh snow and sunshine. They're not live parking counts.</p>`],
   flakes: () => ["Snowflake forecast", `<p>A snowflake's shape is set by the <b>temperature of the cloud it grows in</b>. Snowline checks the temperature and moisture at four heights above the mountain (about 5,000 to 18,000 ft) for each hour of the storm.</p>
     <p><b>Stellar dendrites</b> grow around 0 to −6°F (−12 to −18°C) and make the lightest, fluffiest powder. <b>Needles and columns</b> grow around 14 to 25°F (−4 to −10°C) and pack down denser. <b>Rimed flakes and graupel</b> collect frozen droplets in milder, wetter storms. <b>Strong wind</b> breaks crystals into fragments that pack firm.</p>
@@ -3419,7 +3436,7 @@ function renderElevTable(){
     <tr><td class="et-l">Wind / gust<br><small>${windU()}</small></td>${r.out.map(x=>`<td>${x.n? fmtWind(x.wmax) : "—"}<br><small>${x.n? fmtWind(x.gmax) : ""}</small></td>`).join("")}</tr>
     <tr><td class="et-l">Wind chill<br><small>daytime low</small></td>${r.out.map(x=>`<td>${x.chill!=null? fmtT(x.chill) : "—"}</td>`).join("")}</tr>`).join("");
   const fz = rows[0].out.map(x=>x.sl);
-  card.innerHTML = `<div class="card-h"><h2>By elevation</h2><span class="muted">next ${nD} days</span></div>
+  card.innerHTML = `<div class="card-h"><h2>By elevation${tipI("byelev")}</h2><span class="muted">next ${nD} days</span></div>
     <div class="et-wrap"><table class="et">${head}${body}
       <tr class="et-h"><td colspan="${nD+1}">Whole mountain</td></tr>
       <tr><td class="et-l">Snow level</td>${fz.map(v=>`<td>${v!=null? fmtEl(v) : "—"}</td>`).join("")}</tr>
