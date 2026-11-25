@@ -729,6 +729,7 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 .ms-card{padding:0 !important;background:none !important;border:0 !important}.ms-open.ms-in{width:100%;margin:0}
 #snowCard + .a2hs, .a2hs{margin-top:0}
 #ltStatus:empty{display:none}.lt{padding-bottom:4px}
+.vn-i{display:inline-block;width:1.5em}
 </style>
 </head>
 <body>
@@ -1318,7 +1319,7 @@ function render(){
   $("#app").innerHTML = `
   ${modelNote}
   <div id="nwsAlerts"></div><div id="ncStrip"></div>
-  ${(()=>{ const notes = callouts.slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length) : h; });
+  ${(()=>{ const notes = callouts.slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length).replace(/^\s*(\S+?)\s+/, '<span class="vn-i">$1</span>') : h; });
      return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="rcptStrip"></div>
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
