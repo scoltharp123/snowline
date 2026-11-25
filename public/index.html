@@ -710,6 +710,9 @@ html.sun body{-webkit-font-smoothing:antialiased}html.sun .muted,html.sun small{
 #ltStatus{margin-top:4px}#ltStatus .st-pill{font-size:12px;padding:3px 9px}
 .zn-same{display:flex;justify-content:space-between;align-items:center;gap:10px}.zn-same>div{display:flex;flex-direction:column;gap:2px}.zn-same b{font-size:15px}.zn-same .muted{font-size:12.5px}
 .cam-more{display:block;width:100%;margin-top:10px;text-align:center}.tipbtn{background:none;border:0;color:#8e8e93;padding:0 2px;font-size:12px}
+.sl-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px}.sl-h h3{margin:0}.sl-h .seg button{font-size:12px;padding:5px 9px}
+.sl-say{font-size:13px;color:#c9d4e3;margin:6px 0 8px;line-height:1.4}.sl-box{height:260px !important}
+.sl-leg{flex-wrap:wrap;gap:6px 14px}.sl-leg .dot{margin-right:4px}.sl-leg .ln{display:inline-block;width:16px;height:2px;background:rgba(125,211,252,.55);vertical-align:3px;margin-right:4px;border-radius:2px}.sl-leg .ln.thick{height:4px;background:#93c5fd;vertical-align:2px}
 </style>
 </head>
 <body>
@@ -1385,8 +1388,12 @@ function renderSection(id){
   if(id==="elev"){
     ["elev","sl"].forEach(k=>{ if(S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
     el.innerHTML = `<div class="card-h"><span class="muted">Snow from valley to summit (band = model range)</span>${winSegHTML()}</div><div class="chartbox tall"><canvas id="cElev"></canvas></div>
-      <h3>Snow level, next 7 days${tipI("snowlevel")}</h3><div class="chartbox"><canvas id="cSL"></canvas></div><div class="legend"><span><i class="dot" style="background:#38bdf8"></i> snow at your elevation</span><span><i class="dot" style="background:#34d399"></i> rain</span></div>`;
-    renderElevChart(C); renderSL(C); wireWinSeg(el, ()=>renderSection("elev")); }
+      <div class="sl-h"><h3>Snow level${tipI("snowlevel")}</h3><div class="seg sm" id="slDays">${[3,5,7].map(d=>`<button data-d="${d}" class="${(S.slDays||5)===d?"on":""}">${d} days</button>`).join("")}</div></div>
+      <p class="sl-say" id="slSay"></p>
+      <div class="chartbox sl-box"><canvas id="cSL"></canvas></div>
+      <div class="legend sl-leg"><span><i class="ln"></i> each weather model</span><span><i class="ln thick"></i> Snowline blend</span><span><i class="dot" style="background:#60a5fa"></i>Snow</span><span><i class="dot" style="background:#a78bfa"></i>Mix</span><span><i class="dot" style="background:#4ade80"></i>Rain</span></div>`;
+    renderElevChart(C); renderSL(C); wireWinSeg(el, ()=>renderSection("elev"));
+    el.querySelectorAll("#slDays button").forEach(b=>b.onclick=()=>{ S.slDays = +b.dataset.d; el.querySelectorAll("#slDays button").forEach(x=>x.classList.toggle("on", x===b)); renderSL(S.ctx.C); }); }
   if(id==="outlook"){ el.innerHTML = `<div id="lrWeeks"></div><div id="seasonPanel"></div><div id="lrMonths"></div>`; renderSeason(C); ensureSeason(); renderOutlook(); }
   if(id==="avy"){ renderAvy(); }
 }
@@ -1736,25 +1743,61 @@ function renderElevChart(C0){
 }
 
 function renderSL(C){
-  const L=S.loc; const start=C.nowIdx, end=Math.min(C.time.length,start+24*7);
-  const slice = C.cons.slice(start,end);
-  const times = C.time.slice(start,end);
-  const labels = times.map(t=>t.slice(11,13)==="12"? dow(t.slice(0,10)) : "");   // one day name, centered on each day
-  const conv = m => imp()? m*FT : m;
+  try{ S.charts.sl?.destroy?.(); }catch(e){}
+  const L = S.loc, D = S.data, days = S.slDays || 5, start = C.nowIdx, end = Math.min(C.time.length, start + 24*days);
+  const slice = C.cons.slice(start, end), times = C.time.slice(start, end);
+  const conv = m => imp()? m*FT : m, unit = imp()? "ft" : "m";
+  // one snow-level line per weather model (freezing level less ~1,000 ft, same as the blend)
+  const ids = Object.keys(D.models).filter(id=>S.enabled[id]);
+  const lines = ids.map(id=>{ const m = D.models[id], ix = new Map(m.time.map((t,i)=>[t,i]));
+    return {id, data: times.map(t=>{ const i = ix.get(t); const fl = i==null? null : m.FL?.[i]; return isNum(fl) && fl > 0? conv(fl - 300) : null; })}; })
+    .filter(l=>l.data.filter(v=>v!=null).length > 12);
+  const blend = slice.map(c=>c && isNum(c.sl)? conv(c.sl) : null);
+  const base = conv(L.base/FT), top = conv(L.top/FT);
+  const all = lines.flatMap(l=>l.data).concat(blend).filter(isNum);
+  const lo = Math.min(base - conv(500), ...all.map(v=>v)), hi = Math.max(top + conv(600), ...all);
+  const yMin = Math.max(0, Math.floor(lo/1000)*1000), yMax = Math.ceil(hi/1000)*1000;
+  // where the models disagree most while it's actually precipitating
+  let worst = null;
+  times.forEach((t,k)=>{ const c = slice[k]; if(!c || (c.P||0) < 0.3) return; const v = lines.map(l=>l.data[k]).filter(isNum); if(v.length < 3) return;
+    v.sort((a,b)=>a-b); const s = v[Math.floor(v.length*0.85)] - v[Math.floor(v.length*0.15)]; if(!worst || s > worst.s) worst = {k, s, lo: v[Math.floor(v.length*0.15)], hi: v[Math.floor(v.length*0.85)]}; });
+  const wet = times.map((t,k)=>[t,slice[k]]).filter(([t,c])=>c && (c.P||0) >= 0.3);
+  const rainBase = wet.filter(([t,c])=>conv(c.sl) > base), rainTop = wet.filter(([t,c])=>conv(c.sl) > top);
+  const r10 = v => Math.round(v/(imp()? 100 : 50))*(imp()? 100 : 50), f = v => r10(v).toLocaleString()+" "+unit;
+  const when = t => `${dow(t.slice(0,10))} ${+t.slice(11,13) < 12? "morning" : +t.slice(11,13) < 17? "afternoon" : "night"}`;
+  let say = !wet.length? "Dry stretch: no rain or snow to speak of." :
+    !rainBase.length? "Snow to the base whenever it's precipitating." :
+    rainTop.length? `Rain reaches the summit at times, first ${when(rainTop[0][0])}.` :
+    `Rain at the base at times (first ${when(rainBase[0][0])}); snow up top.`;
+  if(worst && worst.s >= conv(450)) say += ` Models split most ${when(times[worst.k])}: ${f(worst.lo)} to ${f(worst.hi)}.`;
+  else if(wet.length) say += " The models mostly agree.";
+  $("#slSay") && ($("#slSay").textContent = say);
+  const labels = times.map(t=>t.slice(11,13)==="12"? dow(t.slice(0,10)) : "");
   const o = chartBase();
-  o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.ticks.font={size:11, weight:"600"}; o.scales.x.ticks.color="#c9d4e3";
-  o.scales.x.grid = {display:true, drawTicks:false, color: ctx => times[ctx.index]?.slice(11,13)==="00"? "#22304f" : "transparent"};   // a line at each midnight
-  o.plugins.legend.labels.filter = it => it.text !== "Precip";
+  o.scales.x.ticks.autoSkip = false; o.scales.x.ticks.maxRotation = 0; o.scales.x.ticks.font = {size:11, weight:"600"}; o.scales.x.ticks.color = "#c9d4e3";
+  o.scales.x.grid = {display:true, drawTicks:false, color: ctx => times[ctx.index]?.slice(11,13)==="00"? "#22304f" : "transparent"};
+  o.plugins.legend = {display:false};
+  o.plugins.tooltip.filter = it => it.dataset.label === "Snowline blend" || it.dataset.label === "Precip";
   o.plugins.tooltip.callbacks = { title: it => { const t = times[it[0].dataIndex]; return t? `${dow(t.slice(0,10))} ${hl(+t.slice(11,13))}` : ""; },
-    label: it => it.dataset.label==="Precip"? ` Precip ${it.parsed.y.toFixed(2)}${imp()? '"' : " mm"}/hr` : ` ${it.dataset.label} ${Math.round(it.parsed.y).toLocaleString()} ${imp()? "ft" : "m"}` };
-  o.scales.y = {position:"left", ticks:{color:"#8fa1bf",maxTicksLimit:6,callback:v=>Math.round(v).toLocaleString()}, grid:{color:"#1a2540"}, title:{display:true,text:imp()?"snow level (ft)":"snow level (m)",color:"#8fa1bf"}};
-  o.scales.y2 = {position:"right", beginAtZero:true, ticks:{color:"#8fa1bf",maxTicksLimit:4,callback:v=>imp()? (v>=0.1? v.toFixed(2) : +v.toFixed(3)+"") : +v.toFixed(1)+""}, grid:{display:false}, title:{display:true,text:imp()?"precip in/hr":"precip mm/hr",color:"#8fa1bf"}};
-  const flat = v => slice.map(()=>v);
-  S.charts.sl = new Chart($("#cSL"), {data:{labels, datasets:[
-    {type:"line", label:"Snow level", data:slice.map(c=>c?conv(c.sl):null), borderColor:"#a78bfa", borderWidth:2, pointRadius:0, yAxisID:"y", tension:.3},
-    {type:"line", label:"Summit", data:flat(conv(L.top/FT)), borderColor:"#e6edf7", borderDash:[5,4], borderWidth:1, pointRadius:0, yAxisID:"y"},
-    {type:"line", label:"Base", data:flat(conv(L.base/FT)), borderColor:"#8fa1bf", borderDash:[2,4], borderWidth:1, pointRadius:0, yAxisID:"y"},
-    {type:"bar", label:"Precip", data:slice.map(c=>c? (imp()? c.P/25.4 : c.P):null), backgroundColor:slice.map(c=>c && c.sl < bandElev() ? "#38bdf8" : "#34d399"), yAxisID:"y2"}
+    label: it => it.dataset.label==="Precip"? ` ${["Snow","Mix","Rain"][it.dataset.kind[it.dataIndex]]} ${it.parsed.y.toFixed(imp()? 2 : 1)}${imp()? '"' : " mm"}/hr` : ` Snow level ${f(it.parsed.y)}` };
+  o.scales.y = {position:"left", min:yMin, max:yMax, ticks:{color:"#8fa1bf", maxTicksLimit:7, callback:v=>imp()? (v/1000)+"k" : Math.round(v).toLocaleString()}, grid:{color:"#1a2540"}};
+  o.scales.y2 = {position:"right", beginAtZero:true, max: Math.max(0.15, ...slice.map(c=>c? (imp()? c.P/25.4 : c.P) : 0))*3.2, display:false};
+  const kind = slice.map(c=>!c? 2 : (c.frac??(conv(c.sl) < conv(bandElev())? 1 : 0)) >= 0.85? 0 : (c.frac??0) <= 0.15? 2 : 1);
+  const kc = ["#60a5fa","#a78bfa","#4ade80"];
+  // Summit / Base labels drawn on the chart, like a trail map
+  const tags = {id:"sltags", afterDatasetsDraw(ch){ const g = ch.ctx, y = ch.scales.y, x0 = ch.chartArea.left;
+    [["Summit", top], ["Base", base]].forEach(([t,v])=>{ const py = y.getPixelForValue(v); if(py < ch.chartArea.top || py > ch.chartArea.bottom) return;
+      g.save(); g.font = "700 10.5px Inter, system-ui, sans-serif"; const w = g.measureText(t).width + 10; g.fillStyle = "#0b0b0d"; g.strokeStyle = "#e6edf7"; g.lineWidth = 1;
+      g.beginPath(); g.roundRect? g.roundRect(x0+2, py-8, w, 16, 4) : g.rect(x0+2, py-8, w, 16); g.fill(); g.stroke(); g.fillStyle = "#e6edf7"; g.fillText(t, x0+7, py+4); g.restore(); });
+    g.save(); g.font = "700 11px Inter, system-ui, sans-serif"; g.fillStyle = "rgba(147,197,253,.75)"; g.fillText("Snow", ch.chartArea.right - 36, ch.chartArea.top + 14); g.fillStyle = "rgba(74,222,128,.75)"; g.fillText("Rain", ch.chartArea.right - 34, Math.min(y.getPixelForValue(yMin) - 40, (y.getPixelForValue(base) + y.getPixelForValue(yMin))/2)); g.restore(); }};
+  S.charts.sl = new Chart($("#cSL"), {plugins:[tags], data:{labels, datasets:[
+    {type:"line", label:"_snowzone", data:blend, borderWidth:0, pointRadius:0, fill:"end", backgroundColor:"rgba(59,130,246,.13)", yAxisID:"y", tension:.35},
+    {type:"line", label:"_rainzone", data:blend, borderWidth:0, pointRadius:0, fill:"start", backgroundColor:"rgba(74,222,128,.08)", yAxisID:"y", tension:.35},
+    ...lines.map(l=>({type:"line", label:"_"+l.id, data:l.data, borderColor:"rgba(125,211,252,.32)", borderWidth:1.2, pointRadius:0, yAxisID:"y", tension:.35, spanGaps:true})),
+    {type:"line", label:"Snowline blend", data:blend, borderColor:"#93c5fd", borderWidth:3.5, pointRadius:0, yAxisID:"y", tension:.35},
+    {type:"line", label:"_summit", data:times.map(()=>top), borderColor:"rgba(230,237,247,.85)", borderWidth:1.5, pointRadius:0, yAxisID:"y"},
+    {type:"line", label:"_base", data:times.map(()=>base), borderColor:"rgba(230,237,247,.85)", borderWidth:1.5, pointRadius:0, yAxisID:"y"},
+    {type:"bar", label:"Precip", kind, data:slice.map(c=>c? (imp()? c.P/25.4 : c.P) : null), backgroundColor:kind.map(k=>kc[k]), yAxisID:"y2", barPercentage:1, categoryPercentage:.9}
   ]}, options:o});
 }
 
@@ -3221,6 +3264,7 @@ const TIPS = {
     <p><b>Lifts OK:</b> under about 30 mph. <b>Holds possible:</b> about 30–45 mph, when upper lifts often slow down or pause. <b>Holds likely:</b> over about 45 mph.</p>
     <p class="muted">An estimate from the weather, not the resort's lift status. Each resort decides lift by lift.</p>`],
   snowlevel: () => ["Snow level", `<p><b>The elevation where falling precipitation turns from rain to snow.</b> Above it you get snow; below it, rain or a mix.</p>
+    <p>On the chart, <b>each thin line is one weather model</b> and the thick line is Snowline's blend. Where the thin lines fan out, the models disagree, so rain versus snow is still uncertain. Blue shading is snow and green is rain. The bars along the bottom show when it's precipitating, colored snow, mix or rain at your elevation.</p>
     <p>Snowline takes the freezing level from the models and sets the snow level about 1,000 ft below it, since snowflakes take a while to melt on the way down.</p>
     <p class="muted">If the snow level is close to your elevation, small changes decide rain or snow, so expect wetter, heavier snow and less certain totals.</p>`],
   season: () => ["Season so far", `<p><b>Snowpack % of normal</b> compares the water stored in the snow at the nearest SNOTEL gauge with the median for the same date over 1991–2020. 100% is a typical year; it's the number water managers and forecasters use.</p>
