@@ -500,7 +500,7 @@ function render(){
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
       return old? `<span class="muted upd-at old">No signal · saved ${t2}</span>` : `<span class="muted upd-at">Updated ${t2}</span>`; })()}</div>
-    ${(()=>{ const ob = nearObs(); return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    ${(()=>{ const ob0 = nearObs(), ob = ob0 && (!isNum(ob0.elevFt) || Math.abs(ob0.elevFt - e*FT) <= 1500)? ob0 : null; return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
@@ -785,7 +785,7 @@ function powderScore(C,k){
   return clamp(Math.round(s),0,10);
 }
 function renderDisc(C, e, winTot, lo, hi, modelTots, SIM){
-  const N = S.win, D = S.data, L = S.loc;
+  const N = 5, D = S.data, L = S.loc;   // same 5-day window as the totals passed in, so the words match Snow Summary
   const daily = C.consDays.map(d=>d.day+d.night);
   const parts = [];
   if(SIM){ const keys = C.days.slice(0,Math.min(N,7)).map(d=>[at(C,SIM,d,10)?.sim, d]).filter(x=>x[0]);
@@ -1716,7 +1716,8 @@ function renderReport(){
       </div>${spark? `<div class="row" style="margin-top:8px;gap:8px"><span class="muted">Depth, last week</span>${spark}</div>`:""}
       ${stationChartSVG(s)}${nearbyStationsHTML(st)}<div class="muted" style="margin-top:6px">Station is ${s.elevFt < S.loc.top - 800 ? "below the summit, so expect more up high" : "near this elevation"} · updated ${s.updated? String(s.updated).slice(5,16).replace("-","/") : "—"}</div></div>`);
   }
-  const R = rep.resort;
+  // When the grooming card already shows the mountain's own report, don't repeat a second (third-party) one here.
+  const R = extrasFor(S.loc).groom?.report ? null : rep.resort;
   if(R && !R.error && (R.base!=null || R.comment)){
     blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b><span>${provChip("rep", R.date||"")}${statusPill(rep)}</span></div>
       <div class="kv k3">
@@ -1997,10 +1998,11 @@ function openFeedback(){
 function glanceHTML(C, slNow){
   const st = findStorms(C)[0];
   const wk = d => { const l = dayLabel(d); return /\d/.test(l)? new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"}) : l; };
-  const stTxt = !st? "None soon" : (st.a - C.nowIdx <= 3? `${fmtSnow(st.tot,0)} now` : (()=>{ const d1 = C.time[st.a].slice(0,10), d2 = C.time[st.b].slice(0,10), w = d => new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"});
+  const endW = () => { const d2 = C.time[st.b].slice(0,10); return d2===todayStr()? "tonight" : new Date(d2+"T12:00").toLocaleDateString([], {weekday:"short"}); };
+  const stTxt = !st? "None soon" : (st.a - C.nowIdx <= 3? `${fmtSnow(st.tot,0)} <small>now–${endW()}</small>` : (()=>{ const d1 = C.time[st.a].slice(0,10), d2 = C.time[st.b].slice(0,10), w = d => new Date(d+"T12:00").toLocaleDateString([], {weekday:"short"});
       return `${fmtSnow(st.tot,0)} ${d1===d2? wk(d1) : (d1===todayStr()? "now" : w(d1))+"–"+w(d2)}`; })());
   return `<div class="glance">
-    <div><span>Next storm</span><b class="num">${stTxt}</b></div>
+    <div><span>${st && st.a - C.nowIdx <= 3? "This storm" : "Next storm"}</span><b class="num">${stTxt}</b></div>
     <div><span>Snow level</span><b class="num">${fmtEl(slNow)}</b></div></div>`;
 }
 /* ---------- Confidence, in plain words: how sure we are about the next 5 days, and the realistic range ---------- */
@@ -2448,9 +2450,13 @@ function renderGroom(){
     : D.preseason ? `<p class="muted" style="margin:4px 0">Mt. Bachelor hasn't posted ${nordic? "Nordic trail" : "run"} grooming yet. It shows here once the mountain opens.</p>`
     : `<p class="muted" style="margin:4px 0">No ${nordic? "trails" : "runs"} marked groomed right now${D.open? ` · ${D.open} open` : ""}.</p>`;
   const npHere = nordic && NP_PAGES[S.loc.name];
+  // Before opening day: one clear line instead of "0 of 12 lifts" and a list of closed lifts.
+  const pill = statusPill(extrasFor(S.loc).report), opens = pill.match(/Opening ([^<]+)/)?.[1];
+  const shut = !nordic && opens && !(G.lifts||[]).some(l=>l.status==="open");
+  const head2 = shut? `<p class="gr-pre">🗓️ <b>Opens ${esc(opens)}</b><span>Lifts and grooming show here once it's running.</span></p>` : head;
   card.innerHTML = `<div class="card-h"><h2>${nordic? "Grooming · Nordic" : "Grooming & resort report"}</h2><a class="muted" href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor ↗</a></div>
-    ${npHere? npEmbed(S.loc.name) + `<div class="grp">From Mt. Bachelor</div>` : ""}${npHere && D.preseason? "" : head}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
-    ${!nordic? liftsHTML(G.lifts) : ""}
+    ${npHere? npEmbed(S.loc.name) + `<div class="grp">From Mt. Bachelor</div>` : ""}${npHere && D.preseason? "" : head2}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
+    ${!nordic && !shut? liftsHTML(G.lifts) : ""}
     ${D.trails?.length? `<details class="nb" style="margin-top:8px"><summary>See groomed ${nordic? "trails" : "runs"}</summary><div class="list">${D.trails.map(x=>`<div class="li" style="min-height:38px"><span class="nm"><b>${esc(x.name)}</b><small>${esc((x.groom||"").replace(/ And /g," & "))}${x.updated? " · "+ago(x.updated) : ""}</small></span></div>`).join("")}</div></details>` : ""}
     ${R? `<div class="grp">Resort snow report</div><div class="fr"><div><b class="num">${R.overnight ?? "—"}″</b><small>Overnight</small></div><div><b class="num">${R.h24 ?? "—"}″</b><small>24 hours</small></div><div><b class="num">${R.base ?? "—"}″</b><small>Base</small></div></div>
       ${R.text? `<p class="muted clamp3" style="margin:8px 0 0;font-size:13px">${esc(R.text)}</p>` : ""}` : ""}
