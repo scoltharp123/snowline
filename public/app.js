@@ -2161,7 +2161,11 @@ function favRowRender(){
   const el = $("#favRow"); if(!el) return; const F = S.favs || [];
   if(F.length < 2 || (S.view||"forecast") !== "forecast"){ el.innerHTML = ""; el.hidden = true; return; }
   el.hidden = false;
-  el.innerHTML = F.map(f=>`<button data-fav="${esc(f.name)}" class="${f.name===S.loc?.name? "on" : ""}">${esc(dispName(f.name))}</button>`).join("");
+  // Each chip carries that spot's next-3-day snow from its last look (under 12 h old), so you can scan all your spots at once.
+  const snow3 = name => { const r = store.get("fc:" + name, null); if(!r || Date.now() - r.t > 12*3600e3) return "";
+    let td; try{ td = todayStr(); }catch(e){ td = new Date().toLocaleDateString("en-CA"); } const v = [0,1,2].reduce((s, k) => s + (r.d[dateAdd(td, k)] || 0), 0);
+    return v >= 0.5? `<i class="fv-s${v >= 6? " big" : ""}">${fmtSnow(v, 0)}</i>` : ""; };
+  el.innerHTML = F.map(f=>`<button data-fav="${esc(f.name)}" class="${f.name===S.loc?.name? "on" : ""}">${esc(dispName(f.name))}${snow3(f.name)}</button>`).join("");
   el.querySelectorAll("button").forEach(b=>b.onclick=()=>{ const f = F.find(x=>x.name===b.dataset.fav); if(f && f.name !== S.loc?.name){ scrollTo({top:0}); load(f); } });
   const on = el.querySelector(".on"); if(on) el.scrollTo({left: on.offsetLeft - el.clientWidth/2 + on.offsetWidth/2});
 }
@@ -4168,6 +4172,7 @@ function renderChange(C, complete){
   const prev = store.get(key, null);
   if(prev && now - prev.t >= 2*3600e3 && now - prev.t < 5*864e5 && !S.chgBase[key]) S.chgBase[key] = prev;
   if(!prev || now - prev.t >= 2*3600e3) store.set(key, { t: now, d: cur });
+  store.set("fc:" + S.loc.name, { t: now, d: cur }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
   const base = S.chgBase[key]; if(!base) return;
   const days = Object.keys(cur).filter(d => d >= today && base.d[d] != null);
   if(days.length < 3) return;
