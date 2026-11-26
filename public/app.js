@@ -1635,11 +1635,12 @@ function renderStorm(C, SIM, e){
     <div class="callout" style="margin:0 0 12px">${verdict}${rainNote}</div>
     <div class="mtn-wrap"><svg id="mtnSvg" viewBox="0 0 340 170" width="100%"></svg></div>
     <div class="row" style="flex-wrap:nowrap;gap:10px;margin-top:6px"><button class="ibtn" id="stormPlay" aria-label="Play">▶</button><input type="range" id="stormRange" min="${a0}" max="${b0}" value="${st.a}" style="flex:1"></div>
-    <div class="chartbox" style="height:170px;margin-top:8px"><canvas id="cStorm"></canvas></div>`;
+    <div class="muted" style="font-size:12px;margin:10px 0 2px">How hard it snows, hour by hour · tap a bar to see that moment</div>
+    <div class="chartbox" style="height:150px"><canvas id="cStorm"></canvas></div>`;
   const L0=S.loc, lo=Math.min(L0.base-1500, isFinite(slMin)? slMin*FT-500 : L0.base-1500), hi=Math.max(L0.top+800, isFinite(slMax)? slMax*FT+500 : L0.top+800);
   const yOf = ft => 150 - (ft-lo)/(hi-lo)*130;
   let acc = 0; const accAt = {}; for(let i=a0;i<=b0;i++){ acc += C.cons[i]?.snow||0; accAt[i]=acc; }
-  const draw = (i) => {
+  let draw = (i) => {
     const c = C.cons[i]; if(!c) return; const slFt = Math.max(lo, Math.min(hi, c.sl*FT)), y = yOf(slFt);
     const peakY = yOf(L0.top), baseY = yOf(L0.base), meY = yOf(bandElev()*FT); const ty = ptype(c);
     const flakes = c.snow>=0.05 ? Array.from({length:Math.min(40, Math.round(c.snow*30)+4)},(_,k)=>`<circle cx="${(k*53+i*17)%340}" cy="${(k*37+i*29)%Math.max(10,y)}" r="1.6" fill="${y<peakY? PT.rain : "#fff"}" opacity=".8"/>`).join("") : "";
@@ -1662,12 +1663,16 @@ function renderStorm(C, SIM, e){
   // rate + snow level chart
   const idx=[]; for(let i=a0;i<=b0;i++) idx.push(i);
   const o = chartBase(); o.plugins.legend.display=false; o.scales.x.ticks.autoSkip=false;
-  o.scales.y.title={display:true,text:imp()?"in/hr":"cm/hr",color:"#8b9cba"};
-  o.scales.y2={position:"right",grid:{display:false},ticks:{color:"#b48cff",font:{size:10},maxTicksLimit:4,callback:v=>imp()? Math.round(v/100)/10+"k" : v},title:{display:true,text:"snow lvl",color:"#b48cff"}};
+  // One idea per chart: how hard it snows each hour (snow level already moves on the mountain above). Tap a bar to scrub there.
+  o.scales.y.title={display:true,text:imp()?"inches per hour":"cm per hour",color:"#8b9cba",font:{size:10}};
+  o.onClick = (ev, els) => { const k = els?.[0]?.index; if(k==null) return; rng.value = a0 + k; draw(a0 + k); };
   S.charts.storm = new Chart($("#cStorm"), {data:{labels:idx.map(i=>{ const h=+C.time[i].slice(11,13); return h===0? dow(C.time[i].slice(0,10)) : h%6===0? hl(h) : ""; }), datasets:[
-    {type:"bar", data:idx.map(i=>snowNum(C.cons[i]?.snow||0)), backgroundColor:idx.map(i=>{ const t=ptype(C.cons[i]); return t==="none"? "#3d8bfd" : PT[t]; }), yAxisID:"y", borderRadius:2},
-    {type:"line", data:idx.map(i=> C.cons[i]? (imp()? C.cons[i].sl*FT : C.cons[i].sl) : null), borderColor:"#b48cff", borderWidth:1.6, pointRadius:0, yAxisID:"y2", tension:.3}
+    {type:"bar", data:idx.map(i=>snowNum(C.cons[i]?.snow||0)), backgroundColor:idx.map(i=>{ const t=ptype(C.cons[i]); return t==="none"? "#3d8bfd" : PT[t]; }), yAxisID:"y", borderRadius:2}
   ]}, options:o});
+  // The bar for the moment on the mountain stays bright; the rest dim, so the chart and the picture move together.
+  const cols = idx.map(i=>{ const t=ptype(C.cons[i]); return t==="none"? "#3d8bfd" : PT[t]; });
+  const mark = i => { const ch = S.charts.storm; if(!ch?.data?.datasets) return; ch.data.datasets[0].backgroundColor = idx.map((j,k)=> j===i? cols[k] : (/^#[0-9a-f]{6}$/i.test(cols[k])? cols[k]+"66" : cols[k])); ch.update("none"); };
+  const draw0 = draw; draw = i => { draw0(i); mark(i); }; setTimeout(()=>mark(+rng.value), 600);
 }
 
 /* ---------- Extras: measured snow, resort/grooming report, learned blend, avalanche detail ---------- */
