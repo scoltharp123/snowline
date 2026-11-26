@@ -2964,17 +2964,24 @@ function renderWaxBox(el){
 /* ---------- Unified alerts (one rule list → banner + lock screen) ---------- */
 const ALERT_WIN = {h24:"24 hr", d3:"3 days", d5:"5 days", d10:"10 days"};
 function ruleLabel(r){ const sp = r.spot==="*favs"? "Any favorite" : r.spot==="*all"? "Any spot" : r.spot.replace(/,\s*[A-Z]{2}$/,""); return r.type==="overnight" ? `${sp}: ≥ ${fmtSnow(r.inches,0)} overnight` : `${sp}: ≥ ${fmtSnow(r.inches,0)} in ${ALERT_WIN[r.win||"d3"]}`; }
+// Alerts should say the same number the spot's page says. When you've opened a spot in the last 6 hours, its
+// full multi-model Snowline forecast is used for the window; otherwise the quick all-spots scan fills in.
+function snowlineWin(name, win){ const r = store.get("fc:" + name, null), n = {d3:3, d5:5}[win];
+  if(!r || !n || Date.now() - r.t > 6*3600e3 || (r.band && r.band !== store.get("alertBand","mid"))) return null; let td; try{ td = todayStr(); }catch(e){ td = new Date().toLocaleDateString("en-CA"); }
+  let s = 0; for(let k = 0; k < n; k++){ const v = r.d[dateAdd(td, k)]; if(v == null) return null; s += v; } return s; }
 function evalAlerts(F){
   const hits = [];
   for(const r of activeRules()){
     const pool = r.spot === "*favs" ? F.rows.filter(x=>S.favs.some(f=>f.name===x.spot.name)) : r.spot === "*all" ? F.rows : F.rows.filter(x=>x.spot.name===r.spot);
-    for(const x of pool){ const v = r.type==="overnight" ? x.last24 : x[r.win||"d3"]; if(isNum(v) && v >= r.inches) hits.push({r, x, v, w: r.type==="overnight"? "the last 24 hr" : ALERT_WIN[r.win||"d3"]}); }
+    for(const x of pool){ const v = r.type==="overnight" ? x.last24 : (snowlineWin(x.spot.name, r.win||"d3") ?? x[r.win||"d3"]); const own = r.type!=="overnight" && snowlineWin(x.spot.name, r.win||"d3") != null;
+      // Say where on the mountain the number is for: the quick scan reads the summit, which is usually more than mid.
+      if(isNum(v) && v >= r.inches) hits.push({r, x, v, w: (r.type==="overnight"? "the last 24 hr" : ALERT_WIN[r.win||"d3"]) + (own? "" : " up top")}); }
   }
   return hits;
 }
 function pushSpots(){ const L = S.favs.length? S.favs : (S.loc? [S.loc] : []); return L.slice(0,6).map(x=>({name:x.name, lat:x.lat, lon:x.lon, base:x.base, top:x.top})); }
 function pushRules(){ const all=[...S.favs, ...PRESETS]; return activeRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
-async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","summit"), nowcast: store.get("ncOn", true)}})}); }catch(e){} }
+async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","mid"), nowcast: store.get("ncOn", true)}})}); }catch(e){} }
 function renderAlerts(){
   const el = $("#view-alerts"); const spots = finderSpots(); const on = store.get("pushOn", false);
   if(!alertRules().length && !store.get("alertsSeeded")){ store.set("alerts", [{spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); store.set("alertsSeeded", 1); }
@@ -2992,7 +2999,7 @@ function renderAlerts(){
       ${sw("briefTog", "Morning brief", "Around 6am: overnight snow, more today, grooming and the temperature up top", briefOn)}
       ${briefOn? `<div class="seg sm" id="briefSeg" style="margin:2px 0 6px">${[["snow","Snow days"],["daily","Every day"]].map(([k,l])=>`<button data-b="${k}" class="${store.get("brief","snow")===k?"on":""}">${l}</button>`).join("")}</div>` : ""}
       <div class="al-row al-band"><div><b>Check snow at</b><div class="muted">The elevation alerts and the brief use at each favorite</div></div></div>
-      <div class="seg sm" id="bandAl" style="margin:0 0 6px">${[["base","Base"],["mid","Mid"],["summit","Summit"]].map(([k,l])=>`<button data-k="${k}" class="${store.get("alertBand","summit")===k?"on":""}">${l}</button>`).join("")}</div>
+      <div class="seg sm" id="bandAl" style="margin:0 0 6px">${[["base","Base"],["mid","Mid"],["summit","Summit"]].map(([k,l])=>`<button data-k="${k}" class="${store.get("alertBand","mid")===k?"on":""}">${l}</button>`).join("")}</div>
       ${on? `<button class="link" id="pTest" style="padding-left:0;margin-top:6px">Send a test notification</button>` : ""}
       <div id="aHits"></div></div>
     <details class="sec" id="customAl"><summary><span class="ttl">Custom alerts</span><span class="sv">${alertRules().filter(r=>r.spot!=="*favs").length || "Add your own"}</span></summary><div class="sec-b">
@@ -3015,7 +3022,7 @@ function renderAlerts(){
     if(on){ try{ const sub = await pushSub(); if(sub){ await post({action:"unsubscribe", endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); } }catch(e){} store.set("pushOn", false); toast("Lock-screen alerts off"); renderAlerts(); return; }
     try{ const perm = await Notification.requestPermission(); if(perm!=="granted"){ toast("Notifications are blocked in Settings"); return; }
       const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
-      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","summit"), nowcast: store.get("ncOn", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
+      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","mid"), nowcast: store.get("ncOn", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
     }catch(e){ toast("Couldn't turn on notifications"); } };
   document.querySelectorAll("#briefSeg button").forEach(b=>b.onclick=()=>{ store.set("brief", b.dataset.b); document.querySelectorAll("#briefSeg button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(b.dataset.b==="off"? "Morning brief off" : b.dataset.b==="daily"? "Morning brief every day" : "Morning brief on snow days"); });
   const flip = (id, get, set, msg) => { const b = $("#"+id); if(b) b.onclick = () => { const v = !get(); set(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); pushSync(); toast(msg(v)); }; };
@@ -4172,7 +4179,7 @@ function renderChange(C, complete){
   const prev = store.get(key, null);
   if(prev && now - prev.t >= 2*3600e3 && now - prev.t < 5*864e5 && !S.chgBase[key]) S.chgBase[key] = prev;
   if(!prev || now - prev.t >= 2*3600e3) store.set(key, { t: now, d: cur });
-  store.set("fc:" + S.loc.name, { t: now, d: cur }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
+  store.set("fc:" + S.loc.name, { t: now, d: cur, band: S.band }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
   const base = S.chgBase[key]; if(!base) return;
   const days = Object.keys(cur).filter(d => d >= today && base.d[d] != null);
   if(days.length < 3) return;
