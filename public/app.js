@@ -2204,7 +2204,8 @@ function warmFav(f, ref, det, ens){
 }
 function preloadFavs(){
   if(S.preT && Date.now() - S.preT < 40*60e3) return; S.preT = Date.now();
-  const list = (S.favs||[]).filter(f=>f.name!==S.loc?.name && isNum(f.lat) && isNum(f.base) && isNum(f.top)).slice(0,5); let k = 0;
+  const fresh = n => { const r = store.get("fc:" + n, null); return r?.full && Date.now() - r.t < 30*60e3; };
+  const list = (S.favs||[]).filter(f=>(f.name!==S.loc?.name || !fresh(f.name)) && isNum(f.lat) && isNum(f.base) && isNum(f.top)).slice(0,5); let k = 0;
   const next = async () => { const f = list[k++]; if(!f) return; if(document.visibilityState !== "visible"){ S.preT = 0; return; }
     const ref = ((f.base+f.top)/2)/FT;
     const ensP = Promise.all(ENS.map(m=>fetchEns(m, f, ref).catch(()=>null)));
@@ -4199,13 +4200,15 @@ $("#setUsage") && ($("#setUsage").onclick = () => { closeSheet("setSheet"); open
 S.chgBase = S.chgBase || {};
 function renderChange(C, complete){
   const el = $("#chgStrip"); if(!el || !S.loc) return; el.innerHTML = "";
+  // The spot you're viewing always refreshes its saved forecast (chips, Favorites, alerts read it), even if a model is missing.
+  if(!S.usedOld && C?.consDays){ const d7 = {}; C.days.slice(0,7).forEach((d,k)=>{ const x = C.consDays[k]; if(x?.n) d7[d] = Math.round((x.day+x.night)*10)/10; });
+    store.set("fc:" + S.loc.name, { t: Date.now(), d: d7, band: S.band, full: fcFull(C) }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender(); }
   if(S.usedOld || !complete || !C?.consDays) return;
   const key = "chg:" + S.loc.name + "|" + S.band, now = Date.now(), today = todayStr();
   const cur = {}; C.days.slice(0, 7).forEach((d, k) => { const x = C.consDays[k]; if(x?.n) cur[d] = Math.round((x.day + x.night) * 10) / 10; });
   const prev = store.get(key, null);
   if(prev && now - prev.t >= 2*3600e3 && now - prev.t < 5*864e5 && !S.chgBase[key]) S.chgBase[key] = prev;
   if(!prev || now - prev.t >= 2*3600e3) store.set(key, { t: now, d: cur });
-  store.set("fc:" + S.loc.name, { t: now, d: cur, band: S.band, full: fcFull(C) }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
   const base = S.chgBase[key]; if(!base) return;
   const days = Object.keys(cur).filter(d => d >= today && base.d[d] != null);
   if(days.length < 3) return;
