@@ -495,7 +495,7 @@ function render(){
   ${modelNote}
   <div id="nwsAlerts"></div><div id="ncStrip"></div>
   ${(()=>{ const notes = callouts.slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length).replace(/^\s*(\S+?)\s+/, '<span class="vn-i">$1</span>') : h; });
-     return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="rcptStrip"></div>
+     return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="chgStrip"></div><div id="rcptStrip"></div>
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
@@ -544,7 +544,7 @@ function render(){
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
   renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); usageMark("spots", S.loc?.name); usageMark("modes", S.mode); setTimeout(usageObserve, 300); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
-  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderReceipt(); }catch(err){}
+  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderChange(C, nIn >= MODELS.length-2); }catch(err){} try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderGlide(); renderElevTable(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
@@ -4155,3 +4155,32 @@ async function openUsage(){
   }catch(e){ $("#tipBox").innerHTML = `<p>Couldn't load usage right now.</p>`; }
 }
 $("#setUsage") && ($("#setUsage").onclick = () => { closeSheet("setSheet"); openUsage(); });
+
+/* ---------- "Since you last looked": the reason to open the app again ----------
+   Per spot, remember the day-by-day snow from the start of your last visit (a visit = 2+ hours since the last look).
+   Next time, say plainly how the forecast moved and which day moved most. Quiet when nothing meaningful changed. */
+S.chgBase = S.chgBase || {};
+function renderChange(C, complete){
+  const el = $("#chgStrip"); if(!el || !S.loc) return; el.innerHTML = "";
+  if(S.usedOld || !complete || !C?.consDays) return;
+  const key = "chg:" + S.loc.name + "|" + S.band, now = Date.now(), today = todayStr();
+  const cur = {}; C.days.slice(0, 7).forEach((d, k) => { const x = C.consDays[k]; if(x?.n) cur[d] = Math.round((x.day + x.night) * 10) / 10; });
+  const prev = store.get(key, null);
+  if(prev && now - prev.t >= 2*3600e3 && now - prev.t < 5*864e5 && !S.chgBase[key]) S.chgBase[key] = prev;
+  if(!prev || now - prev.t >= 2*3600e3) store.set(key, { t: now, d: cur });
+  const base = S.chgBase[key]; if(!base) return;
+  const days = Object.keys(cur).filter(d => d >= today && base.d[d] != null);
+  if(days.length < 3) return;
+  const diff = days.map(d => [d, cur[d] - base.d[d]]), tot = diff.reduce((s, x) => s + x[1], 0);
+  const big = diff.slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+  const was = new Date(base.t), when = (now - base.t < 20*3600e3 && was.getDate() === new Date().getDate()? "" : was.toLocaleDateString(undefined, { weekday: "short" }) + " ") + was.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(":00", "").replace(" ", "").toLowerCase();
+  const total = days.reduce((s, d) => s + cur[d], 0), dayW = d => d === today? "today" : d === dateAdd(today, 1)? "tomorrow" : dow(d);
+  let icon, msg, cls = "";
+  if(Math.abs(tot) >= 1 && Math.abs(big[1]) >= 0.8){
+    const up = tot > 0; icon = up? "📈" : "📉"; cls = up? "ok" : "";
+    msg = `<b>${up? "+" : "−"}${fmtSnow(Math.abs(tot), 1)}</b> ${up? "more" : "less"} snow in the forecast, mostly ${dayW(big[0])}${up && Math.abs(big[1]) >= 3? " 🎉" : ""}.`;
+  } else if(total >= 2 && now - base.t >= 6*3600e3){ icon = "🎯"; cls = "ok"; msg = `Forecast holding steady: still about <b>${fmtSnow(total, 0)}</b> this week.`; }
+  else return;
+  el.innerHTML = `<div class="rc chg"><span class="chg-i">${icon}</span><div class="rc-b"><div class="rc-h">Since you looked ${when}</div><div class="rc-n"><span class="${cls? "chg-ok" : ""}">${msg}</span></div></div><button class="rc-x" aria-label="Hide">✕</button></div>`;
+  el.querySelector(".rc-x").onclick = () => { delete S.chgBase[key]; el.innerHTML = ""; };
+}
