@@ -450,7 +450,7 @@ function render(){
   const callouts = [];
   const bigDay = consDaily.slice(0,7).reduce((b,v,i)=>v>b.v?{v,i}:b,{v:0,i:0});
   const rainHrs = C.cons.slice(C.nowIdx, C.nowIdx+24*N).filter(c=>c && c.P>0.3 && c.sl > e).length;
-  if(bigDay.v >= 6) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}.${S.mode==="bc"? "" : " "+firstPowDay(C)}</div>`);
+  if(bigDay.v >= 6 && C.days[bigDay.i] !== todayStr()) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}.${S.mode==="bc"? "" : " "+firstPowDay(C)}</div>`);
   if(rainHrs >= 6){
     const wet = C.cons.map((c,i)=>[c,i]).slice(C.nowIdx, C.nowIdx+24*N).filter(([c,i])=>c && c.P>0.3 && c.sl > e && +C.time[i].slice(11,13) >= 6 && +C.time[i].slice(11,13) <= 18);
     const byDay = {}; wet.forEach(([c,i])=>{ const d = C.time[i].slice(0,10); byDay[d] = (byDay[d]||0) + 1; });
@@ -1284,8 +1284,10 @@ async function checkAlerts(){
   if(!activeRules().length){ $("#alertBanner").innerHTML=""; return; }
   try{ const F = await loadFinder(); const hits = evalAlerts(F);
     document.querySelector('#tabs a[data-v="alerts"]').classList.toggle("has", hits.length>0);
-    $("#alertBanner").innerHTML = hits.length? `<div class="al-strip">${hits.slice(0,3).map(h=>{ const here = S.loc && h.x.spot.name===S.loc.name;
-        return `<button data-alspot="${encodeURIComponent(h.x.spot.name)}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round"><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 003.4 0"/></svg><span><b>${here? "Here" : esc(h.x.spot.name.replace(/, [A-Z]{2}$/,""))}</b> ${fmtSnow(h.v,0)} in ${h.w}</span>${here? "" : "<i>›</i>"}</button>`; }).join("")}</div>` : "";
+    // The page you're on already shows its own forecast, so only point to OTHER spots your alerts caught: one quiet line.
+    const by = {}; hits.forEach(h=>{ const n = h.x.spot.name; if(n !== S.loc?.name && (!by[n] || h.v > by[n].v)) by[n] = h; });
+    const oth = Object.values(by).sort((a,b)=>b.v-a.v), h0 = oth[0];
+    $("#alertBanner").innerHTML = h0? `<div class="al-strip"><button data-alspot="${encodeURIComponent(h0.x.spot.name)}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round"><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 003.4 0"/></svg><span><b>${esc(dispName(h0.x.spot.name))}</b> ${fmtSnow(h0.v,0)} in ${h0.w}${oth.length>1? ` <em>· +${oth.length-1} more</em>` : ""}</span><i>›</i></button></div>` : "";
     $("#alertBanner").querySelectorAll("[data-alspot]").forEach(b=>b.onclick=()=>{ const n = decodeURIComponent(b.dataset.alspot); if(S.loc?.name===n){ location.hash="alerts"; return; } const sp = [...S.favs,...PRESETS].find(x=>x.name===n); if(sp){ scrollTo(0,0); load(sp); } });
   }catch(e){}
 }
