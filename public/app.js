@@ -428,9 +428,9 @@ const grp = (id, title, inner) => `<details class="sec gsec" data-sec="${id}" ${
 /* Keep each group honest: hide it when nothing inside has content, and list what's inside on the closed row */
 function tidyGroups(){
   document.querySelectorAll("details.gsec").forEach(g=>{
-    const cards = [...g.querySelectorAll(".grp-b > section.card")].filter(c=> !c.hidden && c.innerHTML.trim());
+    const cards = [...g.querySelectorAll(".grp-b > section.card")].filter(c=> !c.hidden && (c.firstElementChild || c.textContent.trim()));
     g.hidden = !cards.length;
-    const names = [...new Set(cards.map(c=> (c.dataset.sv || c.querySelector("h2")?.textContent || "").replace(/\s*·.*$/,"").trim()).filter(Boolean))];
+    const names = [...new Set(cards.map(c=> (c.dataset.sv || c.querySelector("h2")?.textContent || "").replace(/ⓘ/g,"").replace(/\s*·.*$/,"").trim()).filter(Boolean))];
     const sv = g.querySelector(".sv"); if(sv) sv.textContent = names.slice(0,3).join(" · ") + (names.length>3? ` +${names.length-3}` : "");
   });
 }
@@ -532,7 +532,7 @@ function render(){
   ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds${tipI("models")}</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
   <div class="promise"><b>Free forever · no ads · no account</b><span>Your favorites and settings stay on your phone.</span><a href="/accuracy">How accurate is Snowline? ›</a></div>
-  <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models · ${C.ensDays.length} ensemble members<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
+  <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models${C.ensDays.length? ` · ${C.ensDays.length} ensemble runs` : ""}<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
   $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read the full forecast" : "Show less"; };
@@ -546,8 +546,8 @@ function render(){
 
   renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); usageMark("spots", S.loc?.name); usageMark("modes", S.mode); setTimeout(usageObserve, 300); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
   { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderReceipt(); }catch(err){}
-  { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
-  if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderElevTable(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
+  { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); renderElevTable(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
+  if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
   renderDisc(C, e, winTot, lo, hi, modelTots, SIM);
@@ -1925,15 +1925,16 @@ document.addEventListener("click", e=>{ const b = e.target.closest("[data-open]"
   const sync = () => { if(Date.now() < lock || $("#view-forecast").style.display==="none") return;
     // hide tabs whose section isn't on this page (e.g. no cams)
     let cur = null;
-    nav.querySelectorAll("button").forEach(b=>{ const el = document.getElementById(b.dataset.j); const has = el && !el.hidden && el.innerHTML.trim()!=="" && !el.closest("details.gsec")?.hidden;
+    nav.querySelectorAll("button").forEach(b=>{ const el = document.getElementById(b.dataset.j); const has = el && !el.hidden && !!(el.firstElementChild || el.textContent.trim()) && !el.closest("details.gsec")?.hidden;
       b.hidden = !has; if(!has) return;
       const top = (el.closest("details.gsec:not([open])") || el).getBoundingClientRect().top;
       if(top - offset() <= 12) cur = b; });
     const first = [...nav.querySelectorAll("button")].find(b=>!b.hidden);
     if(cur !== nav._cur){ nav._cur = cur; mark(cur || first); } };
-  addEventListener("scroll", ()=>requestAnimationFrame(sync), {passive:true});
-  new MutationObserver(()=>requestAnimationFrame(sync)).observe($("#app"), {childList:true});
-  setInterval(sync, 2000);
+  let q = 0; const soon = () => { if(!q) q = requestAnimationFrame(() => { q = 0; sync(); }); };   // at most once per frame
+  addEventListener("scroll", soon, {passive:true});
+  new MutationObserver(soon).observe($("#app"), {childList:true});
+  setInterval(() => { if(!document.hidden) soon(); }, 2000);
 })();
 
 /* ---------- Season so far: snowpack vs normal at the nearest gauge ---------- */
@@ -2288,7 +2289,7 @@ function renderReceipt(){
 const isBach = () => S.loc?.name === "Mt. Bachelor, OR";
 const tgtDay = (cutHr) => { const h = +S.ctx.C.time[S.ctx.C.nowIdx].slice(11,13); return h >= cutHr ? dateAdd(todayStr(), 1) : todayStr(); };
 const dayWord = d => d===todayStr()? "Today" : d===dateAdd(todayStr(),1)? "Tomorrow" : dayLabel(d);
-function cAt(ft){ const k = Math.round(ft/100); S.ctx.zc ||= {}; return S.ctx.zc[k] ||= computeAt(ft/FT); }
+function cAt(ft){ const k = Math.round(ft/500)*5;   /* 500 ft steps: plenty for wind and crowd reads, far fewer full computes */ S.ctx.zc ||= {}; return S.ctx.zc[k] ||= computeAt(ft/FT); }
 const windM = c => c? Math.max(c.RW||0, (c.G||0)*0.8) : 0;
 const angD = (a, b) => { const d = Math.abs(((a - b) % 360 + 360) % 360); return d > 180 ? 360 - d : d; };
 
