@@ -474,7 +474,7 @@ function render(){
       const wet = rain >= 2 && sc < 6.5, gale = gust >= 72 && sc < 6.5;
       const [lvl, head] = wet? ["skip", `Skip it ${who.toLowerCase()}`] : gale? ["meh", `Windy ${who.toLowerCase()}`] : sc>=8? ["go", `Go! ${who} is epic`] : sc>=6.5? ["go", `Worth it ${who.toLowerCase()}`] : sc>=5? ["ok", `Good day ${who.toLowerCase()}`] : sc>=3.5? ["meh", `Fair ${who.toLowerCase()}`] : ["skip", `Skip it ${who.toLowerCase()}`];
       const why = wet? `rain at ${fmtEl(e)}` : gale? `gusts to ${fmtWind(gust)} ${windU()}, ${lab}` : `${lab}, best ${when}`;
-      verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}:</b> ${why}</span><span class="v-sc" data-tip="quality" role="button" aria-label="What the ski score means">${scoreChip(sc)}</span></div></div>`; }
+      verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}</b><em>${why[0].toUpperCase()+why.slice(1)}</em></span><span class="v-sc" data-tip="quality" role="button" aria-label="What the ski score means">${scoreChip(sc)}</span></div><div id="ncStrip"></div></div>`; }
   }
   if(verdict && bestK>=0 && days7[bestK]!==vDay){ const b = sums[bestK];
     verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="vs-t">Best this week: <b>${(l=>/\d/.test(l)? new Date(days7[bestK]+"T12:00").toLocaleDateString([], {weekday:"short"}) : l)(dayLabel(days7[bestK]))}</b> ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div></div>`); bestK = -1; }
@@ -493,7 +493,7 @@ function render(){
   const glance = glanceHTML(C, slNow);
   $("#app").innerHTML = `
   ${modelNote}
-  <div id="nwsAlerts"></div><div id="ncStrip"></div>
+  <div id="nwsAlerts"></div>${verdict? "" : `<div id="ncStrip"></div>`}
   ${(()=>{ const notes = callouts.slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length).replace(/^\s*(\S+?)\s+/, '<span class="vn-i">$1</span>') : h; });
      return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="chgStrip"></div><div id="rcptStrip"></div>
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
@@ -2250,7 +2250,7 @@ function renderNowcast(){
   if(n?.state==="soon" && (n.totIn >= 0.3)) h = `<div class="nc nc-soon"><div class="nc-i">❄️</div><div><div class="nc-t">Snow in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
       <div class="nc-s">Starts around ${ncClock(n.startMs)}${n.totIn >= 0.5? ` · about ${fmtSnow(n.totIn, n.totIn<1?1:0)}${n.endMs? ` by ${ncClock(n.endMs)}` : ""}` : ""}${n.peakRate >= 0.4? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
   else if(n?.state==="now") h = `<div class="nc nc-now"><div class="nc-i"><span class="nc-dot"></span>❄️</div><div><div class="nc-t">Snowing now · ${hard(n.nowRate)}</div>
-      <div class="nc-s">${n.totIn >= 0.3? `About ${fmtSnow(n.totIn, n.totIn<1?1:0)} more` : "Light"}${n.endMs? ` · lets up around ${ncClock(n.endMs)}` : " · keeps going for a while"}${n.peakRate >= 0.8 && n.peakMs > Date.now()+20*60e3? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
+      <div class="nc-s">${n.totIn >= 0.3? `About ${fmtSnow(n.totIn, n.totIn<1?1:0)} more` : "Light"}${n.endMs? ` · lets up around ${ncClock(n.endMs)}` : ""}${n.peakRate >= 0.8 && n.peakMs > Date.now()+20*60e3? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
   else if(n?.state==="rain") h = `<div class="nc nc-rain"><div class="nc-i">🌧️</div><div><div class="nc-t">Rain in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
       <div class="nc-s">Starts around ${ncClock(n.startMs)} at ${fmtEl(S.ctx.e)}${n.snowMs? ` · turns to snow around ${ncClock(n.snowMs)}` : ""}</div></div></div>`;
   el.innerHTML = h; fallFromForecast();
