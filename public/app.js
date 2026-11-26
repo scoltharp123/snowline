@@ -759,10 +759,12 @@ async function renderFavs(force){
     ${S.favs.length? "" : `<div class="callout">Tap ☆ on any forecast to add it here. Until then, here are some spots near Bend.</div>`}
     ${weekendHTML(list, F.rows)}
     <div class="seg scroll fav-views" id="favViews">${FAV_VIEWS.map(([k,l])=>`<button data-fv="${k}" class="${(S.favView||"snow")===k?"on":""}">${l}</button>`).join("")}</div>
-    ${list.map(sp=>{ const r = byName.get(sp.name); if(!r) return "";
-      return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${sp.name}</b><div class="muted">${Math.round(sp.top).toLocaleString()} ft summit · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
-        ${(S.favView && S.favView!=="snow" && favBodyHTML(S.favView, sp, r)) || snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</div>`; }).join("")}
-    <div class="muted" style="text-align:center;margin:10px 0">Summit forecasts · Open-Meteo best-match blend through Snowline's snow model</div>`;
+    ${list.map(sp=>{ const r0 = byName.get(sp.name), fc = store.get("fc:" + sp.name, null), own = fc?.full && Date.now() - fc.t < 3*3600e3;
+      const r = own? { last24: fc.full.p24, days15: fc.full.vals, dates15: fc.full.dates, d5: fc.full.vals.slice(0,5).reduce((s,v)=>s+(v||0),0) } : r0; if(!r) return "";
+      const bandFt = own? (fc.band==="base"? sp.base : fc.band==="summit"? sp.top : (sp.base+sp.top)/2) : sp.top, bandLab = own? ({base:"Base", mid:"Mid", summit:"Summit"}[fc.band] || "Mid") : "Summit";
+      return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${sp.name}</b><div class="muted">${bandLab} · ${(Math.round(bandFt/10)*10).toLocaleString()} ft · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
+        ${(S.favView && S.favView!=="snow" && favBodyHTML(S.favView, sp, r0 || r)) || snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</div>`; }).join("")}
+    <div class="muted" style="text-align:center;margin:10px 0">Snowline's forecast at the height you ski: Mid for alpine, Base for Nordic. Spots marked Summit haven't been checked in the last few hours.</div>`;
   el.querySelectorAll("#wkSeg button").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); S.wkDay = b.dataset.d; renderFavs(); });
   el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ if(S.favEdit) return; const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
   const fe=$("#favEdit"); if(fe) fe.onclick = () => { S.favEdit=!S.favEdit; renderFavs(); };
@@ -2188,6 +2190,7 @@ function favStep(dir){
 //    instant and still works offline (answers are kept on the phone for a day as a fallback).
 /* Work out each favorite's forecast in the background with the exact same code as its page, so:
    tapping it opens instantly (ready in memory), its chip shows its snow, and alerts quote the same number. */
+function fcFull(C){ return { dates: C.days.slice(0,15), vals: C.consDays.slice(0,15).map(x=>x.n? Math.round((x.day+x.night)*10)/10 : null), p24: isNum(C.past24)? Math.round(C.past24*10)/10 : null }; }
 function warmFav(f, ref, det, ens){
   const models = {}; det.forEach((d,i)=>{ if(d) models[MODELS[i].id] = d; });
   const first = Object.values(models).sort((a,b)=>b.time.length-a.time.length)[0]; if(!first || Object.keys(models).length < 4) return;
@@ -2196,7 +2199,7 @@ function warmFav(f, ref, det, ens){
   const ok = modesFor(f), ln = store.get("lastNordic","skate"), mode = ok.includes(S.mode)? S.mode : ok.includes(ln)? ln : ok[0];
   const keep = {data:S.data, loc:S.loc, band:S.band, ctx:S.ctx}; let C;
   try{ S.data = data; S.loc = f; S.band = bandFor(mode); S.ctx = {...(S.ctx||{}), zc:{}}; C = computeAt(bandElev()); }
-  finally{ const fb = S.band; Object.assign(S, keep); if(C) store.set("fc:" + f.name, (()=>{ const d = {}; C.days.slice(0,7).forEach((dd,k)=>{ const x = C.consDays[k]; if(x?.n) d[dd] = Math.round((x.day+x.night)*10)/10; }); return {t:Date.now(), d, band:fb}; })()); }
+  finally{ const fb = S.band; Object.assign(S, keep); if(C) store.set("fc:" + f.name, (()=>{ const d = {}; C.days.slice(0,7).forEach((dd,k)=>{ const x = C.consDays[k]; if(x?.n) d[dd] = Math.round((x.day+x.night)*10)/10; }); return {t:Date.now(), d, band:fb, full: fcFull(C)}; })()); }
   favRowRender();
 }
 function preloadFavs(){
@@ -4202,7 +4205,7 @@ function renderChange(C, complete){
   const prev = store.get(key, null);
   if(prev && now - prev.t >= 2*3600e3 && now - prev.t < 5*864e5 && !S.chgBase[key]) S.chgBase[key] = prev;
   if(!prev || now - prev.t >= 2*3600e3) store.set(key, { t: now, d: cur });
-  store.set("fc:" + S.loc.name, { t: now, d: cur, band: S.band }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
+  store.set("fc:" + S.loc.name, { t: now, d: cur, band: S.band, full: fcFull(C) }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
   const base = S.chgBase[key]; if(!base) return;
   const days = Object.keys(cur).filter(d => d >= today && base.d[d] != null);
   if(days.length < 3) return;
