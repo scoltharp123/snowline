@@ -514,7 +514,6 @@ function render(){
   ${!isAlp() && S.mode!=="bc"? `<section class="card" id="glideCard"></section>` : ""}
   <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast${tipI("hourly")}</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast${tipI("daily")}</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div><button class="link dl-lr" id="lrOpen">Long range · weeks 1–5 and the season ›</button></section>
-  ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="zoneCard"></section>` : ""}
   <section class="card" id="camCard"></section>
   <section class="card" id="fxCard"><div class="card-h"><h2>Snowline Forecaster${tipI("forecaster")}</h2><span class="muted" id="discSrc">from the models</span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read the full forecast</button></section>
@@ -546,7 +545,7 @@ function render(){
 
   renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); usageMark("spots", S.loc?.name); usageMark("modes", S.mode); setTimeout(usageObserve, 300); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
   { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderReceipt(); }catch(err){}
-  { const go = ()=>{ try{ renderMtn(); renderZones(); renderGlide(); renderElevTable(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
+  { const go = ()=>{ try{ renderMtn(); renderGlide(); renderElevTable(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
   const ensT = ensWindowTotals(C, N); const lo = ensT.length? pct(ensT,.1) : Math.min(...modelTots), hi = ensT.length? pct(ensT,.9) : Math.max(...modelTots);
@@ -2194,7 +2193,7 @@ function favStep(dir){
   scrollTo({top:0}); load(f); toast(dispName(f.name));
 }
 (()=>{ let x0 = null, y0 = 0, t0 = 0;
-  const skip = "#bigmap,.ss-r,.hs,.dh,.tablewrap,.fav-row,.leaflet-container,iframe,.np-f,.zn-svg,.gl-strip,.jtabs,.elv,.seg,.cf-bar,canvas,.mx-cam,input,.sheet";
+  const skip = "#bigmap,.ss-r,.hs,.dh,.tablewrap,.fav-row,.leaflet-container,iframe,.np-f,.gl-strip,.jtabs,.elv,.seg,.cf-bar,canvas,.mx-cam,input,.sheet";
   addEventListener("touchstart", e=>{ if((S.view||"forecast")!=="forecast" || e.touches.length>1 || e.target.closest(skip) || document.querySelector(".sheet.on")){ x0 = null; return; } x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); }, {passive:true});
   addEventListener("touchend", e=>{ if(x0==null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
     if(Date.now() - t0 < 600 && Math.abs(dx) > 80 && Math.abs(dy) < 45) favStep(dx < 0? 1 : -1); }, {passive:true});
@@ -2291,7 +2290,6 @@ const tgtDay = (cutHr) => { const h = +S.ctx.C.time[S.ctx.C.nowIdx].slice(11,13)
 const dayWord = d => d===todayStr()? "Today" : d===dateAdd(todayStr(),1)? "Tomorrow" : dayLabel(d);
 function cAt(ft){ const k = Math.round(ft/500)*5;   /* 500 ft steps: plenty for wind and crowd reads, far fewer full computes */ S.ctx.zc ||= {}; return S.ctx.zc[k] ||= computeAt(ft/FT); }
 const windM = c => c? Math.max(c.RW||0, (c.G||0)*0.8) : 0;
-const angD = (a, b) => { const d = Math.abs(((a - b) % 360 + 360) % 360); return d > 180 ? 360 - d : d; };
 
 /* Lift wind holds. Each lift's tipping point starts from how exposed it is, then is replaced by what Snowline has
    learned from Bachelor's own lift reports (logged every 30 minutes all season). */
@@ -2341,59 +2339,6 @@ function renderMtn(){
     </div></div>
     <div class="mt-row"><div class="mt-k">Crowds</div><div class="mt-v"><div class="wh"><b style="color:${cr.c}">${cr.lv}</b><span class="muted">${esc(cr.why)}</span></div><div class="mt-tip">${cr.tip}</div></div></div>
     <div class="muted mt-foot">Snowline's estimates <button class="tipbtn" data-tip="mtnest" aria-label="How these are estimated">ⓘ</button> · <a href="https://www.mtbachelor.com/the-mountain/lift-trail-report/" target="_blank" rel="noopener">Lift report ↗</a></div>`;
-}
-
-/* Where it's skiing best: each part of the mountain gets its own snow-surface simulation for the way it faces and its
-   height (sun, warmth, refreeze), then wind: slopes downwind of recent snow + wind get loaded, upwind slopes get scoured. */
-const BACH_ZONES = [
-  {n:"Summit", sub:"Summit Express", az:null, ft:8800, x:0, y:0},
-  {n:"Frontside", sub:"Pine Marten · Skyliner", az:0, ft:7300},
-  {n:"Outback", sub:"Outback Express", az:330, ft:7300},
-  {n:"Northwest", sub:"Northwest Express", az:285, ft:7700},
-  {n:"Rainbow", sub:"Rainbow · Sunrise", az:60, ft:6900},
-  {n:"Cloudchaser", sub:"Cloudchaser · Alpenglow", az:115, ft:7300},
-  {n:"South side", sub:"from the Summit", az:185, ft:8400}];
-const AZN = a => a==null? "all ways" : ["north","northeast","east","southeast","south","southwest","west","northwest"][Math.round(a/45)%8];
-function zoneRead(z, d, h){
-  const C = cAt(z.ft), i = idxOf(C).get(`${d}T${String(h).padStart(2,"0")}:00`); if(i==null) return null;
-  const k = "s"+z.ft+"_"+z.az; S.ctx.zs ||= {}; const SIM = S.ctx.zs[k] ||= simulate(C, z.az); const sim = SIM[i]; if(!sim) return null;
-  let sc = scoreOf(sim), lab = sim.label, wind = null;
-  let u = 0, v = 0, mx = 0, snow = 0; for(let j=Math.max(0,i-18); j<=i; j++){ const c = C.cons[j]; if(!c) continue; snow += c.snow||0; const m = windM(c); mx = Math.max(mx, m); if(isNum(c.WD) && m){ u += Math.sin(c.WD*Math.PI/180)*m; v += Math.cos(c.WD*Math.PI/180)*m; } }
-  const from = (Math.atan2(u, v)*180/Math.PI + 360) % 360;
-  if(mx >= 30 && (u || v)){
-    if(z.az==null){ if(mx >= 45){ wind = "scoured"; } }
-    else if(snow >= 1.5 && angD(z.az, from+180) <= 60){ wind = "loaded"; }
-    else if(angD(z.az, from) <= 60){ wind = "scoured"; }
-  }
-  if(wind==="loaded"){ sc = Math.min(10, sc + 0.6); lab = "Wind-loaded powder"; }
-  if(wind==="scoured"){ sc = Math.max(0, sc - 1.2); lab = "Wind-scoured, firm in spots"; }
-  return {sc, lab, wind};
-}
-function renderZones(){
-  const el = $("#zoneCard"); if(!el || !isBach() || !S.ctx) return;
-  const d = tgtDay(14), h = S.zoneHr ?? (+S.ctx.C.time[S.ctx.C.nowIdx].slice(11,13) >= 11 && d===todayStr()? 14 : 10);
-  const Z = BACH_ZONES.map(z=>({...z, r: zoneRead(z, d, h)})).filter(z=>z.r);
-  if(!Z.length){ el.remove(); return; }
-  const best = [...Z].sort((a,b)=>b.r.sc-a.r.sc)[0], R = 118, cx = 130, cy = 130;
-  const spread = best.r.sc - Math.min(...Z.map(z=>z.r.sc));
-  if(spread < 0.4){ el.innerHTML = `<div class="card-h"><h2>Where to ski${tipI("zones")}</h2></div><div class="zn-same"><div><b>About the same on every side</b><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"} · ${esc(best.r.lab.toLowerCase())}</span></div>${scoreChip(best.r.sc)}</div><div class="muted" style="font-size:11.5px;margin-top:6px">When one side of the mountain skis noticeably better, a map of every side shows here.</div>`; return; }
-  const arc = (a0, a1, r0, r1) => { const p = (a, r) => [cx + r*Math.sin(a*Math.PI/180), cy - r*Math.cos(a*Math.PI/180)]; const [x0,y0] = p(a0,r1), [x1,y1] = p(a1,r1), [x2,y2] = p(a1,r0), [x3,y3] = p(a0,r0); return `M${x0},${y0} A${r1},${r1} 0 0 1 ${x1},${y1} L${x2},${y2} A${r0},${r0} 0 0 0 ${x3},${y3}Z`; };
-  const ring = Z.filter(z=>z.az!=null), sum = Z.find(z=>z.az==null);
-  const svg = `<svg viewBox="0 -4 260 266" class="zn-svg" role="img" aria-label="Mt. Bachelor snow quality by side of the mountain">
-    ${ring.sort((a,b)=>a.az-b.az).map((z,k,A)=>{ const prev = A[(k-1+A.length)%A.length].az, next = A[(k+1)%A.length].az;
-      const gapL = ((z.az - prev + 360) % 360) || 360, gapR = ((next - z.az + 360) % 360) || 360;
-      const a0 = z.az - Math.min(40, gapL/2 - 2), a1 = z.az + Math.min(40, gapR/2 - 2), mid = (a0+a1)/2, tx = cx + 86*Math.sin(mid*Math.PI/180), ty = cy - 86*Math.cos(mid*Math.PI/180);
-      return `<path d="${arc(a0,a1,52,R)}" fill="${scoreColor(z.r.sc)}" stroke="${z===best? "#fff" : "#111113"}" stroke-width="${z===best? 2.5 : 2}"/>
-      <text x="${tx}" y="${ty-3}" text-anchor="middle" class="zn-t">${z.n}</text><text x="${tx}" y="${ty+12}" text-anchor="middle" class="zn-s">${z.r.sc.toFixed(1)}</text>`; }).join("")}
-    ${sum? `<circle cx="${cx}" cy="${cy}" r="46" fill="${scoreColor(sum.r.sc)}" stroke="${sum===best? "#fff" : "#111113"}" stroke-width="${sum===best? 2.5 : 2}"/><text x="${cx}" y="${cy-3}" text-anchor="middle" class="zn-t">Summit</text><text x="${cx}" y="${cy+12}" text-anchor="middle" class="zn-s">${sum.r.sc.toFixed(1)}</text>` : ""}
-    <text x="${cx}" y="8" text-anchor="middle" class="zn-n">N ↑</text></svg>`;
-  el.innerHTML = `<div class="card-h"><h2>Where to ski${tipI("zones")}</h2><div class="seg sm zn-seg">${[[10,"Morning"],[14,"Afternoon"]].map(([v,l])=>`<button data-h="${v}" class="${v===h?"on":""}">${l}</button>`).join("")}</div></div>
-    <div class="zn-best"><span class="muted">${dayWord(d)} ${h<12? "morning" : "afternoon"}</span><div><b>${best.n}</b> · ${esc(best.r.lab.toLowerCase())}</div></div>
-    ${svg}
-    ${(()=>{ const row = z=>`<div class="zn-li"><div><b>${z.n}</b><small>${esc(z.sub)} · faces ${AZN(z.az)}</small><small class="zn-l">${esc(z.r.lab)}</small></div>${scoreChip(z.r.sc)}</div>`, L = [...Z].sort((a,b)=>b.r.sc-a.r.sc);
-      return `<details class="nb zn-more"><summary>Every side, ranked</summary><div class="zn-list">${L.map(row).join("")}</div></details>`; })()}
-    <div class="muted mt-foot">Snowline's estimate. Each side of the mountain is simulated for its sun, warmth and height, then adjusted for wind: slopes downwind of recent snow and wind collect it, upwind slopes get blown firm. Sides are approximate.</div>`;
-  el.querySelectorAll(".zn-seg button").forEach(b=>b.onclick=()=>{ S.zoneHr = +b.dataset.h; renderZones(); });
 }
 
 /* Nordic glide forecast: how fast skis will run, hour by hour, from air temperature, humidity, sun and new snow. */
@@ -2473,7 +2418,6 @@ const TIPS = {
   byelev: () => ["By elevation", `<p>The same forecast at three heights on the mountain: <b>top, middle and base</b>, side by side for each day. It shows how much more snow falls up high, how much colder it is, and whether the base gets rain while the top gets snow.</p>`],
   models: () => ["The weather models", `<p>Snowline blends about a dozen of the world's weather models (American, European, Canadian, German, Japanese and more), giving more weight to the ones that have been most accurate here.</p><p>This table shows what each one says on its own. When they agree, confidence is high. When one is far off from the rest, Snowline leans on the others.</p>`],
   accum: () => ["Running total", `<p>Snow adding up over the next days. The line is Snowline's forecast and the shading is the realistic low-to-high range. Read across to any day to see the total by then.</p>`],
-  zones: () => ["Where to ski", `<p>Each side of Mt. Bachelor faces a different way, so sun, warmth and wind treat it differently. Snowline estimates the snow quality on each side, then marks the best one.</p><p><b>Downwind</b> sides collect blowing snow and get deeper. <b>Upwind</b> sides get blown firm. <b>Sunny</b> sides soften first and can crust up later.</p>`],
   glide: () => ["Glide", `<p>How fast your skis should run each hour, from temperature, humidity, sun and new snow. <b>Blue</b> is fast. <b>Yellow</b> is medium. <b>Red</b> is slow or sticky (very cold snow, fresh cold snow, or wet snow near freezing).</p><p>The wax suggestion matches the fastest part of the day.</p>`],
   mtnest: () => ["How these are estimated", `<p><b>Wind holds</b> come from the forecast wind near each lift's top. Every 30 minutes all season, Snowline saves Bachelor's lift status next to the wind, so each lift's tipping point is learned from what really happened${S.liftwx?.days? ` (${S.liftwx.days} days so far)` : ""}.</p><p><b>Crowds</b> come from the day of the week, school holidays, fresh snow and sunshine. They're not live parking counts.</p>`],
   flakes: () => ["Snowflake forecast", `<p>A snowflake's shape is set by the <b>temperature of the cloud it grows in</b>. Snowline checks the temperature and moisture at four heights above the mountain (about 5,000 to 18,000 ft) for each hour of the storm.</p>
@@ -4206,7 +4150,7 @@ document.addEventListener("visibilitychange", () => {
     usageMark("spots", S.loc?.name); usageMark("modes", S.mode); } });
 
 const CARD_NAMES = { snowCard:"Snow summary", nowCard:"Right now", mtnCard:"Wind holds & crowds", glideCard:"Glide & wax", hourCard:"Hourly",
-  dailyCard:"Daily", zoneCard:"Best side of the mountain", camCard:"Webcams", fxCard:"Forecaster write-up", groomCard:"Grooming", reportCard:"Resort report",
+  dailyCard:"Daily", camCard:"Webcams", fxCard:"Forecaster write-up", groomCard:"Grooming", reportCard:"Resort report",
   stakeCard:"Snow stake", tmCard:"Trail map", openCard:"Trails open", repCard:"Rider reports", workCard:"Plan your day", roadCard:"Roads & passes",
   birkiePanel:"Birkie", seasonCard:"Season so far", modelsCard:"Models & odds", mxCard:"Live at Meissner", bcCard:"Avalanche", elevCard:"Snow by height", accumCard:"Running total" };
 const OPEN_NAMES = { dhSheet:"A day's details", tipSheet:"Explanations", setSheet:"Settings", locSheet:"Search spots", miniSheet:"Mini map", repSheet:"Send a report", welcomeSheet:"Welcome tour", installSheet:"Add to Home Screen", lrSheet:"Lifts & runs", shareSheet:"Share" };
