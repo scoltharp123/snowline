@@ -504,7 +504,7 @@ function render(){
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
-    <button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
+    <div id="trustLine"></div><button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
   </section>
   ${a2hsHTML()}
   ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
@@ -544,7 +544,7 @@ function render(){
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
   renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); usageMark("spots", S.loc?.name); usageMark("modes", S.mode); setTimeout(usageObserve, 300); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
-  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderChange(C, nIn >= MODELS.length-2); }catch(err){} try{ renderReceipt(); }catch(err){}
+  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderChange(C, nIn >= MODELS.length-2); renderTrust(); }catch(err){} try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderGlide(); renderElevTable(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
@@ -1685,7 +1685,7 @@ function loadExtras(loc){
   api(`/obs?${q}`).then(r=>{ X.obs=r; done(); }).catch(()=>{});
   if(loc.name==="Meissner Nordic (Bend), OR") api("/meissner").then(r=>{ X.mx=r; if(S.loc===loc) renderMeissner(); }).catch(()=>{ X.mx={stations:[]}; if(S.loc===loc) renderMeissner(); });
   api(`/season?${q}`).then(r=>{ X.season=r; if(S.loc===loc) renderSeasonCard(); }).catch(()=>{});
-  api(`/verify?${q}`).then(r=>{ X.verify=r; done(); if(S.loc===loc) try{ renderReceipt(); }catch(err){} setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
+  api(`/verify?${q}`).then(r=>{ X.verify=r; done(); if(S.loc===loc) try{ renderReceipt(); renderTrust(); }catch(err){} setTimeout(()=>saveScore(loc), 1500); }).catch(()=>{});
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
   api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
   api(`/nws?${q}`).then(r=>{ X.nws=r; if(S.loc===loc){ renderNwsAlerts(); renderAFD(); } }).catch(()=>{});
@@ -2186,12 +2186,29 @@ function favStep(dir){
 
 // 3) Works with no signal at the trailhead: once the forecast is up, quietly fetch your other favorites so switching is
 //    instant and still works offline (answers are kept on the phone for a day as a fallback).
+/* Work out each favorite's forecast in the background with the exact same code as its page, so:
+   tapping it opens instantly (ready in memory), its chip shows its snow, and alerts quote the same number. */
+function warmFav(f, ref, det, ens){
+  const models = {}; det.forEach((d,i)=>{ if(d) models[MODELS[i].id] = d; });
+  const first = Object.values(models).sort((a,b)=>b.time.length-a.time.length)[0]; if(!first || Object.keys(models).length < 4) return;
+  const data = { ref, models, ens: ens.filter(Boolean), ensNames: ens.map((e,i)=>e?ENS[i].name:null).filter(Boolean), time:first.time, offset:first.offset, tz:first.tz, fetched:new Date(), ensPending:false };
+  if(!MEM.has(f.name) || Date.now() - MEM.get(f.name).t > 5*60e3) MEM.set(f.name, {t:Date.now(), data});
+  const ok = modesFor(f), ln = store.get("lastNordic","skate"), mode = ok.includes(S.mode)? S.mode : ok.includes(ln)? ln : ok[0];
+  const keep = {data:S.data, loc:S.loc, band:S.band, ctx:S.ctx}; let C;
+  try{ S.data = data; S.loc = f; S.band = bandFor(mode); S.ctx = {...(S.ctx||{}), zc:{}}; C = computeAt(bandElev()); }
+  finally{ const fb = S.band; Object.assign(S, keep); if(C) store.set("fc:" + f.name, (()=>{ const d = {}; C.days.slice(0,7).forEach((dd,k)=>{ const x = C.consDays[k]; if(x?.n) d[dd] = Math.round((x.day+x.night)*10)/10; }); return {t:Date.now(), d, band:fb}; })()); }
+  favRowRender();
+}
 function preloadFavs(){
   if(S.preT && Date.now() - S.preT < 40*60e3) return; S.preT = Date.now();
   const list = (S.favs||[]).filter(f=>f.name!==S.loc?.name && isNum(f.lat) && isNum(f.base) && isNum(f.top)).slice(0,5); let k = 0;
   const next = async () => { const f = list[k++]; if(!f) return; if(document.visibilityState !== "visible"){ S.preT = 0; return; }
     const ref = ((f.base+f.top)/2)/FT;
-    await Promise.all([...MODELS.map(m=>fetchDet(m, f, ref).catch(()=>null)), ...ENS.map(m=>fetchEns(m, f, ref).catch(()=>null))]);
+    const ensP = Promise.all(ENS.map(m=>fetchEns(m, f, ref).catch(()=>null)));
+    const det = await Promise.all(MODELS.map(m=>fetchDet(m, f, ref).catch(()=>null)));
+    try{ warmFav(f, ref, det, []); }catch(e){}
+    // ensembles (odds and range) patch into the warmed page when they land; never hold up the next spot for them
+    ensP.then(ens=>{ const m = MEM.get(f.name); if(ens && m && !m.data.ens.length){ m.data.ens = ens.filter(Boolean); m.data.ensNames = ens.map((e,i)=>e?ENS[i].name:null).filter(Boolean); } });
     setTimeout(next, 1500); };
   setTimeout(next, 5000);
 }
@@ -2264,7 +2281,7 @@ function renderReceipt(){
   if(!end || end < dateAdd(todayStr(), -3) || store.get("rcptHide","")===key){ el.innerHTML = ""; return; }
   const got = R.st.obsSnow, mark = R.nailed? "✓ Nailed it" : R.close? "✓ On target" : got > R.said? "Overdelivered" : "Came up short";
   el.innerHTML = `<div class="rc"><div class="rc-b"><div class="rc-h">🧾 Storm receipt · ${esc(R.range)}</div>
-      <div class="rc-n"><span>Snowline said <b>${fmtSnow(R.said,0)}</b></span><span>${esc((R.fell||"Measured").replace(" reported",""))} got <b>${fmtSnow(got,0)}</b></span><span class="rc-v ${R.close? "ok" : ""}">${mark}</span></div></div>
+      <div class="rc-n"><span>Snowline said <b>${fmtSnow(R.said,0)}</b></span><span>${esc((R.fell||"Measured").replace(" reported",""))} got <b>${fmtSnow(got,0)}</b></span><span class="rc-v ${R.close? "ok" : ""}">${mark}</span>${(r=>r? `<span>Season <b>${r.w}/${r.n}</b> on target</span>` : "")(trustRecord())}</div></div>
     <button class="rc-sh" onclick="openRecapSheet()">Share</button><button class="rc-x" aria-label="Hide">✕</button></div>`;
   el.querySelector(".rc-x").onclick = ()=>{ store.set("rcptHide", key); el.innerHTML = ""; };
 }
@@ -4205,3 +4222,17 @@ function renderChange(C, complete){
 
 /* No Home Screen icon badge, ever: clear any number an earlier version put there. */
 try{ navigator.clearAppBadge?.().catch(()=>{}); }catch(e){}
+
+/* ---------- Snowline's scorecard, where people decide whether to trust it ----------
+   One line in Snow Summary once there are 3+ graded storms: "Snowline: 8 of 10 storms within 2″ of Mt. Bachelor's
+   report". Tap → the full accuracy card. Graded against the resort's own report first, else the nearby snow gauge. */
+function trustRecord(){ const v = extrasFor(S.loc).verify; if(!v) return null;
+  const rr = v.resort?.record; if(rr?.storms >= 3) return {w: rr.within, n: rr.storms, vs: `${v.resort.name}'s report`};
+  const R = v.record; if(R?.storms >= 3) return {w: R.within, n: R.storms, vs: "the snow gauge"};
+  return null; }
+function renderTrust(){
+  const el = $("#trustLine"); if(!el || !S.loc) return; const r = trustRecord(); if(!r){ el.innerHTML = ""; return; }
+  const pct = r.w / r.n, ic = pct >= .7? "🎯" : pct >= .5? "📏" : "🧪";
+  el.innerHTML = `<button class="trust" type="button">${ic} <b>Snowline: ${r.w} of ${r.n} storms</b> within 2″ of ${esc(r.vs)} <i>›</i></button>`;
+  el.querySelector("button").onclick = () => { const d = document.querySelector('details[data-sec="g-acc"]'); if(d){ d.open = true; setTimeout(()=>$("#trackCard")?.scrollIntoView({behavior:"smooth", block:"start"}), 350); } };
+}
