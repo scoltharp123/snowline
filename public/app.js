@@ -4172,7 +4172,7 @@ function renderChange(C, complete){
   const prev = store.get(key, null);
   if(prev && now - prev.t >= 2*3600e3 && now - prev.t < 5*864e5 && !S.chgBase[key]) S.chgBase[key] = prev;
   if(!prev || now - prev.t >= 2*3600e3) store.set(key, { t: now, d: cur });
-  store.set("fc:" + S.loc.name, { t: now, d: cur }); appBadge(C); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
+  store.set("fc:" + S.loc.name, { t: now, d: cur }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
   const base = S.chgBase[key]; if(!base) return;
   const days = Object.keys(cur).filter(d => d >= today && base.d[d] != null);
   if(days.length < 3) return;
@@ -4190,11 +4190,5 @@ function renderChange(C, complete){
   el.querySelector(".rc-x").onclick = () => { delete S.chgBase[key]; el.innerHTML = ""; };
 }
 
-/* Home Screen icon badge: the next 24 h of snow (whole inches/cm) at your first favorite, so a glance at the phone
-   says "it's snowing". Clears when it's dry. Only where the phone allows it (installed app + notifications on). */
-function appBadge(C){ try{
-  if(!("setAppBadge" in navigator) || !matchMedia("(display-mode: standalone)").matches) return;
-  const home = (S.favs||[])[0]?.name || S.loc?.name; if(S.loc?.name !== home) return;
-  let s = 0; for(let i = C.nowIdx; i < C.nowIdx + 24 && i < C.cons.length; i++) s += C.cons[i]?.snow || 0;
-  const n = Math.round(snowNum(s)); n >= 1? navigator.setAppBadge(n).catch(()=>{}) : navigator.clearAppBadge?.().catch(()=>{});
-}catch(e){} }
+/* No Home Screen icon badge, ever: clear any number an earlier version put there. */
+try{ navigator.clearAppBadge?.().catch(()=>{}); }catch(e){}
