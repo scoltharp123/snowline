@@ -599,14 +599,12 @@ function renderRightNow(C, SIM, e){
   el.innerHTML = `<div class="card-h" style="margin-bottom:8px"><h2>Right Now</h2><span class="muted">${fmtEl(e)}</span></div>
     <div class="rn">
       <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like ${fmtT(now.feels)}</div></div></div>
-      <div class="rn-b"><div class="rn-w num"><span class="arr" style="transform:rotate(${(c.WD||0)+180}deg)">↑</span>${fmtWind(c.W)} <small>${windU()}</small></div><div class="muted">${compass(c.WD)} gusts to ${fmtWind(c.G)}</div></div>
+      <div class="rn-b"><div class="rn-w num"><span class="arr" style="transform:rotate(${(c.WD||0)+180}deg)">↑</span>${fmtWind(c.W)} <small>${windU()}</small></div><div class="muted">${compass(c.WD)} gusts to ${fmtWind(c.G)}${S.mode==="alpine" && isBach() && isNum(c.RW)? ` · ridge ${fmtWind(c.RW)}` : ""}</div></div>
     </div>
     <div class="surf-row"><span class="ic">${now.icon}</span><div style="flex:1;min-width:0"><b>${now.label}</b><div class="muted">${descOf(now)}</div></div><div style="text-align:right"><div class="num" style="font-size:26px;color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</div><div class="muted">${MODE_NAME[S.mode]}</div></div></div>
-    <div class="kv">
-      ${ts? `<div class="full"><div class="l">Best window ${tsDay}${tipI("quality")}</div><div class="v"><b>${hl(ts.best.from)}–${hl(ts.best.to)}</b> · ${ts.best.sim.icon} ${ts.best.sim.label} ${scoreChip(ts.best.avg)}</div></div>`:""}
+    <div class="kv kv-now">
       ${W? `<div><div class="l">Glide</div><div class="v">${W.glide}</div></div>${S.mode==="classic"? `<div><div class="l">Kick</div><div class="v">${W.kick}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${speedColor(W.speed)}">${W.speed}</div></div>`}` : ""}
-      <div><div class="l">New snow</div><div class="v">${fmtSnow(now.newSnow)}${now.newSnow>0.5? ` · ${now.age<24?"last 24h":Math.round(now.age/24)+"d ago"}`:""}</div></div>
-      ${S.mode==="alpine" && isBach()? `<div><div class="l">Ridge wind</div><div class="v">${fmtWind(c.RW)} ${windU()}</div></div>` : S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span> <span class="muted" style="white-space:nowrap">ridge ${fmtWind(c.RW)} ${windU()}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : `<div><div class="l">Snow level${tipI("snowlevel")}</div><div class="v">${fmtEl(c.sl)}</div></div>`}
+      ${S.mode==="alpine" && isBach()? "" : S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span> <span class="muted" style="white-space:nowrap">ridge ${fmtWind(c.RW)} ${windU()}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Ridgetop wind</div><div class="v">${fmtWind(c.RW)} ${windU()} ${compass(c.WD)}</div></div>` : ""}
 
     </div>
     ${(()=>{ const more = [
@@ -4172,7 +4170,7 @@ function renderChange(C, complete){
   const prev = store.get(key, null);
   if(prev && now - prev.t >= 2*3600e3 && now - prev.t < 5*864e5 && !S.chgBase[key]) S.chgBase[key] = prev;
   if(!prev || now - prev.t >= 2*3600e3) store.set(key, { t: now, d: cur });
-  store.set("fc:" + S.loc.name, { t: now, d: cur }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
+  store.set("fc:" + S.loc.name, { t: now, d: cur }); appBadge(C); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender();
   const base = S.chgBase[key]; if(!base) return;
   const days = Object.keys(cur).filter(d => d >= today && base.d[d] != null);
   if(days.length < 3) return;
@@ -4189,3 +4187,12 @@ function renderChange(C, complete){
   el.innerHTML = `<div class="rc chg"><span class="chg-i">${icon}</span><div class="rc-b"><div class="rc-h">Since you looked ${when}</div><div class="rc-n"><span class="${cls? "chg-ok" : ""}">${msg}</span></div></div><button class="rc-x" aria-label="Hide">✕</button></div>`;
   el.querySelector(".rc-x").onclick = () => { delete S.chgBase[key]; el.innerHTML = ""; };
 }
+
+/* Home Screen icon badge: the next 24 h of snow (whole inches/cm) at your first favorite, so a glance at the phone
+   says "it's snowing". Clears when it's dry. Only where the phone allows it (installed app + notifications on). */
+function appBadge(C){ try{
+  if(!("setAppBadge" in navigator) || !matchMedia("(display-mode: standalone)").matches) return;
+  const home = (S.favs||[])[0]?.name || S.loc?.name; if(S.loc?.name !== home) return;
+  let s = 0; for(let i = C.nowIdx; i < C.nowIdx + 24 && i < C.cons.length; i++) s += C.cons[i]?.snow || 0;
+  const n = Math.round(snowNum(s)); n >= 1? navigator.setAppBadge(n).catch(()=>{}) : navigator.clearAppBadge?.().catch(()=>{});
+}catch(e){} }
