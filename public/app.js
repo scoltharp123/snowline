@@ -549,6 +549,7 @@ function render(){
   <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models${C.ensDays.length? ` · ${C.ensDays.length} ensemble runs` : ""}<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
   document.querySelectorAll("#snowCard .ss-r").forEach(r=>{ const s = r.querySelector("svg[data-off]"); if(s && +s.dataset.off) r.scrollLeft = +s.dataset.off; });   // open on today; past is a swipe away
+  barPeek($("#snowCard .ss-r"), "peekMain");
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
   $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read the full forecast" : "Show less"; };
   $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
@@ -794,11 +795,11 @@ async function renderFavs(force){
     ${(()=>{ const cs = list.map(sp=>{ const f = store.get("fc:"+sp.name, null); return f?.call && Date.now()-f.t < 3*3600e3? [sp.name, f.call.sc] : null; }).filter(Boolean).sort((a,b)=>b[1]-a[1]);
       bestFav = cs.length > 1 && cs[0][1] - cs[1][1] >= 0.5 && cs[0][1] >= 5? cs[0][0] : null; return ""; })()}
     ${list.map(sp=>{ const r0 = byName.get(sp.name), fc = store.get("fc:" + sp.name, null), own = fc?.full && Date.now() - fc.t < 3*3600e3;
-      const r = own? { last24: fc.full.p24, days15: fc.full.vals, dates15: fc.full.dates, d5: fc.full.vals.slice(0,5).reduce((s,v)=>s+(v||0),0) } : r0; if(!r) return "";
+      const r = own? { past: fc.full.past || [], last24: fc.full.p24, days15: fc.full.vals, dates15: fc.full.dates, d5: fc.full.vals.slice(0,5).reduce((s,v)=>s+(v||0),0) } : r0; if(!r) return "";
       const call = own && fc.call && fc.call.d >= todayStr()? fc.call : null;
       const bandFt = own? (fc.band==="base"? sp.base : fc.band==="summit"? sp.top : (sp.base+sp.top)/2) : sp.top, bandLab = own? ({base:"Base", mid:"Mid", summit:"Summit"}[fc.band] || "Mid") : "Summit";
       return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${esc(dispName(sp.name))}</b><div class="muted">${bandLab} · ${(Math.round(bandFt/10)*10).toLocaleString()} ft</div>${call? `<div class="fv-why">${call.d===todayStr()? "Today" : "Tomorrow"} · ${esc(call.lab)} · ${hl(call.from)}–${hl(call.to)}</div>` : ""}</div>${call? `<div class="fv-sc">${sp.name===bestFav? `<em>Best pick</em>` : ""}${scoreChip(call.sc)}</div>` : r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
-        ${(S.favView && S.favView!=="snow" && favBodyHTML(S.favView, sp, r0 || r)) || snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</div>`; }).join("")}
+        ${(S.favView && S.favView!=="snow" && favBodyHTML(S.favView, sp, r0 || r)) || snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56, past: r.past || []})}</div>`; }).join("")}
     <div class="muted" style="text-align:center;margin:10px 0;font-size:12px">At the height you ski: Mid for alpine, Base for Nordic</div>`;
   el.querySelectorAll("#wkSeg button").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); S.wkDay = b.dataset.d; renderFavs(); });
   el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ if(S.favEdit) return; const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
@@ -806,6 +807,9 @@ async function renderFavs(force){
   const fs=$("#favShare"); if(fs) fs.onclick = () => shareFavs();
   el.querySelectorAll("[data-fv]").forEach(b=>b.onclick=async()=>{ S.favView=b.dataset.fv; store.set("favView", S.favView); renderFavs(); const v=S.favView; await prepFavView(v, list); if(S.favView===v && (location.hash||"")==="#favs") renderFavs(); });
   wireCamStars(el, ()=>renderFavs());
+  // open each spot's bars on today (past days are a swipe right), and once, nudge the first one so people learn the 15 days scroll
+  el.querySelectorAll(".ss-r").forEach(r=>{ const s = r.querySelector("svg[data-off]"); r.scrollLeft = s? +s.dataset.off : 0; });
+  barPeek(el.querySelector(".ss-r"), "peekFav");
   if(!S.favPrepped && S.favView && S.favView!=="snow"){ S.favPrepped=true; prepFavView(S.favView, list).then(()=>{ if((location.hash||"")==="#favs") renderFavs(); }); }
   el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const n=decodeURIComponent(b.dataset.rm); S.favs=S.favs.filter(f=>f.name!==n); store.set("favs",S.favs); if(!S.favs.length) S.favEdit=false; updateTop(); renderFavs(); });
   el.querySelectorAll("[data-up]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const n=decodeURIComponent(b.dataset.up); const i=S.favs.findIndex(f=>f.name===n); if(i>0){ const [x]=S.favs.splice(i,1); S.favs.splice(i-1,0,x); store.set("favs",S.favs); renderFavs(); } });
@@ -2228,7 +2232,7 @@ function favStep(dir){
    tapping it opens instantly (ready in memory), its chip shows its snow, and alerts quote the same number. */
 function callFor(C, SIM){ try{ const td = todayStr(), d = new Date().getHours() < 14? td : dateAdd(td, 1), x = daySummary(C, SIM, d);
   return x?.best? { d, sc: Math.round(x.best.avg*10)/10, lab: x.best.sim.label, from: x.best.from, to: x.best.to } : null; }catch(e){ return null; } }
-function fcFull(C){ return { dates: C.days.slice(0,15), vals: C.consDays.slice(0,15).map(x=>x.n? Math.round((x.day+x.night)*10)/10 : null), p24: isNum(C.past24)? Math.round(C.past24*10)/10 : null }; }
+function fcFull(C){ return { past: pastDaysSnow(C), dates: C.days.slice(0,15), vals: C.consDays.slice(0,15).map(x=>x.n? Math.round((x.day+x.night)*10)/10 : null), p24: isNum(C.past24)? Math.round(C.past24*10)/10 : null }; }
 function warmFav(f, ref, det, ens){
   const models = {}; det.forEach((d,i)=>{ if(d) models[MODELS[i].id] = d; });
   const first = Object.values(models).sort((a,b)=>b.time.length-a.time.length)[0]; if(!first || Object.keys(models).length < 4) return;
@@ -4297,3 +4301,10 @@ function renderTrust(){
   el.innerHTML = `<button class="trust" type="button">${ic} <b>Snowline: ${r.w} of ${r.n} storms</b> within 2″ of ${esc(r.vs)} <i>›</i></button>`;
   el.querySelector("button").onclick = () => { const d = document.querySelector('details[data-sec="g-acc"]'); if(d){ d.open = true; setTimeout(()=>$("#trackCard")?.scrollIntoView({behavior:"smooth", block:"start"}), 350); } };
 }
+
+/* One gentle sideways nudge the first time someone sees a scrollable bar strip, so they learn there's more to swipe. */
+function barPeek(r, key){ try{
+  if(!r || store.get(key, false) || r.scrollWidth - r.clientWidth < 60 || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const io = new IntersectionObserver(es=>{ if(!es[0].isIntersecting) return; io.disconnect(); store.set(key, true);
+    const x0 = r.scrollLeft; setTimeout(()=>{ r.scrollTo({left: x0 + 90, behavior:"smooth"}); setTimeout(()=>r.scrollTo({left: x0, behavior:"smooth"}), 650); }, 500); }, {threshold:.8});
+  io.observe(r); }catch(e){} }
