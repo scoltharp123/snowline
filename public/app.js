@@ -511,7 +511,7 @@ function render(){
   ${modelNote}
   <div id="nwsAlerts"></div>${verdict? "" : `<div id="ncStrip"></div>`}
   ${(()=>{ const notes = callouts.slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length).replace(/^\s*(\S+?)\s+/, '<span class="vn-i">$1</span>') : h; });
-     return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="chgStrip"></div><div id="rcptStrip"></div>
+     return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="rateStrip"></div><div id="chgStrip"></div><div id="rcptStrip"></div>
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
@@ -563,7 +563,7 @@ function render(){
   document.querySelectorAll("details.sec").forEach(d=>d.addEventListener("toggle", ()=>{ const id=d.dataset.sec; if(d.open){ S.open.add(id); renderSection(id); inner(d); } else S.open.delete(id); store.set("open",[...S.open]); }));
 
   renderRightNow(C, SIM, e); renderNowcast(); loadNowcast(); preloadFavs(); fallFromForecast(); usageMark("spots", S.loc?.name); usageMark("modes", S.mode); setTimeout(usageObserve, 300); setTimeout(()=>{ try{ if(!$("#app").classList.contains("stale")) powderBurst(); }catch(err){} }, 400);
-  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderChange(C, nIn >= MODELS.length-2); renderTrust(); }catch(err){} try{ renderReceipt(); }catch(err){}
+  { const L0 = S.loc; loadFlakes(L0).then(()=>{ if(S.loc===L0 && S.ctx){ const r = $("#flkRow"); if(r){ r.innerHTML = flakeHTML(S.ctx.C, S.ctx.e); r.hidden = !r.innerHTML; } } }); } try{ renderChange(C, nIn >= MODELS.length-2); renderTrust(); renderRate(C, SIM); }catch(err){} try{ renderReceipt(); }catch(err){}
   { const go = ()=>{ try{ renderMtn(); renderGlide(); renderElevTable(); }catch(err){ console.warn(err); } }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:600}) : setTimeout(go, 60); }
   if(isBach() && !S.liftwx && !S.liftwxP){ S.liftwxP = api("/liftwx").then(r=>{ S.liftwx = r; if(isBach()) renderMtn(); }).catch(()=>{}); } renderAfterWork(C, SIM); renderOpening(); renderReports(); renderRoads(); renderTrack(); renderCamCard(); renderTrailMaps(); renderBC(); renderNwsAlerts(); renderAFD(); renderGroom(); renderStakeCard(); renderSeasonCard(); renderMeissner(); renderStatus(); updateBell(); renderMiniMap(); renderHourStrip(C, SIM); renderDailyList(C, SIM);
   if(S.mode==="skate") renderBirkie();
@@ -1107,7 +1107,13 @@ function classify(st, c, liquid, slrAvg){
   return { key, ...S0, a:r(a), s:r(s), c:r(cl), light, newSnow:st.newSnow, age:st.age, slrAvg, Te:c.Te, feels:windChill(c.Te, c.W), G };
 }
 const descOf = sim => sim ? byMode(sim.d, sim.sk || sim.d, sim.cl || sim.sk || sim.d) : "";
-const scoreOf = sim => sim ? sim[MODE_KEY[S.mode]] : null;
+const scoreOf = sim => sim ? personal(sim[MODE_KEY[S.mode]], sim.label) : null;
+/* Tuned to you: after you rate a few days, scores nudge toward what YOU call good (up to ±1.5), per ski style and surface. */
+function personal(v, label){ if(!isNum(v)) return v; const P = S.pers ||= personalTable(); const k = P[S.mode+"|"+label] ?? P[S.mode] ?? 0; return k? Math.max(0, Math.min(10, Math.round((v + k)*10)/10)) : v; }
+function personalTable(){ const R = store.get("ratings", []), g = {}, add = (k, d) => { (g[k] ||= []).push(d); };
+  R.forEach(r=>{ if(!isNum(r.pred) || !isNum(r.r)) return; const d = r.r - r.pred; add(r.mode+"|"+r.lab, d); add(r.mode, d); });
+  const out = {}; for(const [k, a] of Object.entries(g)){ const m = a.reduce((s,x)=>s+x,0)/a.length, sh = a.length/(a.length + (k.includes("|")? 3 : 5)); out[k] = Math.max(-1.5, Math.min(1.5, Math.round(m*sh*10)/10)); }
+  return out; }
 function scoreColor(v){ if(!isNum(v)) return "#22304f"; if(v>=8) return "#a78bfa"; if(v>=6.5) return "#38bdf8"; if(v>=5) return "#86efac"; if(v>=3.5) return "#fde68a"; return "#fca5a5"; }
 const scoreChip = v => `<span class="sc" style="background:${scoreColor(v)}">${isNum(v)?v.toFixed(1):"—"}</span>`;
 const hl = h => h===0?"12a":h<12?h+"a":h===12?"12p":(h-12)+"p";
@@ -4328,4 +4334,25 @@ function renderNews(R){
     ${nums? `<div class="nw-n">${nums}</div>` : ""}<p class="nw-t clamp4">${esc(R.text)}</p>${R.text.length > 220? `<button class="link nw-more">Read all</button>` : ""}`;
   const m = el.querySelector(".nw-more"); if(m) m.onclick = () => { const p = el.querySelector(".nw-t"); p.classList.toggle("clamp4"); m.textContent = p.classList.contains("clamp4")? "Read all" : "Show less"; };
   return true;
+}
+
+/* ---------- Rate your day: one tap that teaches Snowline what YOU call a good day ----------
+   Opening a spot in the morning remembers the call; after 2pm (or the next morning) it asks once: how was it? */
+function renderRate(C, SIM){
+  const el = $("#rateStrip"); if(!el || !S.loc || S.usedOld) return; el.innerHTML = "";
+  const td = todayStr(), hr = new Date().getHours(), key = d => d + "|" + S.loc.name + "|" + S.mode;
+  const seen = store.get("seenDays", {}), rated = new Set(store.get("ratings", []).map(r=>r.d + "|" + r.spot + "|" + r.mode)), skip = new Set(store.get("rateSkip", []));
+  if(hr >= 6 && hr < 14 && !seen[key(td)]){ const x = daySummary(C, SIM, td); if(x?.best){ seen[key(td)] = {pred: x.best.sim[MODE_KEY[S.mode]], lab: x.best.sim.label};
+    const keep = Object.keys(seen).sort().slice(-30); store.set("seenDays", Object.fromEntries(keep.map(k=>[k, seen[k]]))); } }
+  const ask = hr >= 14? td : hr < 11? dateAdd(td, -1) : null; if(!ask) return; const k = key(ask), s = seen[k];
+  if(!s || rated.has(k) || skip.has(k)) return;
+  el.innerHTML = `<div class="rate"><span class="rate-q"><b>How was ${ask===td? "today" : "yesterday"}?</b><small>${esc(dispName(S.loc.name))}</small></span>
+    <div class="rate-b"><button data-r="2.5" aria-label="Bad">😩</button><button data-r="6" aria-label="Good">🙂</button><button data-r="9" aria-label="Great">🤩</button><button class="link" data-r="x">Didn't go</button></div></div>`;
+  el.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{
+    if(b.dataset.r === "x"){ store.set("rateSkip", [...skip, k].slice(-60)); el.innerHTML = ""; return; }
+    const R = store.get("ratings", []); R.push({d: ask, spot: S.loc.name, mode: S.mode, pred: s.pred, lab: s.lab, r: +b.dataset.r}); store.set("ratings", R.slice(-80));
+    S.pers = null; const n = R.filter(x=>x.mode===S.mode).length;
+    el.innerHTML = `<div class="rate done">${b.textContent} Thanks! ${n >= 3? "Scores are now tuned to how you ski." : `${3-n} more and scores start tuning to you.`}</div>`;
+    setTimeout(()=>{ el.innerHTML = ""; if(n >= 3) render(); }, 2200);
+  });
 }
