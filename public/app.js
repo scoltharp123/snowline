@@ -751,6 +751,7 @@ function updateSeasonSummary(){
 const SHORT_NAMES = {"Mt. Bachelor, OR":"Mt. Bachelor","Mt. Bachelor Nordic Center, OR":"Bachelor Nordic","Meissner Nordic (Bend), OR":"Meissner","Elk Lake Resort (Nordic), OR":"Elk Lake"};
 function dispName(n){ return SHORT_NAMES[n] || String(n||"").replace(/,\s*[A-Z]{2}$/,""); }
 const DEFAULT_FAVS = ["Mt. Bachelor, OR","Mt. Bachelor Nordic Center, OR","Meissner Nordic (Bend), OR","Hoodoo, OR"];
+let bestFav = null;
 async function renderFavs(force){
   const el = $("#view-favs");
   const list = S.favs.length ? S.favs : DEFAULT_FAVS.map(n=>PRESETS.find(p=>p.name===n)).filter(Boolean);
@@ -762,10 +763,13 @@ async function renderFavs(force){
     ${S.favs.length? "" : `<div class="callout">Tap ☆ on any forecast to add it here. Until then, here are some spots near Bend.</div>`}
     ${weekendHTML(list, F.rows)}
     <div class="seg scroll fav-views" id="favViews">${FAV_VIEWS.map(([k,l])=>`<button data-fv="${k}" class="${(S.favView||"snow")===k?"on":""}">${l}</button>`).join("")}</div>
+    ${(()=>{ const cs = list.map(sp=>{ const f = store.get("fc:"+sp.name, null); return f?.call && Date.now()-f.t < 3*3600e3? [sp.name, f.call.sc] : null; }).filter(Boolean).sort((a,b)=>b[1]-a[1]);
+      bestFav = cs.length > 1 && cs[0][1] - cs[1][1] >= 0.5 && cs[0][1] >= 5? cs[0][0] : null; return ""; })()}
     ${list.map(sp=>{ const r0 = byName.get(sp.name), fc = store.get("fc:" + sp.name, null), own = fc?.full && Date.now() - fc.t < 3*3600e3;
       const r = own? { last24: fc.full.p24, days15: fc.full.vals, dates15: fc.full.dates, d5: fc.full.vals.slice(0,5).reduce((s,v)=>s+(v||0),0) } : r0; if(!r) return "";
+      const call = own && fc.call && fc.call.d >= todayStr()? fc.call : null;
       const bandFt = own? (fc.band==="base"? sp.base : fc.band==="summit"? sp.top : (sp.base+sp.top)/2) : sp.top, bandLab = own? ({base:"Base", mid:"Mid", summit:"Summit"}[fc.band] || "Mid") : "Summit";
-      return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${sp.name}</b><div class="muted">${bandLab} · ${(Math.round(bandFt/10)*10).toLocaleString()} ft · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
+      return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${esc(dispName(sp.name))}</b><div class="muted">${bandLab} · ${(Math.round(bandFt/10)*10).toLocaleString()} ft</div>${call? `<div class="fv-why">${call.d===todayStr()? "Today" : "Tomorrow"} · ${esc(call.lab)} · ${hl(call.from)}–${hl(call.to)}</div>` : ""}</div>${call? `<div class="fv-sc">${sp.name===bestFav? `<em>Best pick</em>` : ""}${scoreChip(call.sc)}</div>` : r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
         ${(S.favView && S.favView!=="snow" && favBodyHTML(S.favView, sp, r0 || r)) || snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</div>`; }).join("")}
     <div class="muted" style="text-align:center;margin:10px 0;font-size:12px">At the height you ski: Mid for alpine, Base for Nordic</div>`;
   el.querySelectorAll("#wkSeg button").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); S.wkDay = b.dataset.d; renderFavs(); });
@@ -2190,6 +2194,8 @@ function favStep(dir){
 //    instant and still works offline (answers are kept on the phone for a day as a fallback).
 /* Work out each favorite's forecast in the background with the exact same code as its page, so:
    tapping it opens instantly (ready in memory), its chip shows its snow, and alerts quote the same number. */
+function callFor(C, SIM){ try{ const td = todayStr(), d = new Date().getHours() < 14? td : dateAdd(td, 1), x = daySummary(C, SIM, d);
+  return x?.best? { d, sc: Math.round(x.best.avg*10)/10, lab: x.best.sim.label, from: x.best.from, to: x.best.to } : null; }catch(e){ return null; } }
 function fcFull(C){ return { dates: C.days.slice(0,15), vals: C.consDays.slice(0,15).map(x=>x.n? Math.round((x.day+x.night)*10)/10 : null), p24: isNum(C.past24)? Math.round(C.past24*10)/10 : null }; }
 function warmFav(f, ref, det, ens){
   const models = {}; det.forEach((d,i)=>{ if(d) models[MODELS[i].id] = d; });
@@ -2197,9 +2203,9 @@ function warmFav(f, ref, det, ens){
   const data = { ref, models, ens: ens.filter(Boolean), ensNames: ens.map((e,i)=>e?ENS[i].name:null).filter(Boolean), time:first.time, offset:first.offset, tz:first.tz, fetched:new Date(), ensPending:false };
   if(!MEM.has(f.name) || Date.now() - MEM.get(f.name).t > 5*60e3) MEM.set(f.name, {t:Date.now(), data});
   const ok = modesFor(f), ln = store.get("lastNordic","skate"), mode = ok.includes(S.mode)? S.mode : ok.includes(ln)? ln : ok[0];
-  const keep = {data:S.data, loc:S.loc, band:S.band, ctx:S.ctx}; let C;
-  try{ S.data = data; S.loc = f; S.band = bandFor(mode); S.ctx = {...(S.ctx||{}), zc:{}}; C = computeAt(bandElev()); }
-  finally{ const fb = S.band; Object.assign(S, keep); if(C) store.set("fc:" + f.name, (()=>{ const d = {}; C.days.slice(0,7).forEach((dd,k)=>{ const x = C.consDays[k]; if(x?.n) d[dd] = Math.round((x.day+x.night)*10)/10; }); return {t:Date.now(), d, band:fb, full: fcFull(C)}; })()); }
+  const keep = {data:S.data, loc:S.loc, band:S.band, ctx:S.ctx, mode:S.mode}; let C, call = null;
+  try{ S.data = data; S.loc = f; S.mode = mode; S.band = bandFor(mode); S.ctx = {...(S.ctx||{}), zc:{}}; C = computeAt(bandElev()); call = callFor(C, simulate(C)); if(call) call.mode = mode; }
+  finally{ const fb = S.band; Object.assign(S, keep); if(C) store.set("fc:" + f.name, (()=>{ const d = {}; C.days.slice(0,7).forEach((dd,k)=>{ const x = C.consDays[k]; if(x?.n) d[dd] = Math.round((x.day+x.night)*10)/10; }); return {t:Date.now(), d, band:fb, full: fcFull(C), call}; })()); }
   favRowRender();
 }
 function preloadFavs(){
@@ -2377,9 +2383,6 @@ function renderGlide(){
 
 /* ---------- Nordic Pulse live grooming, shown as Nordic Pulse's own page inside Snowline (nothing copied or stored) ---------- */
 const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Elk Lake Resort (Nordic), OR": "https://nordic-pulse.com/ski-areas/US/OR/Elk-Lake-Resort", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
-// Meissner parks in a state Sno-Park: a permit is required Nov 1 – Apr 30 (ODOT). One quiet line, only in season.
-function snoParkHTML(){ const m = new Date().getMonth(); if(!(m >= 10 || m <= 3)) return "";
-  return `<a class="sp-line" href="https://www.oregon.gov/ODOT/DMV/Pages/Vehicle/sno_park_permits.aspx" target="_blank" rel="noopener"><span>🅿️</span><span><b>Sno-Park permit needed</b> through Apr 30</span><i>Get one ↗</i></a>`; }
 function npEmbed(name){
   const u = NP_PAGES[name]; if(!u) return "";
   return `<div class="np"><div class="np-f" data-np="${u}" role="button" tabindex="0" aria-label="Open the live grooming map">
@@ -2476,7 +2479,7 @@ const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meis
 function renderGroom(){
   const card = $("#groomCard"); if(!card || !S.loc) return; const G = extrasFor(S.loc).groom;
   if(S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = false;
-    card.innerHTML = `<div class="card-h"><h2>Grooming</h2><span class="muted">${mxGroomLine()}</span></div>${npEmbed(S.loc.name)}${snoParkHTML()}`; wireNP(card); return; }
+    card.innerHTML = `<div class="card-h"><h2>Grooming</h2><span class="muted">${mxGroomLine()}</span></div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
   if(!G || S.mode==="bc"){ card.hidden = true; return; }
   if(G.links && NP_PAGES[S.loc.name] && S.mode!=="bc"){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2>${RESORT_SITE[S.loc.name]? `<a class="muted" href="${RESORT_SITE[S.loc.name]}" target="_blank" rel="noopener">Area site ↗</a>` : ""}</div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
   if(G.links){ if(!G.links.length){ card.hidden = true; return; }
@@ -4221,7 +4224,8 @@ function renderChange(C, complete){
   const el = $("#chgStrip"); if(!el || !S.loc) return; el.innerHTML = "";
   // The spot you're viewing always refreshes its saved forecast (chips, Favorites, alerts read it), even if a model is missing.
   if(!S.usedOld && C?.consDays){ const d7 = {}; C.days.slice(0,7).forEach((d,k)=>{ const x = C.consDays[k]; if(x?.n) d7[d] = Math.round((x.day+x.night)*10)/10; });
-    store.set("fc:" + S.loc.name, { t: Date.now(), d: d7, band: S.band, full: fcFull(C) }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender(); }
+    const call = S.ctx?.SIM? callFor(C, S.ctx.SIM) : null; if(call) call.mode = S.mode;
+    store.set("fc:" + S.loc.name, { t: Date.now(), d: d7, band: S.band, full: fcFull(C), call }); if(S.favs?.some(f => f.name === S.loc.name)) favRowRender(); }
   if(S.usedOld || !complete || !C?.consDays) return;
   const key = "chg:" + S.loc.name + "|" + S.band, now = Date.now(), today = todayStr();
   const cur = {}; C.days.slice(0, 7).forEach((d, k) => { const x = C.consDays[k]; if(x?.n) cur[d] = Math.round((x.day + x.night) * 10) / 10; });
