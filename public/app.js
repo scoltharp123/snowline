@@ -142,7 +142,7 @@ async function getJSONnet(url, tries=3, wait=1500){
   if(r.status===429){ S.omLimited = Date.now(); } if(!r.ok) throw new Error(r.status); const j = await r.json(); if(j.error) throw new Error(j.reason||"error"); S.omLimited = 0; return j; }
 async function fetchDet(m, loc, ref){
   for(const api of m.api){
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&hourly=${DET_VARS}&models=${api}&timezone=auto&past_days=3&forecast_days=${m.days||16}`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&elevation=${ref.toFixed(0)}&hourly=${DET_VARS}&models=${api}&timezone=auto&past_days=5&forecast_days=${m.days||16}`;
     try{
       const j = await getJSON(url); const h = j.hourly;
       const P = getVar(h,"precipitation");
@@ -418,7 +418,7 @@ function snowBarsSVG(vals, dates, o={}){
   return `<svg class="bars" data-off="${off}" width="${w+off}" height="${hh}" viewBox="0 0 ${w+off} ${hh}">${pg}<g transform="translate(${off},0)">${g}</g></svg>`;
 }
 // What already fell, day by day, from the same snow model (the 3 days before today)
-function pastDaysSnow(C){ try{ const td = todayStr(); return [3,2,1].map(k=>{ const d = dateAdd(td, -k); let s = 0, c = 0;
+function pastDaysSnow(C){ try{ const td = todayStr(); return [5,4,3,2,1].map(k=>{ const d = dateAdd(td, -k); let s = 0, c = 0;
   C.time.forEach((t,i)=>{ if(t.startsWith(d)){ s += C.cons[i]?.snow || 0; c++; } }); return c >= 12? {d, v: s} : null; }).filter(Boolean); }catch(e){ return []; } }
 
 /* Likely range for each 5-day block: the middle 80% of the ensemble runs */
