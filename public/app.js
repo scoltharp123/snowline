@@ -384,8 +384,8 @@ const LETTER = ["S","M","T","W","T","F","S"];
 /* ---------- Snow summary bars (inline SVG, OpenSnow style) ---------- */
 function snowBarsSVG(vals, dates, o={}){
   const n = vals.length, cw = o.cw || 26, H = o.h || 70, top = o.labels ? 44 : 30, w = n*cw;
-  const vv = vals.map(v=>isNum(v)? snowNum(v) : null);
-  const mx = Math.max(imp()? 6 : 15, ...vv.map(v=>v||0));
+  const vv = vals.map(v=>isNum(v)? snowNum(v) : null), past = o.past || [], P = past.length, off = P*cw;
+  const mx = Math.max(imp()? 6 : 15, ...vv.map(v=>v||0), ...past.map(p=>snowNum(p.v||0)));
   let g = "";
   const ti = dates.indexOf(localToday()); if(ti>=0) g += `<rect x="${ti*cw+1}" y="${top-8}" width="${cw-2}" height="${H+46}" rx="7" fill="#232327"/>`;
   [[0,5,"Next 1–5 Days"],[5,10,"Next 6–10 Days"],[10,15,"Next 11–15 Days"]].forEach(([a,b,lab])=>{
@@ -406,8 +406,20 @@ function snowBarsSVG(vals, dates, o={}){
   let hh = top + H + 36;
   if(o.labels) dates.forEach((d,i)=>{ if(d) g += `<rect data-bd="${d}" x="${i*cw}" y="0" width="${cw}" height="${top+H+60}" fill="transparent" style="cursor:pointer"/>`; });
   if(o.q){ o.q.forEach((sc,i)=>{ if(!isNum(sc)) return; g += `<rect x="${i*cw+8}" y="${hh+8}" width="${cw-16}" height="5" rx="2.5" fill="${scoreColor(sc)}"/>`; }); hh += 18; }
-  return `<svg class="bars" width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}">${g}</svg>`;
+  // Past days sit to the left, off-screen at first: swipe right to see what already fell (OpenSnow-style).
+  let pg = "";
+  if(P){ const tot = past.reduce((s,p)=>s+(p.v||0),0), x1 = 4, x2 = off-4, xm = (x1+x2)/2;
+    pg += `<text x="${xm}" y="10" class="t-l">${P >= 3? `Past ${P} Days` : "Past"}</text><path d="M${x1} 15v6M${x2} 15v6M${x1} 18H${xm-16}M${xm+16} 18H${x2}" class="t-br"/><text x="${xm}" y="22" class="t-tot" style="fill:#aab4c3">${fmtSnow(tot,0)}</text>`;
+    past.forEach((p,j)=>{ const v = snowNum(p.v||0), x = j*cw+5, bw = cw-10, h = Math.max(2, v/mx*H), wd = new Date(p.d+"T12:00:00Z").getUTCDay();
+      pg += `<rect x="${x}" y="${top+H-h}" width="${bw}" height="${h}" rx="2" fill="${v<0.05? "#4b5563" : "#64748b"}"/>`;
+      if(o.labels) pg += `<text x="${x+bw/2}" y="${top+H-h-4}" class="t-v" style="fill:#94a3b8">${v<0.5? "0" : Math.round(v)}</text>`;
+      pg += `<text x="${j*cw+cw/2}" y="${top+H+15}" class="t-d" style="fill:#6b7280">${LETTER[wd]}</text><text x="${j*cw+cw/2}" y="${top+H+30}" class="t-d" style="fill:#6b7280">${+p.d.slice(8,10)}</text>`; });
+    pg += `<path d="M${off-0.5} ${top-6}V${top+H+34}" stroke="#2a2d33" stroke-dasharray="3 3"/>`; }
+  return `<svg class="bars" data-off="${off}" width="${w+off}" height="${hh}" viewBox="0 0 ${w+off} ${hh}">${pg}<g transform="translate(${off},0)">${g}</g></svg>`;
 }
+// What already fell, day by day, from the same snow model (the 3 days before today)
+function pastDaysSnow(C){ try{ const td = todayStr(); return [3,2,1].map(k=>{ const d = dateAdd(td, -k); let s = 0, c = 0;
+  C.time.forEach((t,i)=>{ if(t.startsWith(d)){ s += C.cons[i]?.snow || 0; c++; } }); return c >= 12? {d, v: s} : null; }).filter(Boolean); }catch(e){ return []; } }
 
 /* Likely range for each 5-day block: the middle 80% of the ensemble runs */
 function bucketRanges(C){
@@ -503,7 +515,7 @@ function render(){
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
       return old? `<span class="muted upd-at old">No signal · saved ${t2}</span>` : `<span class="muted upd-at">Updated ${t2}</span>`; })()}</div>
-    ${(()=>{ const ob0 = nearObs(), ob = ob0 && (!isNum(ob0.elevFt) || Math.abs(ob0.elevFt - e*FT) <= 1500)? ob0 : null; return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    ${(()=>{ const ob0 = nearObs(), ob = ob0 && (!isNum(ob0.elevFt) || Math.abs(ob0.elevFt - e*FT) <= 1500)? ob0 : null; return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {past: pastDaysSnow(C), labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
@@ -536,6 +548,7 @@ function render(){
   <div class="promise"><b>Free forever · no ads · no account</b><span>Your favorites and settings stay on your phone.</span><a href="/accuracy">How accurate is Snowline? ›</a><button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button></div>
   <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models${C.ensDays.length? ` · ${C.ensDays.length} ensemble runs` : ""}<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
+  document.querySelectorAll("#snowCard .ss-r").forEach(r=>{ const s = r.querySelector("svg[data-off]"); if(s && +s.dataset.off) r.scrollLeft = +s.dataset.off; });   // open on today; past is a swipe away
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
   $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read the full forecast" : "Show less"; };
   $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
@@ -1930,6 +1943,8 @@ function renderSeasonCard(){
   const word = P==null? "" : P>=130? "Way above normal" : P>=110? "Above normal" : P>=90? "About normal" : P>=70? "Below normal" : "Well below normal";
   const col = P==null? "#e6edf7" : P>=110? "#7dd3fc" : P>=90? "#86efac" : P>=70? "#fde68a" : "#fca5a5";
   el.dataset.sv = P!=null? `${P}% of normal snowpack` : `${fmtSnow(N.depth||0,0)} on the ground`;
+  // The season in one number, up top in Snow Summary (OpenSnow keeps this on its report page)
+  const gp = $("#glPack"); if(gp && P!=null){ gp.hidden = false; const b = gp.querySelector("b"); b.innerHTML = `${P}%<small>of avg</small>`; b.style.color = col; }
   // chart: this season's snow water vs the median for each date
   const W = 320, H = 110, n = sr.length, mx = Math.max(1, ...sr.map(r=>Math.max(r[1]||0, r[3]||0)))*1.1;
   const X = i => i/(Math.max(1,n-1))*W, Y = v => H - v/mx*H;
@@ -2009,7 +2024,7 @@ function glanceHTML(C, slNow){
       return `${fmtSnow(st.tot,0)} ${d1===d2? wk(d1) : (d1===todayStr()? "now" : w(d1))+"–"+w(d2)}`; })());
   return `<div class="glance">
     <div><span>${st && st.a - C.nowIdx <= 3? "This storm" : "Next storm"}</span><b class="num">${stTxt}</b></div>
-    <div><span>Snow level</span><b class="num">${fmtEl(slNow)}</b></div></div>`;
+    <div><span>Snow level</span><b class="num">${fmtEl(slNow)}</b></div><div id="glPack" hidden><span>Snowpack</span><b class="num"></b></div></div>`;
 }
 /* ---------- Confidence, in plain words: how sure we are about the next 5 days, and the realistic range ---------- */
 function agreeHTML(C, N, winTot, conf){
