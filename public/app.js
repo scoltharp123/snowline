@@ -3917,9 +3917,9 @@ async function drawPowderCard(fmt="post"){
   const ng = g.createLinearGradient(0, top+330, 0, top+640); ng.addColorStop(0,"#ffffff"); ng.addColorStop(1, hot? "#c4b5fd" : "#7dd3fc"); g.fillStyle = ng;
   g.shadowColor = hot? "rgba(167,139,250,.55)" : "rgba(56,189,248,.45)"; g.shadowBlur = 60; g.fillText(num, 60, top+610, 960); g.shadowBlur = 0;
   g.fillStyle="#e6edf7"; g.font="700 56px 'Space Grotesk', Inter, sans-serif"; g.fillText(T.when, 72, top+700, 940);
-  g.fillStyle="#9fb0cc"; g.font="600 40px Inter, sans-serif"; g.fillText(`at ${S.loc.name}`, 72, top+760, 940);
+  g.fillStyle="#9fb0cc"; g.font="600 40px Inter, sans-serif"; g.fillText(`at ${dispName(S.loc.name)}`, 72, top+760, 940);
   // facts row
-  const facts = [ T.st && T.st.e>T.st.s? [`${fmtSnow(T.big,0)}`, `biggest day · ${dow(C.days[T.bigK])}`] : null, [`${fmtSnow(T.ten,0)}`, "next 10 days"], T.x? [`${T.x.best.avg.toFixed(1)}`, `${S.mode==="alpine"? "ski" : MODE_NAME[S.mode].toLowerCase()} score`] : null ].filter(Boolean).slice(0,3);
+  const facts = [ T.st && T.st.e>T.st.s? [`${fmtSnow(T.big,0)}`, `biggest day · ${dow(C.days[T.bigK])}`] : null, [`${fmtSnow(T.ten,0)}`, "next 10 days"], T.x? [`${hl(T.x.best.from)}–${hl(T.x.best.to)}`, `best window · ${T.x.best.avg.toFixed(1)} score`] : null ].filter(Boolean).slice(0,3);
   facts.forEach(([v,l],i)=>{ const fx = 72 + i*330; g.fillStyle="#fff"; g.font="800 64px 'Space Grotesk', Inter, sans-serif"; g.fillText(v, fx, top+880); g.fillStyle="#8fa1bf"; g.font="500 28px Inter, sans-serif"; g.fillText(l, fx, top+922, 300); });
   // 10-day bars, storm days lit
   const n = 10, bw = 70, gap = (W - 144 - n*bw)/(n-1), by = H - (fmt==="story"? 250 : 150), mx = Math.max(4, ...T.daily);
