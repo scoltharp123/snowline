@@ -607,6 +607,21 @@ function renderSection(id){
 }
 
 /* ---------- Right Now ---------- */
+const LIVE_STN = { "Mt. Bachelor, OR": {id:"MOONM", name:"Moon Mountain", ft:7450}, "Mt. Bachelor Nordic Center, OR": {id:"OD131", name:"Century Dr", ft:6424} };
+const LIVE_C = {};
+async function loadLiveStn(){
+  const el = $("#rnLive"), L0 = S.loc, st = LIVE_STN[L0?.name]; if(!el || !st) return;
+  try{
+    let o = LIVE_C[st.id]; if(!o || Date.now() - o.at > 10*60e3){
+      const j = await (await fetch(`https://api.weather.gov/stations/${st.id}/observations/latest`, {headers:{Accept:"application/geo+json"}})).json();
+      o = LIVE_C[st.id] = {at: Date.now(), p: j.properties || {}}; }
+    if(S.loc !== L0 || !$("#rnLive")) return; const p = o.p, age = (Date.now() - new Date(p.timestamp)) / 60e3, T = p.temperature?.value;
+    if(!isNum(T) || !(age < 120)) return;
+    const kmh = v => !v || !isNum(v.value)? null : /m_s/.test(v.unitCode||"")? v.value*3.6 : v.value;   // NWS sends km/h or m/s
+    const w = kmh(p.windSpeed), g = kmh(p.windGust);
+    $("#rnLive").innerHTML = `<div class="rn-live"><span class="np-live"></span><span><b>Measured ${fmtT(T)}</b>${isNum(w)? ` · wind ${fmtWind(w)}${isNum(g)? `, gusts ${fmtWind(g)}` : ""} ${windU()}` : ""}</span><small>${st.name} · ${st.ft.toLocaleString()} ft · ${age < 2? "just now" : Math.round(age) + " min ago"}</small></div>`;
+  }catch(e){}
+}
 function renderRightNow(C, SIM, e){
   const now = SIM[C.nowIdx], c = C.cons[C.nowIdx]; const el = $("#nowCard"); if(!now || !c){ el.remove(); return; }
   const hr = +C.time[C.nowIdx].slice(11,13), sc = scoreOf(now);
@@ -628,7 +643,7 @@ function renderRightNow(C, SIM, e){
       `${(()=>{ const cn = coldNote(c, now); return cn? `<div class="full"><div class="l">Dress for it</div><div class="v">🧤 ${cn}</div></div>` : ""; })()}`,
       `${!isAlp()? (()=>{ const k = fromKit(c, now); return k && (k.glide||k.kick)? `<div class="full"><div class="l">From your wax box</div><div class="v">🧰 ${[k.glide?.name, k.kick?.name].filter(Boolean).join(" + ")}</div></div>` : ""; })() : ""}`,
       `${!isAlp()? (()=>{ const sg = waxSuggest(c, now); return sg?.text? `<div class="full"><div class="l">Your wax log</div><div class="v">🧠 ${sg.text}</div></div>` : ""; })() : ""}`].join("").trim(); return more? `<details class="more-today"><summary>More for today</summary><div class="kv">${more}</div></details>` : ""; })()}
-`;
+<div id="rnLive"></div>`; loadLiveStn();
 }
 
 /* ---------- Hourly strip ---------- */
@@ -1748,6 +1763,8 @@ function renderReport(){
       </div>${R.comment? `<p class="clamp3 muted" style="margin:8px 0 0">${R.comment}</p>`:""}
       <a class="muted" href="${R.url}" target="_blank" rel="noopener">${R.source} ↗</a></div>`);
   } else if(R && R.url) blocks.push(`<div class="rep"><div class="rep-h"><b>Resort report</b></div><a href="${R.url}" target="_blank" rel="noopener">Open the latest resort report ↗</a></div>`);
+  // The best snow gauge near Bachelor: OSU's snow pillow (6,375 ft), every 10 minutes on the Weather Service's free viewer
+  if(/^Mt\. Bachelor/.test(S.loc.name)) blocks.unshift(`<a class="li" href="https://www.weather.gov/wrh/timeseries?site=OSUSP&hours=72" target="_blank" rel="noopener"><span class="nm"><b>OSU snow pillow · live</b><small>Snow depth and new snow every 10 min · 6,375 ft, by the Nordic Center</small></span><span style="color:#7dd3fc">↗</span></a>`);
   const G = !isAlp() ? rep.grooming : null;
   if(G) blocks.push(`<a class="li" href="${G.url}" target="_blank" rel="noopener"><span class="nm"><b>Nordic grooming report</b><small>Today's grooming on ${G.source}</small></span><span style="color:var(--ice)">↗</span></a>`);
   const cl = "";
