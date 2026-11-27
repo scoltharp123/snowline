@@ -509,9 +509,9 @@ function render(){
     <div id="trustLine"></div>
   </section>
   ${a2hsHTML()}
-  ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
   ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
   <section class="card" id="nowCard"></section>
+  ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
   ${S.loc?.name==="Mt. Bachelor, OR" && isAlp()? `<section class="card" id="mtnCard"></section>` : ""}
   ${!isAlp() && S.mode!=="bc"? `<section class="card" id="glideCard"></section>` : ""}
   <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast${tipI("hourly")}</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
@@ -2378,15 +2378,32 @@ function renderGlide(){
 const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Elk Lake Resort (Nordic), OR": "https://nordic-pulse.com/ski-areas/US/OR/Elk-Lake-Resort", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
 function npEmbed(name){
   const u = NP_PAGES[name]; if(!u) return "";
-  return `<div class="np"><div class="np-h"><b>Live grooming</b><span><button class="np-full" data-np="${u}">Full screen</button><a href="${u}" target="_blank" rel="noopener">Open ↗</a></span></div>
-    <div class="np-f"><iframe src="${u}" loading="lazy" title="Live grooming map from Nordic Pulse" referrerpolicy="no-referrer"></iframe></div>
-    <div class="muted np-c">Live from Nordic Pulse · posted by the groomers as they work</div></div>`;
+  return `<div class="np"><div class="np-f" data-np="${u}" role="button" tabindex="0" aria-label="Open the live grooming map">
+      <div class="np-ph"><div class="spin"></div><span>Loading live grooming…</span></div>
+      <iframe data-src="${u}" title="Live grooming map from Nordic Pulse" referrerpolicy="no-referrer" tabindex="-1" aria-hidden="true"></iframe>
+      <span class="np-tap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Explore the live map</span>
+    </div>
+    <div class="np-c"><span class="np-live"></span>Live from the groomers via Nordic Pulse · <a href="${u}" target="_blank" rel="noopener">Open ↗</a></div></div>`;
 }
-function wireNP(root){ root.querySelectorAll(".np-full").forEach(b=>b.onclick=()=>{
+let npIO = null;
+function wireNP(root){
+  root.querySelectorAll(".np-f").forEach(f=>{
+    const fr = f.querySelector("iframe"), go = () => { if(fr.src) return; fr.onload = () => f.classList.add("ok"); fr.src = fr.dataset.src; };
+    // load only when it's about to be seen: the map is heavy, and most opens never scroll that far
+    if("IntersectionObserver" in window){ npIO ||= new IntersectionObserver(es=>es.forEach(en=>{ if(en.isIntersecting){ npIO.unobserve(en.target); en.target._go?.(); } }), {rootMargin:"300px 0px"}); f._go = go; npIO.observe(f); } else go();
+    const open = () => npOpen(f.dataset.np);
+    f.onclick = open; f.onkeydown = ev => { if(ev.key==="Enter" || ev.key===" "){ ev.preventDefault(); open(); } };
+  });
+}
+function npOpen(u){
   const d = document.createElement("div"); d.className = "np-sheet";
-  d.innerHTML = `<div class="np-bar"><b>Live grooming · Nordic Pulse</b><button aria-label="Close">Done</button></div><iframe src="${b.dataset.np}" title="Live grooming map from Nordic Pulse"></iframe>`;
-  d.querySelector("button").onclick = () => { d.remove(); document.body.style.overflow = ""; };
-  document.body.appendChild(d); document.body.style.overflow = "hidden"; }); }
+  d.innerHTML = `<div class="np-bar"><b>Live grooming</b><span><a href="${u}" target="_blank" rel="noopener">Open in Nordic Pulse ↗</a><button aria-label="Close">Done</button></span></div><div class="np-ph"><div class="spin"></div><span>Loading live grooming…</span></div><iframe src="${u}" title="Live grooming map from Nordic Pulse"></iframe>`;
+  const fr = d.querySelector("iframe"); fr.onload = () => d.classList.add("ok");
+  const close = () => { d.remove(); document.body.style.overflow = ""; removeEventListener("popstate", close); };
+  d.querySelector("button").onclick = () => history.state?.np? history.back() : close();
+  history.pushState({...(history.state||{}), np:1}, ""); addEventListener("popstate", close);
+  document.body.appendChild(d); document.body.style.overflow = "hidden";
+}
 /* ---------- Live at Meissner: the club's own station, ODOT's Wanoga Butte station, the parking-lot cam ---------- */
 function mxGroomLine(){ const m = new Date().getMonth(); return (m===11 || m<=2)? "7 days a week through March" : "Daily Dec–Mar, snow permitting"; }
 function renderMeissner(){
@@ -2405,8 +2422,6 @@ function renderMeissner(){
   const cam = M.cam? `<a class="mx-cam" href="${M.cam.page}" target="_blank" rel="noopener"><img loading="lazy" src="${M.cam.img}?t=${Math.floor(Date.now()/36e5)}" alt="Meissner Sno-Park webcam" onerror="this.closest('a').remove()"><span>Parking lot cam · every 2 hours</span></a>` : "";
   el.innerHTML = `<div class="card-h"><h2>Live at Meissner</h2><a class="muted" href="https://meissnernordic.org/weather/" target="_blank" rel="noopener">Meissner Nordic ↗</a></div>
     <div class="mx-grid">${st}</div>${cam}
-    <div class="mx-gr"><b>Grooming</b><span class="muted">${mxGroomLine()}</span></div>
-    ${npEmbed(S.loc.name)}
     <div class="mx-links">${(M.links||[]).filter(([l])=>!/grooming map/i.test(l)).map(([l,u])=>`<a class="btn" href="${u}" target="_blank" rel="noopener">${l} ↗</a>`).join("")}</div>
     <div class="muted" style="font-size:11px;margin-top:8px">Stations: Meissner Nordic, and ODOT via the National Weather Service.</div>`;
   wireNP(el);
@@ -2456,8 +2471,9 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-tip]
 const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Elk Lake Resort (Nordic), OR", "Methow Valley Trails, WA", "Birkie Trail (Cable, WI)", "Mt. Spokane, WA"];
 function renderGroom(){
   const card = $("#groomCard"); if(!card || !S.loc) return; const G = extrasFor(S.loc).groom;
+  if(S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = false;
+    card.innerHTML = `<div class="card-h"><h2>Grooming</h2><span class="muted">${mxGroomLine()}</span></div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
   if(!G || S.mode==="bc"){ card.hidden = true; return; }
-  if(G.links && S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = true; return; }
   if(G.links && NP_PAGES[S.loc.name] && S.mode!=="bc"){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2>${RESORT_SITE[S.loc.name]? `<a class="muted" href="${RESORT_SITE[S.loc.name]}" target="_blank" rel="noopener">Area site ↗</a>` : ""}</div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
   if(G.links){ if(!G.links.length){ card.hidden = true; return; }
     card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><div class="row" style="gap:8px;flex-wrap:wrap">${G.links.map(([t,u])=>`<a class="btn" style="text-decoration:none" href="${u}" target="_blank" rel="noopener">${t} ↗</a>`).join("")}</div>
