@@ -118,7 +118,8 @@ function needMap(){
 }
 const libsReady = Promise.resolve();
 // Warm both up once the forecast is on screen, so opening a map or chart is instant.
-function warmLibs(){ const go = ()=>{ needChart().catch(()=>{}); needMap().catch(()=>{}); }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:4000}) : setTimeout(go, 2500); }
+// Warm only the chart library; the map library (~150 KB) loads when a map is actually opened. Skip on data-saver.
+function warmLibs(){ if(navigator.connection?.saveData) return; const go = ()=>{ needChart().catch(()=>{}); }; ("requestIdleCallback" in window)? requestIdleCallback(go, {timeout:4000}) : setTimeout(go, 2500); }
 // Open-Meteo answers 429 when busy (per phone/network); retry busy, server and network errors with growing waits.
 const OM_CACHE = "om-answers-v1";
 const isOM = u => /open-meteo\.com\//.test(u) && !/geocoding-api|\/elevation\?/.test(u);
@@ -766,7 +767,7 @@ async function renderFavs(force){
       const bandFt = own? (fc.band==="base"? sp.base : fc.band==="summit"? sp.top : (sp.base+sp.top)/2) : sp.top, bandLab = own? ({base:"Base", mid:"Mid", summit:"Summit"}[fc.band] || "Mid") : "Summit";
       return `<div class="card fc" role="button" tabindex="0" data-n="${encodeURIComponent(sp.name)}">${S.favEdit && S.favs.length? `<div class="fc-edit"><button data-up="${encodeURIComponent(sp.name)}" aria-label="Move up">↑</button><button data-rm="${encodeURIComponent(sp.name)}" aria-label="Remove">Remove</button></div>`:""}<div class="fc-h"><div><b>${sp.name}</b><div class="muted">${bandLab} · ${(Math.round(bandFt/10)*10).toLocaleString()} ft · ${regionOf2(sp.name)}</div></div>${r.d5>=6? `<span class="badge" style="background:#33236b;color:#d9ccff">${fmtSnow(r.d5,0)} 5-day</span>`:""}</div>
         ${(S.favView && S.favView!=="snow" && favBodyHTML(S.favView, sp, r0 || r)) || snowSummaryHTML(r.last24, r.days15, r.dates15, {labels:true, h:56})}</div>`; }).join("")}
-    <div class="muted" style="text-align:center;margin:10px 0">Snowline's forecast at the height you ski: Mid for alpine, Base for Nordic. Spots marked Summit haven't been checked in the last few hours.</div>`;
+    <div class="muted" style="text-align:center;margin:10px 0;font-size:12px">At the height you ski: Mid for alpine, Base for Nordic</div>`;
   el.querySelectorAll("#wkSeg button").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); S.wkDay = b.dataset.d; renderFavs(); });
   el.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{ if(S.favEdit) return; const n=decodeURIComponent(b.dataset.n); const sp=[...S.favs,...PRESETS].find(x=>x.name===n); location.hash="forecast"; load(sp); });
   const fe=$("#favEdit"); if(fe) fe.onclick = () => { S.favEdit=!S.favEdit; renderFavs(); };
@@ -2376,6 +2377,9 @@ function renderGlide(){
 
 /* ---------- Nordic Pulse live grooming, shown as Nordic Pulse's own page inside Snowline (nothing copied or stored) ---------- */
 const NP_PAGES = { "Meissner Nordic (Bend), OR": "https://nordic-pulse.com/ski-areas/US/OR/Meissner-Sno-Park", "Elk Lake Resort (Nordic), OR": "https://nordic-pulse.com/ski-areas/US/OR/Elk-Lake-Resort", "Mt. Bachelor Nordic Center, OR": "https://nordic-pulse.com/ski-areas/US/OR/Mt-Bachelor-Nordic-Center" };
+// Meissner parks in a state Sno-Park: a permit is required Nov 1 – Apr 30 (ODOT). One quiet line, only in season.
+function snoParkHTML(){ const m = new Date().getMonth(); if(!(m >= 10 || m <= 3)) return "";
+  return `<a class="sp-line" href="https://www.oregon.gov/ODOT/DMV/Pages/Vehicle/sno_park_permits.aspx" target="_blank" rel="noopener"><span>🅿️</span><span><b>Sno-Park permit needed</b> through Apr 30</span><i>Get one ↗</i></a>`; }
 function npEmbed(name){
   const u = NP_PAGES[name]; if(!u) return "";
   return `<div class="np"><div class="np-f" data-np="${u}" role="button" tabindex="0" aria-label="Open the live grooming map">
@@ -2472,7 +2476,7 @@ const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meis
 function renderGroom(){
   const card = $("#groomCard"); if(!card || !S.loc) return; const G = extrasFor(S.loc).groom;
   if(S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = false;
-    card.innerHTML = `<div class="card-h"><h2>Grooming</h2><span class="muted">${mxGroomLine()}</span></div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
+    card.innerHTML = `<div class="card-h"><h2>Grooming</h2><span class="muted">${mxGroomLine()}</span></div>${npEmbed(S.loc.name)}${snoParkHTML()}`; wireNP(card); return; }
   if(!G || S.mode==="bc"){ card.hidden = true; return; }
   if(G.links && NP_PAGES[S.loc.name] && S.mode!=="bc"){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2>${RESORT_SITE[S.loc.name]? `<a class="muted" href="${RESORT_SITE[S.loc.name]}" target="_blank" rel="noopener">Area site ↗</a>` : ""}</div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
   if(G.links){ if(!G.links.length){ card.hidden = true; return; }
