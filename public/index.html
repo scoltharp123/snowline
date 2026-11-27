@@ -344,7 +344,8 @@ body:not([data-view="forecast"]) .ibtn.fo{display:none}
 .callout{display:block;position:relative}
 .callout.tip{background:#13233b;border-color:#24446e;padding-right:40px}
 .callout.tip button{position:absolute;right:6px;top:6px;width:32px;height:32px;border:0;background:none;color:var(--mute);font-size:16px}
-.ss-r{-webkit-mask-image:linear-gradient(90deg,#000 86%,transparent);mask-image:linear-gradient(90deg,#000 86%,transparent)}
+.ss{position:relative}.ss::after{content:"";position:absolute;right:0;top:0;bottom:0;width:30px;background:linear-gradient(90deg,rgba(17,17,19,0),#111113);pointer-events:none;border-radius:0 20px 20px 0}
+.ss-r{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x pan-y}.ss-r svg{touch-action:pan-x pan-y}
 .qleg{display:flex;gap:9px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--mute);margin-top:8px}
 .qleg span:first-child{color:#c7c7cc;font-weight:600}
 .qleg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
