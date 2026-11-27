@@ -358,3 +358,34 @@ export function combine(alert, brief) {
   if (alert && brief) return { ...alert, body: alert.body + "\n" + brief.body };
   return alert || brief || null;
 }
+
+// ---- Night-before call: around 8pm, only when a favorite gets 4"+ (at the elevation the person skis) by tomorrow noon.
+// One message an evening at most, best spots first; quiet every other night so people trust it.
+export async function buildEve(sub) {
+  if (sub.prefs?.eve === false || !(sub.spots || []).length) return null;
+  const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  if (sub.eveSent === dayKey) return null;
+  const min = sub.prefs?.overnight ?? 4, metric = sub.prefs?.units === "metric";
+  const hits = [];
+  for (const sp of sub.spots.slice(0, 6)) {
+    try {
+      const s = bandSpot(sp, sub.prefs), elev = Math.round((s.top || s.base || 5000) / 3.28084);
+      const j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${sp.lat}&longitude=${sp.lon}&elevation=${elev}&hourly=snowfall,rain,temperature_2m&forecast_days=2&timezone=auto`);
+      const h = j.hourly, off = j.utc_offset_seconds * 1000, nk = new Date(Date.now() + off).toISOString().slice(0, 13) + ":00";
+      const i0 = Math.max(0, h.time.findIndex(t => t >= nk)), tom = new Date(Date.now() + off + 864e5).toISOString().slice(0, 10), iN = h.time.indexOf(tom + "T12:00");
+      if (iN < 0) continue;
+      let snow = 0, rain = 0, last = -1;
+      for (let i = i0; i < iN; i++) { const v = (h.snowfall[i] || 0) / 2.54; snow += v; rain += (h.rain[i] || 0) / 25.4; if (v >= 0.1) last = i; }
+      if (snow < min || rain > 0.15) continue;   // a real refresh, not a rain-soaked one
+      const stops = last >= 0 ? +h.time[last].slice(11, 13) : null;
+      hits.push({ name: shortName(sp.name), snow, stops, t: h.temperature_2m[h.time.indexOf(tom + "T09:00")] });
+    } catch (e) {}
+  }
+  if (!hits.length) return null;
+  hits.sort((a, b) => b.snow - a.snow);
+  const amt = v => metric ? Math.round(v * 2.54) + " cm" : Math.round(v) + '"', hr = x => x === 0 ? "midnight" : x < 12 ? x + "a" : x === 12 ? "noon" : (x - 12) + "p";
+  const top = hits[0], cold = top.t != null && top.t <= -4;
+  const line = x => `${x.name}: ~${amt(x.snow)} by morning${x.stops != null && x.stops >= 6 && x.stops < 12 ? `, easing around ${hr(x.stops)}` : ""}`;
+  return { title: `Tomorrow's the call ❄️ ${top.name}`, body: [line(top), ...hits.slice(1, 2).map(line)].join("\n") + (cold ? "\nCold and light. Set the alarm." : "\nSet the alarm."),
+    tag: "eve-" + dayKey, url: "/?s=" + encodeURIComponent(sub.spots.find(s => shortName(s.name) === top.name)?.name || ""), dayKey };
+}

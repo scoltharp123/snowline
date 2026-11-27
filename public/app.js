@@ -3069,7 +3069,7 @@ function evalAlerts(F){
 }
 function pushSpots(){ const L = S.favs.length? S.favs : (S.loc? [S.loc] : []); return L.slice(0,6).map(x=>({name:x.name, lat:x.lat, lon:x.lon, base:x.base, top:x.top})); }
 function pushRules(){ const all=[...S.favs, ...PRESETS]; return activeRules().map(r=>{ const sp = (r.spot.startsWith("*")? null : all.find(x=>x.name===r.spot)); return {...r, spotObj: sp? {name:sp.name, lat:sp.lat, lon:sp.lon, base:sp.base, top:sp.top} : null}; }); }
-async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","mid"), nowcast: store.get("ncOn", true)}})}); }catch(e){} }
+async function pushSync(){ if(!store.get("pushOn")) return; try{ const sub = await pushSub(); if(sub) await api("/push", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({action:"subscribe", sub, spots: pushSpots(), rules: pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","mid"), nowcast: store.get("ncOn", true), eve: store.get("eveOn", true)}})}); }catch(e){} }
 function renderAlerts(){
   const el = $("#view-alerts"); const spots = finderSpots(); const on = store.get("pushOn", false);
   if(!alertRules().length && !store.get("alertsSeeded")){ store.set("alerts", [{spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); store.set("alertsSeeded", 1); }
@@ -3082,6 +3082,7 @@ function renderAlerts(){
   el.innerHTML = `<div class="vh"><h1>Alerts</h1></div>
     <div class="card al-card">${master}
       ${sw("ncTog", "Snow starting", "A heads-up about an hour before snow starts at a favorite", store.get("ncOn", true))}
+      ${sw("eveTog", "Night-before call", `Around 8pm, only when ${fmtSnow(4,0)}+ will fall by morning at a favorite: set your alarm`, store.get("eveOn", true))}
       ${sw("watchTog", "Storm watch", "A heads-up when 8″+ is coming to a favorite 2–5 days out, ready to share", store.get("watch", true))}
       ${sw("powderTog", "Powder alert", `${fmtSnow(4,0)}+ overnight or ${fmtSnow(8,0)}+ in the next 3 days at any favorite`, store.get("powderOn", true))}
       ${sw("briefTog", "Morning brief", "Around 6am: overnight snow, more today, grooming and the temperature up top", briefOn)}
@@ -3110,11 +3111,12 @@ function renderAlerts(){
     if(on){ try{ const sub = await pushSub(); if(sub){ await post({action:"unsubscribe", endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); } }catch(e){} store.set("pushOn", false); toast("Lock-screen alerts off"); renderAlerts(); return; }
     try{ const perm = await Notification.requestPermission(); if(perm!=="granted"){ toast("Notifications are blocked in Settings"); return; }
       const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
-      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","mid"), nowcast: store.get("ncOn", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
+      await post({action:"subscribe", sub, spots:pushSpots(), rules:pushRules(), prefs:{brief: store.get("brief","snow"), units: S.units, watch: store.get("watch", true), health: store.get("health", false), powder: store.get("powderOn", true), band: store.get("alertBand","mid"), nowcast: store.get("ncOn", true), eve: store.get("eveOn", true)}}); store.set("pushOn", true); toast("Lock-screen alerts on"); renderAlerts(); post({action:"test", endpoint: sub.endpoint}).catch(()=>{});
     }catch(e){ toast("Couldn't turn on notifications"); } };
   document.querySelectorAll("#briefSeg button").forEach(b=>b.onclick=()=>{ store.set("brief", b.dataset.b); document.querySelectorAll("#briefSeg button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(b.dataset.b==="off"? "Morning brief off" : b.dataset.b==="daily"? "Morning brief every day" : "Morning brief on snow days"); });
   const flip = (id, get, set, msg) => { const b = $("#"+id); if(b) b.onclick = () => { const v = !get(); set(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); pushSync(); toast(msg(v)); }; };
   flip("ncTog", ()=>store.get("ncOn", true), v=>store.set("ncOn", v), v=>v? "Snow-starting alerts on" : "Snow-starting alerts off");
+  flip("eveTog", ()=>store.get("eveOn", true), v=>store.set("eveOn", v), v=>v? "Night-before call on" : "Night-before call off");
   flip("watchTog", ()=>store.get("watch", true), v=>store.set("watch", v), v=>v? "Storm watch on" : "Storm watch off");
   flip("powderTog", ()=>store.get("powderOn", true), v=>{ store.set("powderOn", v); if(v && !alertRules().some(r=>r.spot==="*favs")) store.set("alerts", [...alertRules(), {spot:"*favs", type:"overnight", inches:4, win:"d3"}, {spot:"*favs", type:"forecast", inches:8, win:"d3"}]); checkAlerts(); }, v=>v? "Powder alert on" : "Powder alert off");
   document.querySelectorAll("#bandAl button").forEach(b=>b.onclick=()=>{ store.set("alertBand", b.dataset.k); document.querySelectorAll("#bandAl button").forEach(x=>x.classList.toggle("on", x===b)); pushSync(); toast(`Alerts now check snow at ${b.textContent.toLowerCase()} elevation`); });

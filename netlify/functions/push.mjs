@@ -17,6 +17,7 @@ export default async (req) => {
     rec.prefs.health = b.prefs?.health === true;
     rec.prefs.powder = b.prefs?.powder !== false;
     rec.prefs.nowcast = b.prefs?.nowcast !== false;
+    rec.prefs.eve = b.prefs?.eve !== false;
     rec.prefs.band = ["base", "mid", "summit"].includes(b.prefs?.band) ? b.prefs.band : "summit";
     await s.setJSON(subKey(b.sub.endpoint), rec);
     return json({ ok: true });
