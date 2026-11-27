@@ -447,9 +447,10 @@ function render(){
   const conf = confidence(modelTots);
 
   // callouts (max 2)
-  const callouts = [];
+  let callouts = [];
   const bigDay = consDaily.slice(0,7).reduce((b,v,i)=>v>b.v?{v,i}:b,{v:0,i:0});
   const rainHrs = C.cons.slice(C.nowIdx, C.nowIdx+24*N).filter(c=>c && c.P>0.3 && c.sl > e).length;
+  S.snowSoon = bigDay.v >= 6;
   if(bigDay.v >= 6 && C.days[bigDay.i] !== todayStr()) callouts.push(`<div class="callout gold">❄️ <b>${fmtSnow(bigDay.v)} ${dayLabel(C.days[bigDay.i])}</b> at ${fmtEl(e)}.${S.mode==="bc"? "" : " "+firstPowDay(C)}</div>`);
   if(rainHrs >= 6){
     const wet = C.cons.map((c,i)=>[c,i]).slice(C.nowIdx, C.nowIdx+24*N).filter(([c,i])=>c && c.P>0.3 && c.sl > e && +C.time[i].slice(11,13) >= 6 && +C.time[i].slice(11,13) <= 18);
@@ -474,10 +475,11 @@ function render(){
       const wet = rain >= 2 && sc < 6.5, gale = gust >= 72 && sc < 6.5;
       const [lvl, head] = wet? ["skip", `Skip it ${who.toLowerCase()}`] : gale? ["meh", `Windy ${who.toLowerCase()}`] : sc>=8? ["go", `Go! ${who} is epic`] : sc>=6.5? ["go", `Worth it ${who.toLowerCase()}`] : sc>=5? ["ok", `Good day ${who.toLowerCase()}`] : sc>=3.5? ["meh", `Fair ${who.toLowerCase()}`] : ["skip", `Skip it ${who.toLowerCase()}`];
       const why = wet? `rain at ${fmtEl(e)}` : gale? `gusts to ${fmtWind(gust)} ${windU()}, ${lab}` : `${lab}, best ${when}`;
+      if(wet) callouts = callouts.filter(c => !c.includes('class="callout rain"'));   // the call already says rain
       verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}</b><em>${why[0].toUpperCase()+why.slice(1)}</em></span><span class="v-sc" data-tip="quality" role="button" aria-label="What the ski score means">${scoreChip(sc)}</span></div><div id="ncStrip"></div></div>`; }
   }
   if(verdict && bestK>=0 && days7[bestK]!==vDay){ const b = sums[bestK];
-    verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="vs-t">Best this week: <b>${(l=>/\d/.test(l)? new Date(days7[bestK]+"T12:00").toLocaleDateString([], {weekday:"short"}) : l)(dayLabel(days7[bestK]))}</b> ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div></div>`); bestK = -1; }
+    verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="vs-t">Best this week: <b>${(l=>/\d/.test(l)? new Date(days7[bestK]+"T12:00").toLocaleDateString([], {weekday:"short"}) : l)(dayLabel(days7[bestK]))}</b> ${hl(b.best.from)}–${hl(b.best.to)}</span>${scoreChip(b.best.avg)}</div></div>`); bestK = -1; }
   if(bestK>=0 && callouts.length<2 && S.mode!=="bc" && days7[bestK]!==vDay){ /* no "best day" in Tour mode: a snow score is not a reason to enter avalanche terrain */ const b=sums[bestK]; callouts.push(`<div class="callout quiet best"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="bt"><b>Best day: ${dayLabel(days7[bestK])}</b> · ${hl(b.best.from)}–${hl(b.best.to)} · ${b.best.sim.label.toLowerCase()}</span>${scoreChip(b.best.avg)}${tipI("best")}</div>`); }
   S.bestDay = bestK>=0 ? days7[bestK] : null;
 
@@ -504,7 +506,7 @@ function render(){
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
-    <div id="trustLine"></div><button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button>
+    <div id="trustLine"></div>
   </section>
   ${a2hsHTML()}
   ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
@@ -515,7 +517,7 @@ function render(){
   <section class="card" id="hourCard"><div class="card-h"><h2>Hourly Forecast${tipI("hourly")}</h2><span class="muted">${fmtEl(e)}</span></div><div class="hs" id="hourStrip"></div><button class="link" id="toDetailed">Detailed hourly forecast</button></section>
   <section class="card" id="dailyCard"><div class="card-h"><h2>Daily Forecast${tipI("daily")}</h2><span class="muted">tap a day</span></div><div class="dl" id="dailyList"></div><button class="link dl-lr" id="lrOpen">Long range · weeks 1–5 and the season ›</button></section>
   <section class="card" id="camCard"></section>
-  <section class="card" id="fxCard"><div class="card-h"><h2>Snowline Forecaster${tipI("forecaster")}</h2><span class="muted" id="discSrc">from the models</span></div>
+  <section class="card" id="fxCard"><div class="card-h"><h2>Snowline Forecaster${tipI("forecaster")}</h2><span class="muted" id="discSrc"></span></div>
     <div class="disc clamp" id="disc"></div><button class="link" id="discMore">Read the full forecast</button></section>
   <div class="more-h" id="moreH">More for this spot</div>
   ${grp("g-mtn", "On the mountain", `${isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
@@ -530,7 +532,7 @@ function render(){
   ${grp("g-season", "Season so far", `<section class="card" id="seasonCard"></section>`)}
   ${grp("g-acc", "Models & accuracy", `<section class="card" id="modelsCard"><div class="card-h"><h2>Models & odds${tipI("models")}</h2></div><div id="sb-models"></div></section><section class="card" id="trackCard"></section>`)}
   ${SECTIONS.filter(s=>!s.nordic || !isAlp()).map(s=>`<details class="sec" data-sec="${s.id}" ${S.open.has(s.id)?"open":""}><summary><span class="ttl">${s.title}</span><span class="sv" id="sv-${s.id}">${sv[s.id]||""}</span></summary><div class="sec-b" id="sb-${s.id}"></div></details>`).join("")}
-  <div class="promise"><b>Free forever · no ads · no account</b><span>Your favorites and settings stay on your phone.</span><a href="/accuracy">How accurate is Snowline? ›</a></div>
+  <div class="promise"><b>Free forever · no ads · no account</b><span>Your favorites and settings stay on your phone.</span><a href="/accuracy">How accurate is Snowline? ›</a><button class="link fb-link" id="fbOpen">Forecast look wrong? Tell us</button></div>
   <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models${C.ensDays.length? ` · ${C.ensDays.length} ensemble runs` : ""}<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
@@ -1528,8 +1530,8 @@ if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("messa
 const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 function miniBars(vals){ const w=4, gap=2, H=18; const mx=Math.max(4,...vals); return `<svg width="${vals.length*(w+gap)}" height="${H}" viewBox="0 0 ${vals.length*(w+gap)} ${H}">${vals.map((v,i)=>{ const h=Math.max(1.5, v/mx*H); return `<rect x="${i*(w+gap)}" y="${H-h}" width="${w}" height="${h}" rx="1" fill="${v<0.05?'#3a3a3e':barColor(v)}"/>`; }).join("")}</svg>`; }
 function a2hsHTML(){
-  if(APP.standalone){   // opened from the Home Screen: once, point to snow alerts if they're off
-    if(store.get("pushOn") || store.get("hiAlerts")) return "";
+  if(APP.standalone){   // opened from the Home Screen: point to snow alerts if they're off, but only on the forecast when a real storm is coming
+    if(store.get("pushOn") || store.get("hiAlerts") || (location.hash||"#forecast")==="#forecast" && !S.snowSoon) return "";
     return `<div class="callout tip ih" id="a2hs"><span class="ih-ic">🔔</span><div><b>Get a heads-up when snow is coming</b><br><span class="muted">Plus a short morning brief on snow days.</span><br><button class="link ih-go" onclick="store.set('hiAlerts',1);location.hash='alerts'">Turn on snow alerts</button></div><button class="ih-x" aria-label="Dismiss" onclick="store.set('hiAlerts',1);this.parentElement.remove()">✕</button></div>`; }
   if(!APP.mobile || (store.get("visits",0) < 2 && !S.favs.length) || Date.now() < store.get("a2hsSnooze",0)) return "";
   return `<div class="callout tip ih" id="a2hs"><img src="/icon-192.png" alt="" width="40" height="40"><div><b>Add Snowline to your Home Screen</b><br><span class="muted">Opens like an app, one tap to your spots.</span><br><button class="link ih-go" onclick="openInstall()">Show me how</button></div><button class="ih-x" aria-label="Not now" onclick="store.set('a2hsSnooze',Date.now()+21*864e5);this.parentElement.remove()">✕</button></div>`;
@@ -3429,7 +3431,7 @@ async function renderCamCard(){
     card.innerHTML = `<div class="card-h"><h2>Cams</h2>${cams.length? `<div class="seg sm" id="camSeg">${[["list","List"],["grid","Grid"]].concat(cams.some(c=>isNum(c.lat))? [["map","Map"]] : []).map(([k,l])=>`<button data-cv="${k}" class="${v===k?"on":""}">${l}</button>`).join("")}</div>`:""}</div>
       ${resort}
       ${cams.length? (v==="map"? `<div class="cmap-wrap" id="camWrap"><div id="camMini"></div><button class="cmap-fs" id="camFs" aria-label="Full screen map">⤢</button></div>` : `<div class="cams-${v}">${(S.camAll? cams : cams.slice(0,4)).map(c=>camTile(c, v==="list")).join("")}</div>${!S.camAll && cams.length > 4? `<button class="btn cam-more" id="camMore">Show all ${cams.length} cams</button>` : ""}`) : ""}
-      ${cams.length? `<div class="muted" style="font-size:11px;margin-top:6px">${rc.length? `Resort cams: <a href="${rc[0].page.split("webcam-modal")[0]}" target="_blank" rel="noopener">${rc[0].src} ↗</a>${rc[0].live? " · tap a cam for live video" : ""} · `:""}${road.length? "Road cams: ODOT TripCheck · ":""}☆ saves a camera to Favorites</div>`:""}`;
+      ${cams.length && rc.length? `<div class="muted" style="font-size:11px;margin-top:6px"><a href="${rc[0].page.split("webcam-modal")[0]}" target="_blank" rel="noopener">More ${rc[0].src} cams ↗</a></div>` : ""}`;
     const more = card.querySelector("#camMore"); if(more) more.onclick = ()=>{ S.camAll = true; draw(); };
     card.querySelectorAll("[data-cv]").forEach(b=>b.onclick=()=>{ store.set("camView", b.dataset.cv); draw(); });
     wireCamStars(card, draw);
