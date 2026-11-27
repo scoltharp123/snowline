@@ -171,7 +171,12 @@ export default async (req) => {
             .filter(x => x.reported >= 2).reverse();
           const g = stormsR.filter(x => x.snowline != null && !x.ongoing);
           const rec = g.length ? { storms: g.length, within: g.filter(x => Math.abs(x.snowline - x.reported) <= Math.max(2, 0.25 * x.reported)).length, avgErr: r1(g.reduce((a, x) => a + Math.abs(x.snowline - x.reported), 0) / g.length) } : null;
-          resort = { name: "Mt. Bachelor", days: ds.length, since: ds[0] || null, storms: stormsR.slice(0, 6), record: rec };
+          // Tune to what the mountain reports: after 3+ graded storms, scale Snowline's snow toward Bachelor's own totals,
+          // trusting it more as storms add up (full weight at 6), never more than ±25%.
+          let fix = null; const gs = g.filter(x => x.snowline > 0.5);
+          if (gs.length >= 3) { const ratio = gs.reduce((a, x) => a + x.reported, 0) / gs.reduce((a, x) => a + x.snowline, 0);
+            fix = r2(clamp(1 + (ratio - 1) * Math.min(1, gs.length / 6), 0.75, 1.25)); }
+          resort = { name: "Mt. Bachelor", days: ds.length, since: ds[0] || null, storms: stormsR.slice(0, 6), record: rec, fix };
         }
       } catch (e) {}
     }

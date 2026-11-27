@@ -265,7 +265,8 @@ function computeAt(e){
   const nowIdx = Math.max(0, time.findIndex(t=>t>=nk));
   const ids = Object.keys(D.models).filter(id=>S.enabled[id]);
   // Tuning from the nearest snow gauge: which models have been right here at each lead time, how wet or dry each runs, and how fluffy the snow really is
-  const cal = S.learnOn ? learned() : null, fix = cal?.slrFix || 1;
+  // Bachelor: tuned to the resort's own reports when there are enough graded storms; elsewhere, to the snow gauge
+  const cal = S.learnOn ? learned() : null, rfix = S.learnOn ? S.extras[S.loc?.name]?.verify?.resort?.fix : null, fix = rfix || cal?.slrFix || 1;
   const leadOf = i => { const dd = (i - nowIdx)/24; return dd <= 1.5 ? 1 : dd <= 4 ? 3 : 5; };
   const per = {}; // id -> hourly {snow, Te, slr, sl}
   for(const id of Object.keys(D.models)){
@@ -522,6 +523,7 @@ function render(){
     <div id="trustLine"></div>
   </section>
   ${a2hsHTML()}
+  ${isBach() && isAlp()? `<section class="card news" id="newsCard" hidden></section>` : ""}
   ${!isAlp()? `<section class="card" id="groomCard" hidden></section>` : ""}
   <section class="card" id="nowCard"></section>
   ${S.loc?.name==="Meissner Nordic (Bend), OR"? `<section class="card" id="mxCard"><div class="loading"><div class="spin"></div>Checking Meissner's weather stations…</div></section>` : ""}
@@ -549,7 +551,7 @@ function render(){
   <div class="muted" style="text-align:center;margin:12px 0 4px">Updated ${D.fetched.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Object.keys(D.models).length} models${C.ensDays.length? ` · ${C.ensDays.length} ensemble runs` : ""}<br><a href="#" id="aboutLink">How Snowline works</a></div>`;
 
   document.querySelectorAll("#snowCard .ss-r").forEach(r=>{ const s = r.querySelector("svg[data-off]"); if(s && +s.dataset.off) r.scrollLeft = +s.dataset.off; });   // open on today; past is a swipe away
-  barPeek($("#snowCard .ss-r"), "peekMain");
+  barPeek($("#snowCard .ss-r"), "peekMain"); try{ renderNews(extrasFor(S.loc).groom?.report); }catch(e){}
   const mr=$("#modelRetry"); if(mr) mr.onclick = ev => { ev.preventDefault(); MEM.delete(S.loc.name); load(S.loc); };
   $("#discMore").onclick = () => { const d=$("#disc"); d.classList.toggle("clamp"); $("#discMore").textContent = d.classList.contains("clamp")? "Read the full forecast" : "Show less"; };
   $("#aboutLink").onclick = ev => { ev.preventDefault(); openSheet("setSheet"); };
@@ -1727,7 +1729,7 @@ function loadExtras(loc){
   api(`/report?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.report=r; done(); }).catch(()=>{});
   api(`/avy?${q}`).then(r=>{ X.avy=r; if(S.loc===loc) renderAvy(); }).catch(()=>{ X.avyFailed=true; });
   api(`/nws?${q}`).then(r=>{ X.nws=r; if(S.loc===loc){ renderNwsAlerts(); renderAFD(); } }).catch(()=>{});
-  if(GROOM_SPOTS.includes(loc.name)) api(`/groom?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.groom=r; if(S.loc===loc) renderGroom(); }).catch(()=>{});
+  if(GROOM_SPOTS.includes(loc.name)) api(`/groom?spot=${encodeURIComponent(loc.name)}`).then(r=>{ X.groom=r; if(S.loc===loc){ renderGroom(); renderNews(r?.report); } }).catch(()=>{});
   if(loc.bc || PRESETS.find(p=>p.name===loc.name)?.bc || S.mode==="bc") loadAvyObs(loc);
 }
 function nearObs(){ const X = S.loc && S.extras[S.loc.name]; const st = X?.obs?.stations?.[0]; return st && st.km <= SNOTEL_MAX_KM ? st : null; }
@@ -2523,6 +2525,7 @@ function renderGroom(){
       <div class="muted" style="font-size:11px;margin-top:6px">Live grooming for this area is published on its own report; Snowline links to it rather than copying it.</div>`; return; }
   if(G.error){ card.hidden = false; card.innerHTML = `<div class="card-h"><h2>Grooming</h2></div><a href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor's grooming report ↗</a>`; return; }
   const nordic = !isAlp() || S.loc.name==="Mt. Bachelor Nordic Center, OR", D = nordic ? G.nordic : G.alpine, R = G.report; card.hidden = false;
+  const fresh = renderNews(R);   // today's mountain update gets its own card near the top; don't repeat its words down here
   if(!D.total && !D.groomed){ D.preseason = true; }
   const kinds = Object.entries(D.kinds||{}).map(([k,n])=>`<span class="chip-s">${esc(k.replace(/ And /g," & "))} · ${n}</span>`).join("");
   const head = D.groomed ? `<div class="gr-big"><b class="num">${D.groomed}</b><span>of ${D.total} ${nordic? "trails" : "runs"} groomed${D.latest? `<br><small>last update ${ago(D.latest)}</small>` : ""}</span></div>`
@@ -2538,7 +2541,7 @@ function renderGroom(){
     ${!nordic && !shut? liftsHTML(G.lifts) : ""}
     ${D.trails?.length? `<details class="nb" style="margin-top:8px"><summary>See groomed ${nordic? "trails" : "runs"}</summary><div class="list">${D.trails.map(x=>`<div class="li" style="min-height:38px"><span class="nm"><b>${esc(x.name)}</b><small>${esc((x.groom||"").replace(/ And /g," & "))}${x.updated? " · "+ago(x.updated) : ""}</small></span></div>`).join("")}</div></details>` : ""}
     ${R? `<div class="grp">Resort snow report</div><div class="fr"><div><b class="num">${R.overnight ?? "—"}″</b><small>Overnight</small></div><div><b class="num">${R.h24 ?? "—"}″</b><small>24 hours</small></div><div><b class="num">${R.base ?? "—"}″</b><small>Base</small></div></div>
-      ${R.text? `<p class="muted clamp3" style="margin:8px 0 0;font-size:13px">${esc(R.text)}</p>` : ""}` : ""}
+      ${R.text && !fresh? `<p class="muted clamp3" style="margin:8px 0 0;font-size:13px">${esc(R.text)}</p>` : ""}` : ""}
     <div class="muted" style="font-size:11px;margin-top:6px">From Mt. Bachelor's own mountain report.</div>`;
   wireNP(card);
 }
@@ -4298,7 +4301,8 @@ function trustRecord(){ const v = extrasFor(S.loc).verify; if(!v) return null;
 function renderTrust(){
   const el = $("#trustLine"); if(!el || !S.loc) return; const r = trustRecord(); if(!r){ el.innerHTML = ""; return; }
   const pct = r.w / r.n, ic = pct >= .7? "🎯" : pct >= .5? "📏" : "🧪";
-  el.innerHTML = `<button class="trust" type="button">${ic} <b>Snowline: ${r.w} of ${r.n} storms</b> within 2″ of ${esc(r.vs)} <i>›</i></button>`;
+  const fx = extrasFor(S.loc).verify?.resort?.fix, tuned = S.learnOn && fx && Math.abs(fx-1) >= 0.03? ` · tuned ${fx>1? "+" : "−"}${Math.round(Math.abs(fx-1)*100)}% to match` : "";
+  el.innerHTML = `<button class="trust" type="button">${ic} <b>Snowline: ${r.w} of ${r.n} storms</b> within 2″ of ${esc(r.vs)}${tuned} <i>›</i></button>`;
   el.querySelector("button").onclick = () => { const d = document.querySelector('details[data-sec="g-acc"]'); if(d){ d.open = true; setTimeout(()=>$("#trackCard")?.scrollIntoView({behavior:"smooth", block:"start"}), 350); } };
 }
 
@@ -4308,3 +4312,18 @@ function barPeek(r, key){ try{
   const io = new IntersectionObserver(es=>{ if(!es[0].isIntersecting) return; io.disconnect(); store.set(key, true);
     const x0 = r.scrollLeft; setTimeout(()=>{ r.scrollTo({left: x0 + 90, behavior:"smooth"}); setTimeout(()=>r.scrollTo({left: x0, behavior:"smooth"}), 650); }, 500); }, {threshold:.8});
   io.observe(r); }catch(e){} }
+
+/* ---------- "From Mt. Bachelor": the mountain's own update for today, right under Snow Summary (alpine only) ----------
+   Only when the post is from today, so it never shows stale news. Returns true when shown. */
+function renderNews(R){
+  const el = $("#newsCard"); if(!el) return false;
+  const day = d => new Date(d).toLocaleDateString("en-CA", {timeZone:"America/Los_Angeles"});
+  if(!R?.text || !R.date || day(R.date) !== day(Date.now())){ el.hidden = true; return false; }
+  const t = new Date(R.date), when = t.getHours() || t.getMinutes()? t.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}).replace(" ","").toLowerCase() : "today";
+  const nums = [isNum(+R.overnight) && +R.overnight > 0? `<b>${R.overnight}″</b> overnight` : "", isNum(+R.h24) && +R.h24 > 0? `<b>${R.h24}″</b> in 24 hr` : ""].filter(Boolean).join(" · ");
+  el.hidden = false;
+  el.innerHTML = `<div class="nw-h"><span class="nw-dot"></span><b>From Mt. Bachelor</b><span class="muted">${when}</span></div>
+    ${nums? `<div class="nw-n">${nums}</div>` : ""}<p class="nw-t clamp4">${esc(R.text)}</p>${R.text.length > 220? `<button class="link nw-more">Read all</button>` : ""}`;
+  const m = el.querySelector(".nw-more"); if(m) m.onclick = () => { const p = el.querySelector(".nw-t"); p.classList.toggle("clamp4"); m.textContent = p.classList.contains("clamp4")? "Read all" : "Show less"; };
+  return true;
+}
