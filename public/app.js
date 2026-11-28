@@ -612,8 +612,21 @@ function renderSection(id){
 /* ---------- Right Now ---------- */
 const LIVE_STN = { "Mt. Bachelor, OR": {id:"MOONM", name:"Moon Mountain", ft:7450}, "Mt. Bachelor Nordic Center, OR": {id:"OD131", name:"Century Dr", ft:6424} };
 const LIVE_C = {};
+async function loadBachLive(L0){
+  try{
+    let o = LIVE_C.bach; if(!o || Date.now() - o.at > 5*60e3) o = LIVE_C.bach = {at: Date.now(), j: await api("/bachlive")};
+    const now = Date.now(), L = (o.j?.lifts || []).filter(x => isNum(x.tC) && !(x.at && now - new Date(x.at) > 3*3600e3));
+    if(L.length < 2 || S.loc !== L0 || !$("#rnLive")) return false;
+    const t0 = L.map(x => x.at && new Date(x.at)).filter(d => d && !isNaN(d)).sort((a,b)=>b-a)[0], age = t0? (now - t0)/60e3 : null;
+    $("#rnLive").innerHTML = `<div class="lv"><div class="lv-h"><span class="np-live"></span><b>Live on the mountain</b><small>${isNum(age)? (age < 2? "just now" : age < 90? Math.round(age) + " min ago" : Math.round(age/60) + " hr ago") : "Mt. Bachelor"}</small></div>
+      ${L.map(x => { const big = isNum(x.g) && x.g >= 64; return `<div class="lv-r${big? " lv-hot" : ""}"><span>${esc(x.name)}</span><b class="num">${fmtT(x.tC)}</b><span class="num">${isNum(x.w)? `${isNum(x.dir)? `<i class="arr" style="transform:rotate(${x.dir+180}deg)">↑</i>` : ""}${fmtWind(x.w)}${isNum(x.g)? `<small> g${fmtWind(x.g)}</small>` : ""} <small>${windU()}</small>` : "—"}</span></div>`; }).join("")}
+      ${L.some(x => isNum(x.g) && x.g >= 64)? `<div class="lv-n">💨 Gusts over 40 mph up top. Upper lifts may be on wind hold.</div>` : ""}</div>`;
+    return true;
+  }catch(e){ return false; }
+}
 async function loadLiveStn(){
   const el = $("#rnLive"), L0 = S.loc, st = LIVE_STN[L0?.name]; if(!el || !st) return;
+  if(L0?.name === "Mt. Bachelor, OR" && await loadBachLive(L0)) return;
   try{
     let o = LIVE_C[st.id]; if(!o || Date.now() - o.at > 10*60e3){
       const j = await (await fetch(`https://api.weather.gov/stations/${st.id}/observations/latest`, {headers:{Accept:"application/geo+json"}})).json();
