@@ -294,7 +294,9 @@ function computeAt(e){
   let past24 = 0, past24n = 0;
   for(let i=0;i<n;i++){
     const t = time[i];
-    if(i < nowIdx){ if(i >= nowIdx-24 && cons[i]){ past24 += cons[i].snow; past24n++; } continue; }
+    if(i < nowIdx){ if(i >= nowIdx-24 && cons[i]){ past24 += cons[i].snow; past24n++; }
+      if(cons[i] && isNum(cons[i].Te)){ const [d0,p0] = periodOf(t), k0 = dayIdx.get(d0); if(k0!=null && p0==="day"){ const cd0 = consDays[k0]; cd0.tmaxD = cd0.tmaxD==null? cons[i].Te : Math.max(cd0.tmaxD, cons[i].Te); } }   // today's high counts the hours already past
+      continue; }
     const [d,part] = periodOf(t); const k = dayIdx.get(d); if(k==null) continue;
     for(const id of Object.keys(per)){ modelDays[id][k].exp++; const v = per[id][i]; if(v){ modelDays[id][k][part]+=v.snow; modelDays[id][k].n++; } }
     const c = cons[i]; if(!c) continue; const cd = consDays[k];
@@ -815,7 +817,7 @@ function renderDayDetail(C, SIM, el){
     <div><div class="l">Odds of 6"+</div><div class="v">${memb.length? Math.round(100*memb.filter(v=>v>=6).length/memb.length)+"%" : "—"}</div></div>
     <div><div class="l">Quality</div><div class="v">${ratio? `${ratio>=15?"Light & fluffy":ratio>=11?"Average":"Heavy & dense"} <small class="muted">${Math.round(ratio)}:1</small>${tipI("ratio")}` : "—"}</div></div>
     <div><div class="l">Max gust</div><div class="v">${fmtWind(cd.gmax)} ${windU()}</div></div>
-    ${S.mode==="alpine"? `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>` : S.mode==="bc"? `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
+    ${S.mode==="alpine"? (closedOn(d)? "" : `<div><div class="l">Lifts${tipI("lifts")}</div><div class="v"><span class="badge b-${lh.k}">${lh.label}</span></div></div>`) : S.mode==="bc"? `<div><div class="l">Snow level</div><div class="v">${fmtEl(c.sl)}</div></div>` : `<div><div class="l">Tracks</div><div class="v" style="color:${w?speedColor(w.speed):""}">${w? w.speed : "—"}</div></div>`}
     ${x? `<div class="full"><div class="l">Surface · best window</div><div class="v">${x.am?`AM ${x.am.icon} ${x.am.label}`:""}${x.am&&x.pm?" → ":""}${x.pm?`PM ${x.pm.icon} ${x.pm.label}`:""}<br><b>${hl(x.best.from)}–${hl(x.best.to)}</b> ${scoreChip(x.best.avg)} · ${x.best.sim.light.icon} ${x.best.sim.light.label}</div></div>`:""}
     ${(()=>{ const an=aspectNote(C,d); return an? `<div class="full"><div class="l">${byMode("Slope aspects","Sun vs. shade")}</div><div class="v">${an.line}</div></div>` : ""; })()}
     ${w? `<div class="full"><div class="l">Wax at 9am</div><div class="v">Glide: ${w.glide}${S.mode==="classic"?`<br>Kick: ${w.kick}`:""}</div></div>`:""}
@@ -1724,6 +1726,7 @@ function aspectNote(C, d){
   const sTxt = sWet ? (nordic? `Sunny stretches soften by ${hl(sWet.h)}` : `South faces ${sWet.sim.key==="corn"?"turn to corn":"soften"} by ${hl(sWet.h)}`) : (nordic? `Sunny stretches stay ${sAM.key==="firm"?"firm":"dry"}` : `South faces stay ${sAM.key==="firm"?"firm":"dry"}`);
   const dryN = ["powder","fresh","softpack","packed","cold","heavy","wind"].includes(nAM.key);
   const nTxt = nWet ? (nordic? `shaded trail softens by ${hl(nWet.h)}` : `north softens by ${hl(nWet.h)}`) : (dryN? (nordic? "shaded trail stays dry and fast" : "north stays dry and cold") : `${nordic? "shaded trail" : "north"} stays ${nAM.label.toLowerCase()}`);
+  if(sWet && nWet && sWet.h === nWet.h) return { line: `Every aspect ${nordic? "is soft" : "softens"} by ${hl(sWet.h)}.`, sAM, nAM, sWet, nWet };
   return { line: `${sTxt}; ${nTxt}.`, sAM, nAM, sWet, nWet };
 }
 
@@ -1756,7 +1759,7 @@ function renderStorm(C, SIM, e){
     : isAlp()
     ? (dayHrs>=3 && maxG<70
       ? `<b>Ski the storm:</b> about ${fmtSnow(dayTot)} falls during lift hours, ${ratio>=13?"light and deep":"heavier and supportive"}. Then hit the <b>morning after</b> on ${dow(after)}.`
-      : `<b>Wait for the morning after:</b> most of it falls ${dayHrs? "outside lift hours" : "overnight"}${maxG>=70? " with strong winds" : ""}. First chair ${dow(after)} is the call.`)
+      : `<b>Wait for the morning after:</b> most of it falls ${dayHrs? "outside lift hours" : "overnight"}${maxG>=70? " with strong winds" : ""}, so it's on the ground by ${dow(after)} morning.`)
     : (dayHrs>=3
       ? `<b>Expect soft, slow trails while it snows</b> (about ${fmtSnow(dayTot)} during the day)${maxG>=60? ", with wind drifting the open sections" : ""}. The best ${S.mode==="skate"? "skating" : "classic skiing"} is <b>${dow(after)}</b>, once the trails are groomed.`
       : `<b>Most of it falls overnight.</b> ${dow(after)} morning should bring fresh snow on the trails; it skis best once it's groomed${S.mode==="classic"? " and the tracks are set" : ""}.`);
@@ -2068,7 +2071,8 @@ function renderSeasonCard(){
   const N = Z.now, P = N.med >= 2? N.pct : null, sr = Z.series.filter(r=>r[1]!=null || r[3]!=null);
   const word = P==null? "" : P>=130? "Way above normal" : P>=110? "Above normal" : P>=90? "About normal" : P>=70? "Below normal" : "Well below normal";
   const col = P==null? "#e6edf7" : P>=110? "#7dd3fc" : P>=90? "#86efac" : P>=70? "#fde68a" : "#fca5a5";
-  el.dataset.sv = P!=null? `${P}% of normal snowpack` : `${fmtSnow(N.depth||0,0)} on the ground`;
+  const PO = plotObs(), depth = PO && isNum(PO.depth) && !(N.depth > PO.depth)? PO.depth : N.depth;
+  el.dataset.sv = P!=null? `${P}% of normal snowpack` : `${fmtSnow(depth||0,0)} on the ground`;
   // The season in one number, up top in Snow Summary (OpenSnow keeps this on its report page)
   const gp = $("#glPack"); if(gp && P!=null){ gp.hidden = false; const b = gp.querySelector("b"); b.innerHTML = `${P}%<small>of avg</small>`; b.style.color = col; }
   // chart: this season's snow water vs the median for each date
@@ -2080,7 +2084,7 @@ function renderSeasonCard(){
   const unit = imp()? "″" : " cm", sw = v => v==null? "—" : imp()? v.toFixed(1)+"″" : Math.round(v*2.54)+" cm";
   el.innerHTML = `<div class="card-h"><h2>Season so far${tipI("season")}</h2></div>
     <div class="se-hero">${P!=null? `<div class="se-big num" style="color:${col}">${P}%</div><div><b>${word}</b><br><span class="muted">snowpack for ${new Date(N.date+"T12:00:00Z").toLocaleDateString([], {month:"short", day:"numeric", timeZone:"UTC"})}</span></div>` : `<div><b>Early season</b><br><span class="muted">Too little snow so far, here or in a normal year, for a fair % of normal. It shows once the snowpack builds.</span></div>`}</div>
-    <div class="fr se-fr"><div><b class="num">${N.depth!=null? fmtSnow(N.depth,0) : "—"}</b><small>On the ground</small></div><div><b class="num">${fmtSnow(Z.fallen,0)}</b><small>Measured since Oct 1</small></div><div><b class="num">${sw(N.swe)}</b><small>Snow water${N.med!=null? ` · normal ${sw(N.med)}` : ""}</small></div></div>
+    <div class="fr se-fr"><div><b class="num">${depth!=null? fmtSnow(depth,0) : "—"}</b><small>On the ground${depth!==N.depth? " · Bachelor snow plot" : ""}</small></div><div><b class="num">${fmtSnow(Z.fallen,0)}</b><small>Measured since Oct 1</small></div><div><b class="num">${sw(N.swe)}</b><small>Snow water${N.med!=null? ` · normal ${sw(N.med)}` : ""}</small></div></div>
     <svg viewBox="0 -4 ${W} ${H+4}" width="100%" height="120" preserveAspectRatio="none" class="se-ch"><defs><linearGradient id="seG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8" stop-opacity=".45"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs>
       ${area? `<path d="${area}" fill="url(#seG)"/>` : ""}<polyline points="${line(3)}" fill="none" stroke="#8b93a7" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/><polyline points="${line(1)}" fill="none" stroke="#7dd3fc" stroke-width="2.2" vector-effect="non-scaling-stroke"/></svg><div class="se-m">${months}</div>
     <div class="qleg" style="margin-top:4px"><span><i style="background:#7dd3fc"></i>This season</span><span><i style="background:#8b93a7"></i>Normal</span></div>
@@ -2218,7 +2222,7 @@ async function loadFlakes(loc){
   return S.flk[k];
 }
 function flakeType(lay, c, e){
-  if(!lay) return null; const cloud = lay.filter(x=>x.z > e - 200 && isNum(x.T) && isNum(x.RH) && x.RH >= 85); if(!cloud.length) return null;
+  if(!lay || (isNum(c?.Te) && c.Te > 0.5)) return null; const cloud = lay.filter(x=>x.z > e - 200 && isNum(x.T) && isNum(x.RH) && x.RH >= 85); if(!cloud.length) return null;
   if(windM(c) >= 60) return "broken";
   if(cloud.some(x=>x.T <= -12 && x.T >= -18)) return "dendrite";
   const warm = cloud.reduce((a,b)=>b.T > a.T? b : a, cloud[0]);
@@ -2484,8 +2488,7 @@ function renderMtn(){
   const risky = holds.filter(h=>h.p >= 0.35), top = holds[0], learnedN = S.liftwx?.days || 0;
   const tag = p => p >= 0.65? ["Likely hold", "hi"] : ["Possible hold", "md"];
   const preseason = !(extrasFor(S.loc).groom?.lifts||[]).some(l=>l.status==="open");
-  { const R = extrasFor(S.loc).report?.resort, od = R?.opening && new Date(`${R.opening} ${new Date().getFullYear()}`);
-    if(preseason && od && !isNaN(od) && new Date(d+"T12:00") < new Date(od.toDateString())){ el.innerHTML = ""; el.hidden = true; return; } el.hidden = false; }
+  if(closedOn(d)){ el.innerHTML = ""; el.hidden = true; return; } el.hidden = false;
   el.innerHTML = `<div class="card-h"><h2>${dayWord(d)} at Mt. Bachelor</h2>${preseason? `<span class="muted">Preview</span>` : ""}</div>
     <div class="mt-row"><div class="mt-k">Wind holds</div><div class="mt-v">
       ${risky.length? risky.slice(0,4).map(h=>{ const [t,c] = tag(h.p); return `<div class="wh"><b>${esc(h.n)}</b><span class="wh-t w-${c}">${t}</span><span class="muted">${h.when}</span></div>`; }).join("") + (risky.length>4? `<div class="muted" style="font-size:12px">+${risky.length-4} more lifts at risk</div>` : "")
@@ -3429,6 +3432,11 @@ function renderSyncBox(){
 function km(a1,o1,a2,o2){ const R=6371, r=Math.PI/180, dA=(a2-a1)*r, dO=(o2-o1)*r; const h=Math.sin(dA/2)**2+Math.cos(a1*r)*Math.cos(a2*r)*Math.sin(dO/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
 const provChip = (kind, when) => `<span class="pv pv-${kind}">${kind==="rep"? "Reported" : kind==="meas"? "Measured" : "Estimated"}</span>${when? `<span class="pv-t">${when}</span>`:""}`;
 
+// true when the resort hasn't opened yet for day d (no lift calls or crowd guesses for those days)
+function closedOn(d){ const R = extrasFor(S.loc)?.report?.resort; if(!R?.opening || R.status==="Open") return false;
+  if((extrasFor(S.loc).groom?.lifts||[]).some(l=>l.status==="open")) return false;
+  const od = new Date(`${R.opening} ${new Date().getFullYear()}`); if(isNaN(od)) return false; if(od < new Date(Date.now()-60*864e5)) od.setFullYear(od.getFullYear()+1);
+  return new Date(d+"T12:00") < new Date(od.toDateString()); }
 /* ---------- status pill: Open / Opening Dec 4 / Closed ---------- */
 function statusPill(rep){
   const R = rep?.resort; if(!R) return "";
