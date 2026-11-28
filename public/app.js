@@ -492,7 +492,7 @@ function render(){
       const [lvl, head] = wet? ["skip", `Skip it ${who.toLowerCase()}`] : gale? ["meh", `Windy ${who.toLowerCase()}`] : sc>=8? ["go", `Go! ${who} is epic`] : sc>=6.5? ["go", `Worth it ${who.toLowerCase()}`] : sc>=5? ["ok", `Good day ${who.toLowerCase()}`] : sc>=3.5? ["meh", `Fair ${who.toLowerCase()}`] : ["skip", `Skip it ${who.toLowerCase()}`];
       const why = wet? `rain at ${fmtEl(e)}` : gale? `gusts to ${fmtWind(gust)} ${windU()}, ${lab}` : `${lab}, best ${when}`;
       if(wet) callouts = callouts.filter(c => !c.includes('class="callout rain"'));   // the call already says rain
-      verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}</b><em>${why[0].toUpperCase()+why.slice(1)}</em></span><span class="v-sc" data-tip="quality" role="button" aria-label="What the ski score means">${scoreChip(sc)}</span></div><div id="ncStrip"></div></div>`; }
+      verdict = `<div class="verdict v-${lvl}"><div class="v-main"><i></i><span><b>${head}</b><em>${why[0].toUpperCase()+why.slice(1)}</em></span><span class="v-sc" data-tip="quality" role="button" aria-label="What the ski score means">${scoreChip(sc)}</span></div><div id="ncStrip"></div>${!isAlp()? `<div id="grLine"></div>` : ""}</div>`; }
   }
   if(verdict && bestK>=0 && days7[bestK]!==vDay){ const b = sums[bestK];
     verdict = verdict.replace(/<\/div>$/, `<div class="v-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 18.1 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg><span class="vs-t">Best this week: <b>${(l=>/\d/.test(l)? new Date(days7[bestK]+"T12:00").toLocaleDateString([], {weekday:"short"}) : l)(dayLabel(days7[bestK]))}</b> ${hl(b.best.from)}–${hl(b.best.to)}</span>${scoreChip(b.best.avg)}</div></div>`); bestK = -1; }
@@ -701,7 +701,8 @@ async function loadBachLive(L0){
 async function loadLiveStn(){
   const el = $("#rnLive"), L0 = S.loc, st = LIVE_STN[L0?.name]; if(!el || !st) return;
   if(L0?.name === "Mt. Bachelor, OR" && await loadBachLive(L0)) return;
-  if(/^Mt\. Bachelor/.test(L0?.name||"")) bachFeed().catch(()=>{});
+  const bf = /^Mt\. Bachelor/.test(L0?.name||"")? await bachFeed().catch(()=>null) : null;
+  const plot = bf?.j?.lifts?.find(x => x.name==="Snow plot" && x.hist?.length), PJ = bf?.j?.plot;
   try{
     let o = LIVE_C[st.id]; if(!o || Date.now() - o.at > 10*60e3){
       const j = await (await fetch(`https://api.weather.gov/stations/${st.id}/observations?limit=36`, {headers:{Accept:"application/geo+json"}})).json();
@@ -713,8 +714,11 @@ async function loadLiveStn(){
     const w = kmh(p.windSpeed), g = kmh(p.windGust);
     { const hk = new Intl.DateTimeFormat("sv-SE", {timeZone:"America/Los_Angeles", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", hourCycle:"h23"}), seen = new Set(), h = [];
       for(const q of o.ps || [p]){ const t = q.temperature?.value; if(!isNum(t) || !q.timestamp) continue; const k = hk.format(new Date(q.timestamp)).replace(" ", "T") + ":00"; if(seen.has(k)) continue; seen.add(k); h.push([k, t]); }
-      setLiveT(L0.name, [{ft: st.ft, h}]); renderTrend({label: st.name, ft: st.ft, hist: h}); }
-    $("#rnLive").innerHTML = `<div class="rn-live"><span class="np-live"></span><span><b>Measured ${fmtT(T)}</b>${isNum(w)? ` · wind ${fmtWind(w)}${isNum(g)? `, gusts ${fmtWind(g)}` : ""} ${windU()}` : ""}</span><small>${st.name} · ${st.ft.toLocaleString()} ft · ${age < 2? "just now" : Math.round(age) + " min ago"}</small></div>`;
+      // the snow plot sits in the Nordic Center's own parking lot (West Village), so it leads; Century Dr fills in wind
+      setLiveT(L0.name, [{ft: st.ft, h}, ...(plot? [{ft: PLOT_FT, h: plot.hist}] : [])]);
+      renderTrend(plot && plot.hist.length >= 6? {label: "West Village snow plot", ft: PLOT_FT, hist: plot.hist} : {label: st.name, ft: st.ft, hist: h}); }
+    const plotRow = plot && isNum(plot.tC)? `<div class="rn-live"><span class="np-live"></span><span><b>West Village ${fmtT(plot.tC)}</b>${isNum(PJ?.depthIn)? ` · ${fmtSnow(PJ.depthIn,0)} deep` : ""}${PJ?.new24 >= 1? ` · <b style="color:#7dd3fc">+${fmtSnow(PJ.new24,0)}</b> in 24 hr` : ""}</span><small>Snow plot by the Nordic lodge · ${PLOT_FT.toLocaleString()} ft</small></div>` : "";
+    $("#rnLive").innerHTML = plotRow + `<div class="rn-live"><span class="np-live"></span><span><b>${plotRow? "Century Dr " : "Measured "}${fmtT(T)}</b>${isNum(w)? ` · wind ${fmtWind(w)}${isNum(g)? `, gusts ${fmtWind(g)}` : ""} ${windU()}` : ""}</span><small>${st.name} · ${st.ft.toLocaleString()} ft · ${age < 2? "just now" : Math.round(age) + " min ago"}</small></div>`;
   }catch(e){}
 }
 function renderRightNow(C, SIM, e){
@@ -1234,7 +1238,8 @@ function crustCruise(C, SIM, d){
 function wax(sim, c){
   if(!sim || !c) return null;
   const T = c.Te, snowT = Math.min(T, 0), k = sim.key;
-  const glide = snowT <= -12 ? "Cold (−12°C & colder)" : snowT <= -5 ? "Mid-cold (−12 to −5°C)" : snowT <= -1 ? "Mid (−5 to −1°C)" : T <= 2 ? "Warm (−1 to +2°C)" : "Wet / very warm (+2°C & up)";
+  const wetSnow = ["slush","soft","corn","rain","damp"].includes(k);   // wet snow needs warm wax even if the air is a touch below freezing
+  const glide = wetSnow? (T > 2 || k==="slush" || k==="rain"? "Wet / very warm (+2°C & up)" : "Warm (−1 to +2°C)") : snowT <= -12 ? "Cold (−12°C & colder)" : snowT <= -5 ? "Mid-cold (−12 to −5°C)" : snowT <= -1 ? "Mid (−5 to −1°C)" : T <= 2 ? "Warm (−1 to +2°C)" : "Wet / very warm (+2°C & up)";
   const structure = (T > 0 || ["slush","soft","corn","rain"].includes(k)) ? "coarse structure" : snowT < -10 ? "fine structure" : "medium structure";
   let kick;
   if(k==="rain") kick = "Wet klister, or skin skis";
@@ -2621,7 +2626,15 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-tip]
   const f = TIPS[b.dataset.tip]; if(!f) return; const [h, body] = f(); $("#tipTitle").textContent = h; $("#tipBox").innerHTML = body; openSheet("tipSheet"); }, true);
 /* ================= Grooming, avalanche observations, snow stake time-lapse ================= */
 const GROOM_SPOTS = ["Mt. Bachelor, OR", "Mt. Bachelor Nordic Center, OR", "Meissner Nordic (Bend), OR", "Elk Lake Resort (Nordic), OR", "Methow Valley Trails, WA", "Birkie Trail (Cable, WI)", "Mt. Spokane, WA"];
+// Nordic: grooming one tap from the top. Bachelor's own trail count when it's posted; Nordic Pulse's live map always.
+function renderGrLine(){ const el = $("#grLine"); if(!el || !S.loc || isAlp()) return;
+  const np = NP_PAGES[S.loc.name], D = extrasFor(S.loc).groom?.nordic;
+  const txt = D?.groomed? `<b>${D.groomed} of ${D.total} groomed</b>${D.latest? ` · ${ago(D.latest)}` : ""}` : np? `<b>Live grooming map</b>` : "";
+  if(!txt){ el.innerHTML = ""; return; }
+  el.innerHTML = `<button class="v-sub gr-l" type="button"><span>🚜</span><span class="vs-t">${txt}</span><span class="gr-np">${np? "Nordic Pulse ›" : "›"}</span></button>`;
+  el.querySelector("button").onclick = () => np? npOpen(np) : $("#groomCard")?.scrollIntoView({behavior:"smooth", block:"start"}); }
 function renderGroom(){
+  renderGrLine();
   const card = $("#groomCard"); if(!card || !S.loc) return; const G = extrasFor(S.loc).groom;
   if(S.loc.name==="Meissner Nordic (Bend), OR"){ card.hidden = false;
     card.innerHTML = `<div class="card-h"><h2>Grooming</h2><span class="muted">${mxGroomLine()}</span></div>${npEmbed(S.loc.name)}`; wireNP(card); return; }
@@ -2641,10 +2654,10 @@ function renderGroom(){
   const npHere = nordic && NP_PAGES[S.loc.name];
   // Before opening day: one clear line instead of "0 of 12 lifts" and a list of closed lifts.
   const pill = statusPill(extrasFor(S.loc).report), opens = pill.match(/Opening ([^<]+)/)?.[1];
-  const shut = !nordic && opens && !(G.lifts||[]).some(l=>l.status==="open");
-  const head2 = shut? `<p class="gr-pre"><b>🗓️ Opens ${esc(opens)}</b><span>Lifts and grooming show here once it's running.</span></p>` : head;
+  const shut = opens && !(G.lifts||[]).some(l=>l.status==="open");
+  const head2 = shut? `<p class="gr-pre"><b>🗓️ Opens ${esc(opens)}</b><span>${nordic? "Trail grooming shows here once the Nordic Center is running." : "Lifts and grooming show here once it's running."}</span></p>` : head;
   card.innerHTML = `<div class="card-h"><h2>${nordic? "Grooming · Nordic" : "Grooming & resort report"}</h2><a class="muted" href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor ↗</a></div>
-    ${npHere? npEmbed(S.loc.name) + `<div class="grp">From Mt. Bachelor</div>` : ""}${npHere && D.preseason? "" : head2}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
+    ${npHere? npEmbed(S.loc.name) + `<div class="grp">From Mt. Bachelor</div>` : ""}${npHere && D.preseason && !shut? "" : head2}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
     ${!nordic && !shut? liftsHTML(G.lifts) : ""}
     ${D.trails?.length? `<details class="nb" style="margin-top:8px"><summary>See groomed ${nordic? "trails" : "runs"}</summary><div class="list">${D.trails.map(x=>`<div class="li" style="min-height:38px"><span class="nm"><b>${esc(x.name)}</b><small>${esc((x.groom||"").replace(/ And /g," & "))}${x.updated? " · "+ago(x.updated) : ""}</small></span></div>`).join("")}</div></details>` : ""}
     ${R? `<div class="grp">Resort snow report</div><div class="fr"><div><b class="num">${R.overnight ?? "—"}″</b><small>Overnight</small></div><div><b class="num">${R.h24 ?? "—"}″</b><small>24 hours</small></div><div><b class="num">${R.base ?? "—"}″</b><small>Base</small></div></div>
@@ -3004,7 +3017,7 @@ const OREGON = n => /,\s*OR\)?$/.test(n) || /\(.*,\s*OR\)/.test(n);
 function openingOutlook(){
   if(isAlp() || !S.ctx) return null;
   const L0 = S.loc, cfg = NORDIC_SPOTS[L0.name] || (/Nordic|Trails|XC|Sno-?Park/i.test(L0.name)? {thr:12, label:"Trail grooming"} : null);
-  const ob = nearObs(); if(!cfg || !ob || !isNum(ob.depth)) return null;
+  const PO = plotObs(), ob = PO && isNum(PO.depth)? {...PO, name: "Bachelor's snow plot"} : nearObs(); if(!cfg || !ob || !isNum(ob.depth)) return null;
   const C2 = S.ctx.Cbase || (S.ctx.Cbase = computeAt(L0.base/FT));
   let depth = ob.depth; const proj = [depth]; let hit = depth >= cfg.thr ? 0 : null;
   for(let k=0;k<Math.min(15,C2.days.length);k++){
@@ -3015,14 +3028,16 @@ function openingOutlook(){
   return { cfg, ob, now: ob.depth, proj, hit, date: hit!=null && hit>0 ? C2.days[hit-1] : null, need: Math.max(0, cfg.thr - ob.depth) };
 }
 function renderOpening(){
-  const el = $("#openCard"); if(!el) return; const o = openingOutlook(); if(!o || (o.hit===0 && o.now >= o.cfg.thr*1.6)){ el.remove(); return; }
+  const el = $("#openCard"); if(!el) return;
+  if(extrasFor(S.loc).report?.resort?.opening && S.loc.name==="Mt. Bachelor Nordic Center, OR"){ el.remove(); return; }   // the resort has posted its own date (shown with grooming); don't second-guess it
+  const o = openingOutlook(); if(!o || (o.hit===0 && o.now >= o.cfg.thr*1.6)){ el.remove(); return; }
   const W=300,H=70, mx=Math.max(o.cfg.thr*1.3, ...o.proj); const x=i=>i*W/(o.proj.length-1), y=v=>H-6-(v/mx)*(H-12);
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}"><line x1="0" x2="${W}" y1="${y(o.cfg.thr)}" y2="${y(o.cfg.thr)}" stroke="#6ee7a0" stroke-dasharray="5 4"/><text x="${W-2}" y="${y(o.cfg.thr)-4}" fill="#6ee7a0" font-size="10" text-anchor="end">groomable ~${fmtSnow(o.cfg.thr,0)}</text><polyline fill="none" stroke="#5aa2ff" stroke-width="2.5" points="${o.proj.map((v,i)=>`${x(i)},${y(v)}`).join(" ")}"/>${o.hit? `<circle cx="${x(o.hit)}" cy="${y(o.proj[o.hit])}" r="4" fill="#6ee7a0"/>`:""}</svg>`;
   const headline = o.hit===0 ? `Deep enough to groom` : o.hit? `~${dow(o.date)} ${md(o.date)}` : `Not in the next 2 weeks`;
   const sub = o.hit===0 ? `${fmtSnow(o.now,0)} on the ground, above the ~${fmtSnow(o.cfg.thr,0)} groomers usually need.` : o.hit? `Projected depth reaches ~${fmtSnow(o.cfg.thr,0)}, enough for grooming, in about ${o.hit} day${o.hit>1?"s":""}.` : `Needs about ${fmtSnow(o.need,0)} more settled snow; the forecast doesn't get there yet.`;
   el.innerHTML = `<div class="card-h"><h2>Trail opening outlook</h2><span class="muted">${o.cfg.label}</span></div>
     <div class="num" style="font-size:30px;color:${o.hit===0?"#6ee7a0":o.hit?"var(--ice)":"var(--mute)"}">${headline}</div><div class="muted" style="margin:2px 0 8px">${sub}</div>${svg}
-    <div class="muted" style="margin-top:6px">Rule of thumb, not an official opening date. Uses ${o.ob.name} SNOTEL (${Math.round(o.ob.elevFt).toLocaleString()} ft) plus the forecast at the trailhead, with settling and melt.</div>`;
+    <div class="muted" style="margin-top:6px">${(R=>R?.opening && closedOn(todayStr())? `<b>Official opening: ${esc(R.opening.replace(/ 0(\d)/," $1"))}.</b> ` : "")(extrasFor(S.loc).report?.resort)}Rule of thumb for when there's enough snow to groom. Uses ${o.ob.name}${/snow plot/.test(o.ob.name)? "" : " SNOTEL"} (${Math.round(o.ob.elevFt).toLocaleString()} ft) plus the forecast at the trailhead, with settling and melt.</div>`;
 }
 
 /* ---------- After-work planner + cold exposure ---------- */
