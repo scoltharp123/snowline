@@ -612,12 +612,28 @@ function renderSection(id){
 /* ---------- Right Now ---------- */
 const LIVE_STN = { "Mt. Bachelor, OR": {id:"MOONM", name:"Moon Mountain", ft:7450}, "Mt. Bachelor Nordic Center, OR": {id:"OD131", name:"Century Dr", ft:6424} };
 const LIVE_C = {};
+// Calibrate Right Now's temperature to what the mountain is measuring this hour.
+// Each station is compared with Snowline's forecast at that station's own elevation; the average difference shifts Right Now.
+const BACH_FT = {"Northwest":8060, "Pine Marten":7730, "Cloudchaser":7500, "Sunrise":7250, "Snow plot":6400};   // station heights (lift tops; snow plot near West Village)
+function calibrateNow(pts, label){ try{
+  const C = S.ctx?.C; if(!C) return; const ok = pts.filter(p => isNum(p.tC) && isNum(p.ft)); if(!ok.length) return;
+  const d = ok.map(p => p.tC - cAt(p.ft).cons[C.nowIdx]?.Te).filter(isNum); if(!d.length) return;
+  const bias = Math.max(-8, Math.min(8, d.reduce((a,b)=>a+b,0)/d.length));
+  S.nowCal = Math.abs(bias) < 0.6? null : {loc: S.loc?.name, C, bias, label}; applyCal();   // under ~1°F: leave the forecast alone
+}catch(e){} }
+function applyCal(){ const k0 = S.nowCal; if(!k0 || k0.loc !== S.loc?.name || k0.C !== S.ctx?.C) return; const b = k0.bias;
+  const t = $("#nowCard .rn-t"), f = $("#nowCard .rn-fl"), cal = $("#nowCard .rn-cal");
+  if(t && isNum(+t.dataset.c)) t.firstChild.textContent = fmtT(+t.dataset.c + b);
+  if(f && isNum(+f.dataset.c)) f.textContent = fmtT(+f.dataset.c + b);
+  if(cal){ cal.textContent = "✓ Live-matched"; cal.title = `Adjusted to ${k0.label}`; }
+  document.querySelectorAll(".hc-v[data-k]").forEach(h => { const k = +h.dataset.k; if(k >= 0 && k < 6) h.textContent = fmtT(+h.dataset.c + b*(1 - k/6)); });   // fades out over 6 hours
+}
 async function loadBachLive(L0){
   try{
     let o = LIVE_C.bach; if(!o || Date.now() - o.at > 5*60e3) o = LIVE_C.bach = {at: Date.now(), j: await api("/bachlive")};
     const now = Date.now(), L = (o.j?.lifts || []).filter(x => isNum(x.tC) && !(x.at && now - new Date(x.at) > 3*3600e3));
     if(L.length < 2 || S.loc !== L0 || !$("#rnLive")) return false;
-    const P = o.j?.plot;
+    const P = o.j?.plot; calibrateNow(L.map(x => ({tC: x.tC, ft: BACH_FT[x.name]})), "live mountain readings");
     const t0 = L.map(x => x.at && new Date(x.at)).filter(d => d && !isNaN(d)).sort((a,b)=>b-a)[0];
     $("#rnLive").innerHTML = `<div class="lv"><div class="lv-h"><span class="np-live"></span><b>Live on the mountain</b><small>${t0? "as of " + t0.toLocaleTimeString([], {hour:"numeric", minute: t0.getMinutes()? "2-digit" : undefined}) : "Mt. Bachelor"}</small></div>
       ${L.map(x => { const big = isNum(x.g) && x.g >= 64; return `<div class="lv-r${big? " lv-hot" : ""}"><span>${esc(x.name)}${isNum(x.depthIn) && P && P.new24 >= 1? ` <small>${fmtSnow(x.depthIn, 0)} deep</small>` : ""}</span><b class="num">${fmtT(x.tC)}</b><span class="num">${isNum(x.depthIn) && !isNum(x.w)? (P && P.new24 >= 1? `+${fmtSnow(P.new24, 0)} <small>in 24 hr</small>` : `${fmtSnow(x.depthIn, 0)} <small>deep</small>`) : isNum(x.w)? `${isNum(x.dir)? `<i class="arr" style="transform:rotate(${x.dir+180}deg)">↑</i>` : ""}${fmtWind(x.w)}${isNum(x.g)? `<small> g${fmtWind(x.g)}</small>` : ""} <small>${windU()}</small>` : "—"}</span></div>`; }).join("")}
@@ -637,6 +653,7 @@ async function loadLiveStn(){
     if(!isNum(T) || !(age < 120)) return;
     const kmh = v => !v || !isNum(v.value)? null : /m_s/.test(v.unitCode||"")? v.value*3.6 : v.value;   // NWS sends km/h or m/s
     const w = kmh(p.windSpeed), g = kmh(p.windGust);
+    calibrateNow([{tC: T, ft: st.ft}], `the ${st.name} station`);
     $("#rnLive").innerHTML = `<div class="rn-live"><span class="np-live"></span><span><b>Measured ${fmtT(T)}</b>${isNum(w)? ` · wind ${fmtWind(w)}${isNum(g)? `, gusts ${fmtWind(g)}` : ""} ${windU()}` : ""}</span><small>${st.name} · ${st.ft.toLocaleString()} ft · ${age < 2? "just now" : Math.round(age) + " min ago"}</small></div>`;
   }catch(e){}
 }
@@ -647,7 +664,7 @@ function renderRightNow(C, SIM, e){
   const lh = liftHold(c.RW, c.G); const W = !isAlp() ? wax(now, c) : null;
   el.innerHTML = `<div class="card-h" style="margin-bottom:8px"><h2>Right Now</h2><span class="muted">${fmtEl(e)}</span></div>
     <div class="rn">
-      <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like ${fmtT(now.feels)}</div></div></div>
+      <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num" data-c="${c.Te}">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like <span class="rn-fl" data-c="${now.feels}">${fmtT(now.feels)}</span></div><div class="rn-cal"></div></div></div>
       <div class="rn-b"><div class="rn-w num"><span class="arr" style="transform:rotate(${(c.WD||0)+180}deg)">↑</span>${fmtWind(c.W)} <small>${windU()}</small></div><div class="muted">${compass(c.WD)} gusts to ${fmtWind(c.G)}${S.mode==="alpine" && isBach() && isNum(c.RW)? ` · ridge ${fmtWind(c.RW)}` : ""}</div></div>
     </div>
     <div class="surf-row"><span class="ic">${now.icon}</span><div style="flex:1;min-width:0"><b>${now.label}</b><div class="muted">${descOf(now)}</div></div><div style="text-align:right"><div class="num" style="font-size:26px;color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</div><div class="muted">${MODE_NAME[S.mode]}</div></div></div>
@@ -672,11 +689,11 @@ function renderHourStrip(C, SIM){
     const pp = C.pop.get(t); const pc = pp && pp[1] ? Math.round(100*pp[0]/pp[1]) : null; const ty = ptype(c);
     h += `<div class="hc"><div class="hc-t">${i===C.nowIdx?"Now":hl(hr).replace("a","am").replace("p","pm")}</div><div class="hc-d">${i===C.nowIdx || hr===0? dow(t.slice(0,10)) : "&nbsp;"}</div>
       <div class="hc-p" style="border-color:${pc==null? "transparent" : pc>=20?PT[ty==="none"?"snow":ty]:"#2a2a2e"};color:${pc>=20?PT[ty==="none"?"snow":ty]:"var(--mute)"}">${pc==null? "&nbsp;" : pc+"%"}</div>
-      <div class="hc-i" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${wxIcon(c, hr, 24)}</div><div class="hc-v">${fmtT(c.Te)}</div>
+      <div class="hc-i" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${wxIcon(c, hr, 24)}</div><div class="hc-v" data-c="${c.Te}" data-k="${i-C.nowIdx}">${fmtT(c.Te)}</div>
       ${c.snow>=0.05? `<div class="hc-s">${fmtSnow(c.snow,1)}</div>`:`<div class="hc-s muted">&nbsp;</div>`}
       <div class="hc-w">${compass(c.WD)}${fmtWind(c.W)}</div></div>`;
   }
-  $("#hourStrip").innerHTML = h;
+  $("#hourStrip").innerHTML = h; applyCal();
 }
 
 /* ---------- Daily list (day / night) ---------- */
