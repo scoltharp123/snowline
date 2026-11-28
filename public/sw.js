@@ -1,5 +1,5 @@
 // Snowline service worker: offline app + saved forecasts, and push notifications
-const V = "snowline-v75";
+const V = "snowline-v76";
 const TRAILMAPS = "sl-trailmaps";   // official trail maps the user chose to download; kept across app updates
 const SHELL = ["/", "/index.html", "/app.js?v=__APPV__", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
 const WEATHER = /(^|\.)open-meteo\.com$/;

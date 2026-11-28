@@ -516,7 +516,7 @@ function render(){
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
       return old? `<span class="muted upd-at old">No signal · saved ${t2}</span>` : `<span class="muted upd-at">Updated ${t2}</span>`; })()}</div>
-    ${(()=>{ const ob0 = nearObs(), ob = ob0 && (!isNum(ob0.elevFt) || Math.abs(ob0.elevFt - e*FT) <= 1500)? ob0 : null; return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {past: pastDaysSnow(C), labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
+    ${(()=>{ const ob0 = plotObs() || nearObs(), ob = ob0 && (!isNum(ob0.elevFt) || Math.abs(ob0.elevFt - e*FT) <= 1500)? ob0 : null; return snowSummaryHTML(ob && isNum(ob.new24)? ob.new24 : C.past24, C.consDays.map(d=>d.n? d.day+d.night : null), C.days, {past: pastDaysSnow(C), labels:true, q:quality, measured: ob && isNum(ob.new24)? ob.name : null}); })()}
     <div class="qleg" style="margin:8px 14px 0"><button class="qinfo" data-tip="quality" aria-label="What ski quality means">Ski quality <span>ⓘ</span></button><span><i style="background:#a78bfa"></i>Epic</span><span><i style="background:#38bdf8"></i>Great</span><span><i style="background:#86efac"></i>Good</span><span><i style="background:#fde68a"></i>Fair</span><span><i style="background:#fca5a5"></i>Poor</span></div>
     ${glance}
     ${D.ensPending? "" : agreeHTML(C, N, winTot, conf)}
@@ -654,11 +654,11 @@ function renderTrend(st){ try{
   const head = tNow > 0.3? (fz? `Below freezing by ${clock(fz[0])}${wetBefore && wetAfter? ". Rain turns to snow." : wetAfter? ". Snow on the way." : "."}` : `Stays above freezing${fut.some(x=>x[2].P>0.1)? ", so rain, not snow, here" : ""}.`)
                          : (fz? `Above freezing by ${clock(fz[0])}.` : `Staying below freezing${fut.some(x=>x[2].P>0.1)? ": snow, not rain" : ""}.`);
   // drawing
-  const W = 330, H = 118, padL = 30, padR = 6, top = 10, bot = 22, x0 = now - 24, x1 = now + 18;
+  const W = 330, H = 126, padL = 30, padR = 6, top = 10, bot = 30, x0 = now - 24, x1 = now + 18;
   const yl = Math.min(lo, -1) - 1, yh = Math.max(hi, 1) + 1, X = i => padL + (i - x0) / (x1 - x0) * (W - padL - padR), Y = t => top + (yh - t) / (yh - yl) * (H - top - bot);
   const path = pts => pts.map(([i,t], k) => `${k? "L" : "M"}${X(i).toFixed(1)},${Y(t).toFixed(1)}`).join("");
   const futPts = [[meas.at(-1)[0], meas.at(-1)[1]], ...fut.filter(x=>x[0] > meas.at(-1)[0]).map(x=>[x[0], x[1]])];
-  const bars = fut.filter(x => x[2].P > 0.05).map(([i,,c]) => { const snow = (c.frac ?? 1) >= 0.5; return `<rect x="${(X(i)-2.5).toFixed(1)}" y="${H-bot+4}" width="5" height="${Math.min(10, 3 + c.P*6).toFixed(1)}" rx="1.5" fill="${snow? "#60a5fa" : "#4ade80"}"/>`; }).join("");
+  const bars = fut.filter(x => x[2].P > 0.05).map(([i,,c]) => { const snow = (c.frac ?? 1) >= 0.5; return `<rect x="${(X(i)-2.5).toFixed(1)}" y="${H-bot+3}" width="5" height="${Math.min(8, 3 + c.P*5).toFixed(1)}" rx="1.5" fill="${snow? "#60a5fa" : "#4ade80"}"/>`; }).join("");
   const yTicks = [...new Set([0, Math.round(yl+1), Math.round(yh-1)])].filter(t => t >= yl && t <= yh && (t===0 || Math.abs(t) >= 2)).map(t => `<text x="${padL-5}" y="${(Y(t)+3.5).toFixed(1)}" text-anchor="end" class="tr-ax">${fmtT(t)}</text>`).join("");
   const xT = [[now-24, "−24h"], [now-12, "−12h"], [now, "Now"], [now+12, "+12h"]].map(([i,l]) => `<text x="${X(i).toFixed(1)}" y="${H-3}" text-anchor="middle" class="tr-ax${i===now? " tr-now" : ""}">${l}</text>`).join("");
   el.innerHTML = `<div class="tr"><div class="tr-h"><b>${head}</b><small>${esc(st.label)} · ${st.ft.toLocaleString()} ft</small></div>
@@ -672,9 +672,17 @@ function renderTrend(st){ try{
       ${yTicks}${xT}${bars}</svg>
     <div class="tr-leg"><span><i class="tr-l"></i>Measured</span><span><i class="tr-l tr-d"></i>Forecast</span><span><i class="tr-b" style="background:#60a5fa"></i>Snow</span><span><i class="tr-b" style="background:#4ade80"></i>Rain</span></div></div>`;
 }catch(e){} }
+// Bachelor's snow plot (hourly depth sensor near West Village), shared by Mt. Bachelor and Bachelor Nordic.
+const PLOT_FT = 6400;
+function plotObs(){ const j = LIVE_C.bach?.j, P = j?.plot; if(!P || !/^Mt\. Bachelor/.test(S.loc?.name||"")) return null;
+  return {name: "Bachelor's snow plot", new24: P.new24, new3: P.new3, depth: P.depthIn, elevFt: PLOT_FT, tC: (j.lifts||[]).find(x=>x.name==="Snow plot")?.tC}; }
+async function bachFeed(){ let o = LIVE_C.bach; if(o && Date.now() - o.at < 5*60e3) return o;
+  o = LIVE_C.bach = {at: Date.now(), j: await api("/bachlive")};
+  if(o.j?.plot && /^Mt\. Bachelor/.test(S.loc?.name||"")) render();          // first reading: redraw with the measured numbers
+  return o; }
 async function loadBachLive(L0){
   try{
-    let o = LIVE_C.bach; if(!o || Date.now() - o.at > 5*60e3) o = LIVE_C.bach = {at: Date.now(), j: await api("/bachlive")};
+    const o = await bachFeed();
     const now = Date.now(), L = (o.j?.lifts || []).filter(x => isNum(x.tC) && !(x.at && now - new Date(x.at) > 3*3600e3));
     if(L.length < 2 || S.loc !== L0 || !$("#rnLive")) return false;
     const P = o.j?.plot; setLiveT(L0.name, L.map(x => ({ft: BACH_FT[x.name], h: x.hist?.length? x.hist : []})));
@@ -691,6 +699,7 @@ async function loadBachLive(L0){
 async function loadLiveStn(){
   const el = $("#rnLive"), L0 = S.loc, st = LIVE_STN[L0?.name]; if(!el || !st) return;
   if(L0?.name === "Mt. Bachelor, OR" && await loadBachLive(L0)) return;
+  if(/^Mt\. Bachelor/.test(L0?.name||"")) bachFeed().catch(()=>{});
   try{
     let o = LIVE_C[st.id]; if(!o || Date.now() - o.at > 10*60e3){
       const j = await (await fetch(`https://api.weather.gov/stations/${st.id}/observations?limit=36`, {headers:{Accept:"application/geo+json"}})).json();
@@ -1827,11 +1836,18 @@ function renderReport(){
   const el = $("#reportCard"); if(!el) return;
   const X = S.extras[S.loc.name] || {}; const st = X.obs?.stations || []; const rep = X.report || {};
   const blocks = [];
-  if(st.length){
+  const PO = plotObs();
+  if(PO){ blocks.push(`<div class="rep"><div class="rep-h"><b>Snow plot · Mt. Bachelor</b>${provChip("meas")}</div><div class="muted" style="margin:-4px 0 8px">Bachelor's own depth sensor · about ${PLOT_FT.toLocaleString()} ft · hourly</div>
+      <div class="kv k3">
+        <div><div class="l">New 24h</div><div class="v num">${isNum(PO.new24)? fmtSnow(PO.new24) : "—"}</div></div>
+        <div><div class="l">Last 3h</div><div class="v num">${isNum(PO.new3)? fmtSnow(PO.new3) : "—"}</div></div>
+        <div><div class="l">Snow depth</div><div class="v num">${isNum(PO.depth)? fmtSnow(PO.depth,0) : "—"}</div></div>
+      </div>${st.length? nearbyStationsHTML(st) : ""}</div>`); }
+  else if(st.length){
     const s = st[0], mi = Math.round(s.km*0.621*10)/10;
     const dens = s.density ? `${s.density}% water · ${s.density<8?"light, dry":s.density<12?"average":"dense, wet"}` : "—";
     const hist = (s.hist||[]).filter(h=>isNum(h.depth));
-    const spark = hist.length>2 ? (()=>{ const mx=Math.max(...hist.map(h=>h.depth),1), mn=Math.min(...hist.map(h=>h.depth)); const W=120,H=28; return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="#5aa2ff" stroke-width="2" points="${hist.map((h,i)=>`${i*W/(hist.length-1)},${H-2-(h.depth-mn)/Math.max(1,mx-mn)*(H-6)}`).join(" ")}"/></svg>`; })() : "";
+    const spark = hist.length>2 && Math.max(...hist.map(h=>h.depth)) >= 1 ? (()=>{ const mx=Math.max(...hist.map(h=>h.depth),1), mn=Math.min(...hist.map(h=>h.depth)); const W=120,H=28; return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="#5aa2ff" stroke-width="2" points="${hist.map((h,i)=>`${i*W/(hist.length-1)},${H-2-(h.depth-mn)/Math.max(1,mx-mn)*(H-6)}`).join(" ")}"/></svg>`; })() : "";
     blocks.push(`<div class="rep"><div class="rep-h"><b>Live snow</b>${provChip("meas")}</div><div class="muted" style="margin:-4px 0 8px">SNOTEL · ${s.name} · ${mi} mi · ${Math.round(s.elevFt).toLocaleString()} ft</div>
       <div class="kv k3">
         <div><div class="l">New 24h</div><div class="v num">${isNum(s.new24)? fmtSnow(s.new24) : "—"}</div></div>
@@ -2468,6 +2484,8 @@ function renderMtn(){
   const risky = holds.filter(h=>h.p >= 0.35), top = holds[0], learnedN = S.liftwx?.days || 0;
   const tag = p => p >= 0.65? ["Likely hold", "hi"] : ["Possible hold", "md"];
   const preseason = !(extrasFor(S.loc).groom?.lifts||[]).some(l=>l.status==="open");
+  { const R = extrasFor(S.loc).report?.resort, od = R?.opening && new Date(`${R.opening} ${new Date().getFullYear()}`);
+    if(preseason && od && !isNaN(od) && new Date(d+"T12:00") < new Date(od.toDateString())){ el.innerHTML = ""; el.hidden = true; return; } el.hidden = false; }
   el.innerHTML = `<div class="card-h"><h2>${dayWord(d)} at Mt. Bachelor</h2>${preseason? `<span class="muted">Preview</span>` : ""}</div>
     <div class="mt-row"><div class="mt-k">Wind holds</div><div class="mt-v">
       ${risky.length? risky.slice(0,4).map(h=>{ const [t,c] = tag(h.p); return `<div class="wh"><b>${esc(h.n)}</b><span class="wh-t w-${c}">${t}</span><span class="muted">${h.when}</span></div>`; }).join("") + (risky.length>4? `<div class="muted" style="font-size:12px">+${risky.length-4} more lifts at risk</div>` : "")
@@ -2621,7 +2639,7 @@ function renderGroom(){
   // Before opening day: one clear line instead of "0 of 12 lifts" and a list of closed lifts.
   const pill = statusPill(extrasFor(S.loc).report), opens = pill.match(/Opening ([^<]+)/)?.[1];
   const shut = !nordic && opens && !(G.lifts||[]).some(l=>l.status==="open");
-  const head2 = shut? `<p class="gr-pre">🗓️ <b>Opens ${esc(opens)}</b><span>Lifts and grooming show here once it's running.</span></p>` : head;
+  const head2 = shut? `<p class="gr-pre"><b>🗓️ Opens ${esc(opens)}</b><span>Lifts and grooming show here once it's running.</span></p>` : head;
   card.innerHTML = `<div class="card-h"><h2>${nordic? "Grooming · Nordic" : "Grooming & resort report"}</h2><a class="muted" href="${G.link}" target="_blank" rel="noopener">Mt. Bachelor ↗</a></div>
     ${npHere? npEmbed(S.loc.name) + `<div class="grp">From Mt. Bachelor</div>` : ""}${npHere && D.preseason? "" : head2}${kinds? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${kinds}</div>` : ""}
     ${!nordic && !shut? liftsHTML(G.lifts) : ""}
@@ -3529,7 +3547,7 @@ function snowLegendHTML(){ const st = [1,3,6,12,24]; return `<div class="mm-leg"
 
 /* ---------- nearby stations (Snow Report) ---------- */
 function stationChartSVG(s){
-  const H = (s.hourly||[]).filter(x=>isNum(x.d)); if(H.length<6) return "";
+  const H = (s.hourly||[]).filter(x=>isNum(x.d)); if(H.length<6 || Math.max(...H.map(x=>x.d)) < 1) return "";   // no snow on the ground: nothing to chart
   const W=300, Ht=56; const mn=Math.min(...H.map(x=>x.d)), mx=Math.max(...H.map(x=>x.d), mn+2);
   const gains = H.map((x,i)=> i? Math.max(0, x.d-H[i-1].d) : 0); const gMax=Math.max(1,...gains);
   const bw = W/H.length;
