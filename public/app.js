@@ -694,7 +694,7 @@ async function loadLiveStn(){
   try{
     let o = LIVE_C[st.id]; if(!o || Date.now() - o.at > 10*60e3){
       const j = await (await fetch(`https://api.weather.gov/stations/${st.id}/observations?limit=36`, {headers:{Accept:"application/geo+json"}})).json();
-      const ps = (j.features || []).map(f => f.properties).filter(Boolean);
+      const ps = (j.features || (j.properties? [{properties: j.properties}] : [])).map(f => f.properties).filter(Boolean);
       o = LIVE_C[st.id] = {at: Date.now(), p: ps[0] || {}, ps}; }
     if(S.loc !== L0 || !$("#rnLive")) return; const p = o.p, age = (Date.now() - new Date(p.timestamp)) / 60e3, T = p.temperature?.value;
     if(!isNum(T) || !(age < 120)) return;
