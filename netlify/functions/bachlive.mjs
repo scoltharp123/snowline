@@ -37,7 +37,10 @@ export default async (req) => {
       const hit = ORDER.findIndex(([re]) => new RegExp(re, "i").test(lab) || new RegExp(re, "i").test(key));
       const name = hit >= 0 ? ORDER[hit][1] : lab.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
       if (seen.has(name)) continue; const x = reading(first); if (!x || x.tC == null || !x.at || Date.now() - x.at > 3 * 3600e3) continue;   // skip stale or broken stations
-      seen.add(name); lifts.push({ name, rank: hit < 0 ? 99 : hit, ...x });
+      // last 24 hours of temperature, keyed by Bachelor's local clock hour (the same keys Snowline's forecast uses)
+      const hist = (Array.isArray(v) ? v : []).map(r => { const t = parseFloat(r?.temperature), k = String(r?.timestamp || "").slice(0, 13);
+        return /^\d{4}-\d\d-\d\dT\d\d$/.test(k) && Number.isFinite(t) && t > -40 && t < 80 ? [k + ":00", Math.round((t - 32) * 50 / 9) / 10] : null; }).filter(Boolean).slice(0, 24);
+      seen.add(name); lifts.push({ name, rank: hit < 0 ? 99 : hit, ...x, hist });
     }
     lifts.sort((a, b) => a.rank - b.rank);
     return json({ lifts, plot, at: Date.now(), link: "https://www.mtbachelor.com/the-mountain/live-24-hour-weather/" }, { cache: 300 });

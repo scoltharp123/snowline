@@ -453,7 +453,7 @@ function render(){
   if(!S.data) return;
   if(!render.warmed){ render.warmed = true; warmLibs(); }
   destroyCharts(); updateTop();
-  const e = bandElev(), C = computeAt(e), SIM = simulate(C), D = S.data;
+  const e = bandElev(), C = liveAdj(computeAt(e), S.loc?.name), SIM = simulate(C), D = S.data;
   S.ctx = {C, SIM, e}; S.ctx.SIMN = simulate(C, 0); S.ctx.SIMS = simulate(C, 180);
   const consDaily = C.consDays.map(d=>d.day+d.night);
   const N = 5, winTot = windowTotal(consDaily, N);
@@ -612,28 +612,35 @@ function renderSection(id){
 /* ---------- Right Now ---------- */
 const LIVE_STN = { "Mt. Bachelor, OR": {id:"MOONM", name:"Moon Mountain", ft:7450}, "Mt. Bachelor Nordic Center, OR": {id:"OD131", name:"Century Dr", ft:6424} };
 const LIVE_C = {};
-// Calibrate Right Now's temperature to what the mountain is measuring this hour.
-// Each station is compared with Snowline's forecast at that station's own elevation; the average difference shifts Right Now.
+// Live temperatures feed the forecast itself. Each station's readings are compared with Snowline's forecast at that
+// station's own height, hour by hour; the difference corrects Snowline's temperatures for those hours (fading out over
+// the next 6). Everything downstream (Right Now, the hourly strip, and the snow surface model: melt, refreeze, corn,
+// wet snow) then works from what the mountain actually did, not only what the models expected.
 const BACH_FT = {"Northwest":8060, "Pine Marten":7730, "Cloudchaser":7500, "Sunrise":7250, "Snow plot":6400};   // station heights (lift tops; snow plot near West Village)
-function calibrateNow(pts, label){ try{
-  const C = S.ctx?.C; if(!C) return; const ok = pts.filter(p => isNum(p.tC) && isNum(p.ft)); if(!ok.length) return;
-  const d = ok.map(p => p.tC - cAt(p.ft).cons[C.nowIdx]?.Te).filter(isNum); if(!d.length) return;
-  const bias = Math.max(-8, Math.min(8, d.reduce((a,b)=>a+b,0)/d.length));
-  S.nowCal = Math.abs(bias) < 0.6? null : {loc: S.loc?.name, C, bias, label}; applyCal();   // under ~1°F: leave the forecast alone
+S.liveT = {};
+function setLiveT(name, pts){ try{
+  const C = S.ctx?.C; if(!C || S.loc?.name !== name) return; const ix = idxOf(C), acc = {};
+  for(const p of pts){ if(!isNum(p.ft)) continue; const R = cAt(p.ft);
+    for(const [k, t] of p.h || []){ const i = ix.get(k), f = i==null? null : R.cons[i]?.Te; if(isNum(t) && isNum(f)) (acc[k] ||= []).push(t - f); } }
+  const ks = Object.keys(acc).sort(); if(!ks.length) return;
+  const bias = {}; for(const k of ks){ const a = acc[k]; bias[k] = Math.max(-8, Math.min(8, a.reduce((x,y)=>x+y,0)/a.length)); }
+  const last = ks.at(-1), li = ix.get(last), bl = bias[last];
+  for(let j=1; j<=6; j++){ const t = C.time[li+j]; if(t) bias[t] = bl*(1 - j/6); }                       // fade forward
+  if(ks.length === 1) for(let j=1; j<6; j++){ const t = C.time[li-j]; if(t) bias[t] = bl*(1 - j/6); }   // one reading only: fade back too
+  if(Math.max(...Object.values(bias).map(Math.abs)) < 0.6) { if(S.liveT[name]){ delete S.liveT[name]; render(); } return; }   // forecast already close
+  const sig = Object.entries(bias).map(([k,v])=>k.slice(5)+Math.round(v*5)).join();
+  if(S.liveT[name]?.sig === sig) return;
+  S.liveT[name] = {sig, bias, now: bias[C.time[C.nowIdx]]}; render();
 }catch(e){} }
-function applyCal(){ const k0 = S.nowCal; if(!k0 || k0.loc !== S.loc?.name || k0.C !== S.ctx?.C) return; const b = k0.bias;
-  const t = $("#nowCard .rn-t"), f = $("#nowCard .rn-fl"), cal = $("#nowCard .rn-cal");
-  if(t && isNum(+t.dataset.c)) t.firstChild.textContent = fmtT(+t.dataset.c + b);
-  if(f && isNum(+f.dataset.c)) f.textContent = fmtT(+f.dataset.c + b);
-  if(cal){ cal.textContent = "✓ Live-matched"; cal.title = `Adjusted to ${k0.label}`; }
-  document.querySelectorAll(".hc-v[data-k]").forEach(h => { const k = +h.dataset.k; if(k >= 0 && k < 6) h.textContent = fmtT(+h.dataset.c + b*(1 - k/6)); });   // fades out over 6 hours
-}
+// the forecast with live corrections applied (a copy; the raw forecast stays untouched for comparisons)
+function liveAdj(C, name){ const L = S.liveT[name]; if(!L) return C;
+  return {...C, cons: C.cons.map((c, i) => { const b = L.bias[C.time[i]]; return c && b? {...c, Te: c.Te + b} : c; })}; }
 async function loadBachLive(L0){
   try{
     let o = LIVE_C.bach; if(!o || Date.now() - o.at > 5*60e3) o = LIVE_C.bach = {at: Date.now(), j: await api("/bachlive")};
     const now = Date.now(), L = (o.j?.lifts || []).filter(x => isNum(x.tC) && !(x.at && now - new Date(x.at) > 3*3600e3));
     if(L.length < 2 || S.loc !== L0 || !$("#rnLive")) return false;
-    const P = o.j?.plot; calibrateNow(L.map(x => ({tC: x.tC, ft: BACH_FT[x.name]})), "live mountain readings");
+    const P = o.j?.plot; setLiveT(L0.name, L.map(x => ({ft: BACH_FT[x.name], h: x.hist?.length? x.hist : []})));
     const t0 = L.map(x => x.at && new Date(x.at)).filter(d => d && !isNaN(d)).sort((a,b)=>b-a)[0];
     $("#rnLive").innerHTML = `<div class="lv"><div class="lv-h"><span class="np-live"></span><b>Live on the mountain</b><small>${t0? "as of " + t0.toLocaleTimeString([], {hour:"numeric", minute: t0.getMinutes()? "2-digit" : undefined}) : "Mt. Bachelor"}</small></div>
       ${L.map(x => { const big = isNum(x.g) && x.g >= 64; return `<div class="lv-r${big? " lv-hot" : ""}"><span>${esc(x.name)}${isNum(x.depthIn) && P && P.new24 >= 1? ` <small>${fmtSnow(x.depthIn, 0)} deep</small>` : ""}</span><b class="num">${fmtT(x.tC)}</b><span class="num">${isNum(x.depthIn) && !isNum(x.w)? (P && P.new24 >= 1? `+${fmtSnow(P.new24, 0)} <small>in 24 hr</small>` : `${fmtSnow(x.depthIn, 0)} <small>deep</small>`) : isNum(x.w)? `${isNum(x.dir)? `<i class="arr" style="transform:rotate(${x.dir+180}deg)">↑</i>` : ""}${fmtWind(x.w)}${isNum(x.g)? `<small> g${fmtWind(x.g)}</small>` : ""} <small>${windU()}</small>` : "—"}</span></div>`; }).join("")}
@@ -653,7 +660,8 @@ async function loadLiveStn(){
     if(!isNum(T) || !(age < 120)) return;
     const kmh = v => !v || !isNum(v.value)? null : /m_s/.test(v.unitCode||"")? v.value*3.6 : v.value;   // NWS sends km/h or m/s
     const w = kmh(p.windSpeed), g = kmh(p.windGust);
-    calibrateNow([{tC: T, ft: st.ft}], `the ${st.name} station`);
+    { const d = new Date(p.timestamp), k = new Intl.DateTimeFormat("sv-SE", {timeZone:"America/Los_Angeles", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", hourCycle:"h23"}).format(d).replace(" ", "T") + ":00";
+      setLiveT(L0.name, [{ft: st.ft, h: [[k, T]]}]); }
     $("#rnLive").innerHTML = `<div class="rn-live"><span class="np-live"></span><span><b>Measured ${fmtT(T)}</b>${isNum(w)? ` · wind ${fmtWind(w)}${isNum(g)? `, gusts ${fmtWind(g)}` : ""} ${windU()}` : ""}</span><small>${st.name} · ${st.ft.toLocaleString()} ft · ${age < 2? "just now" : Math.round(age) + " min ago"}</small></div>`;
   }catch(e){}
 }
@@ -664,7 +672,7 @@ function renderRightNow(C, SIM, e){
   const lh = liftHold(c.RW, c.G); const W = !isAlp() ? wax(now, c) : null;
   el.innerHTML = `<div class="card-h" style="margin-bottom:8px"><h2>Right Now</h2><span class="muted">${fmtEl(e)}</span></div>
     <div class="rn">
-      <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num" data-c="${c.Te}">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like <span class="rn-fl" data-c="${now.feels}">${fmtT(now.feels)}</span></div><div class="rn-cal"></div></div></div>
+      <div class="rn-a">${wxIcon(c, hr, 34)}<div><div class="rn-t num">${fmtT(c.Te)}<small>${imp()?"F":"C"}</small></div><div class="muted">${SKY_TEXT[skyKind(c)]}, feels like ${fmtT(now.feels)}</div>${isNum(S.liveT[S.loc?.name]?.now)? `<div class="rn-cal" title="Adjusted to the mountain's own weather stations">✓ Live-matched</div>` : ""}</div></div>
       <div class="rn-b"><div class="rn-w num"><span class="arr" style="transform:rotate(${(c.WD||0)+180}deg)">↑</span>${fmtWind(c.W)} <small>${windU()}</small></div><div class="muted">${compass(c.WD)} gusts to ${fmtWind(c.G)}${S.mode==="alpine" && isBach() && isNum(c.RW)? ` · ridge ${fmtWind(c.RW)}` : ""}</div></div>
     </div>
     <div class="surf-row"><span class="ic">${now.icon}</span><div style="flex:1;min-width:0"><b>${now.label}</b><div class="muted">${descOf(now)}</div></div><div style="text-align:right"><div class="num" style="font-size:26px;color:${scoreColor(sc)}">${isNum(sc)?sc.toFixed(1):"—"}</div><div class="muted">${MODE_NAME[S.mode]}</div></div></div>
@@ -689,11 +697,11 @@ function renderHourStrip(C, SIM){
     const pp = C.pop.get(t); const pc = pp && pp[1] ? Math.round(100*pp[0]/pp[1]) : null; const ty = ptype(c);
     h += `<div class="hc"><div class="hc-t">${i===C.nowIdx?"Now":hl(hr).replace("a","am").replace("p","pm")}</div><div class="hc-d">${i===C.nowIdx || hr===0? dow(t.slice(0,10)) : "&nbsp;"}</div>
       <div class="hc-p" style="border-color:${pc==null? "transparent" : pc>=20?PT[ty==="none"?"snow":ty]:"#2a2a2e"};color:${pc>=20?PT[ty==="none"?"snow":ty]:"var(--mute)"}">${pc==null? "&nbsp;" : pc+"%"}</div>
-      <div class="hc-i" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${wxIcon(c, hr, 24)}</div><div class="hc-v" data-c="${c.Te}" data-k="${i-C.nowIdx}">${fmtT(c.Te)}</div>
+      <div class="hc-i" style="color:${ty==="none"?"#e8e8ea":PT[ty]}">${wxIcon(c, hr, 24)}</div><div class="hc-v">${fmtT(c.Te)}</div>
       ${c.snow>=0.05? `<div class="hc-s">${fmtSnow(c.snow,1)}</div>`:`<div class="hc-s muted">&nbsp;</div>`}
       <div class="hc-w">${compass(c.WD)}${fmtWind(c.W)}</div></div>`;
   }
-  $("#hourStrip").innerHTML = h; applyCal();
+  $("#hourStrip").innerHTML = h;
 }
 
 /* ---------- Daily list (day / night) ---------- */
@@ -2280,7 +2288,7 @@ function warmFav(f, ref, det, ens){
   if(!MEM.has(f.name) || Date.now() - MEM.get(f.name).t > 5*60e3) MEM.set(f.name, {t:Date.now(), data});
   const ok = modesFor(f), ln = store.get("lastNordic","skate"), mode = ok.includes(S.mode)? S.mode : ok.includes(ln)? ln : ok[0];
   const keep = {data:S.data, loc:S.loc, band:S.band, ctx:S.ctx, mode:S.mode}; let C, call = null;
-  try{ S.data = data; S.loc = f; S.mode = mode; S.band = bandFor(mode); S.ctx = {...(S.ctx||{}), zc:{}}; C = computeAt(bandElev()); call = callFor(C, simulate(C)); if(call) call.mode = mode; }
+  try{ S.data = data; S.loc = f; S.mode = mode; S.band = bandFor(mode); S.ctx = {...(S.ctx||{}), zc:{}}; C = liveAdj(computeAt(bandElev()), f.name); call = callFor(C, simulate(C)); if(call) call.mode = mode; }
   finally{ const fb = S.band; Object.assign(S, keep); if(C) store.set("fc:" + f.name, (()=>{ const d = {}; C.days.slice(0,7).forEach((dd,k)=>{ const x = C.consDays[k]; if(x?.n) d[dd] = Math.round((x.day+x.night)*10)/10; }); return {t:Date.now(), d, band:fb, full: fcFull(C), call}; })()); }
   favRowRender();
 }
