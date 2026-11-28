@@ -2345,7 +2345,8 @@ function renderNowcast(){
 function renderReceipt(){
   const el = $("#rcptStrip"); if(!el || !S.loc) return; const R = recapData(); if(!R){ el.innerHTML = ""; return; }
   const end = R.st.end || R.st.start; const key = S.loc.name+"|"+end;
-  if(!end || end < dateAdd(todayStr(), -3) || store.get("rcptHide","")===key){ el.innerHTML = ""; return; }
+  // The strip at the top celebrates storms Snowline called well. Misses still count in the season record (and the recap sheet), they just don't get a banner.
+  if(!end || end < dateAdd(todayStr(), -3) || store.get("rcptHide","")===key || !R.close){ el.innerHTML = ""; return; }
   const got = R.st.obsSnow, mark = R.nailed? "✓ Nailed it" : R.close? "✓ On target" : got > R.said? "More than forecast" : "Less than forecast";
   el.innerHTML = `<div class="rc"><div class="rc-b"><div class="rc-h">🧾 Storm receipt · ${esc(R.range)}</div>
       <div class="rc-n"><span>Snowline said <b>${fmtSnow(R.said,0)}</b></span><span>${esc((R.fell||"Measured").replace(" reported",""))} got <b>${fmtSnow(got,0)}</b></span><span class="rc-v ${R.close? "ok" : ""}">${mark}</span>${(r=>r? `<span>Season <b>${r.w}/${r.n}</b> on target</span>` : "")(trustRecord())}</div></div>
