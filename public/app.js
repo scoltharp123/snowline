@@ -617,9 +617,9 @@ async function loadBachLive(L0){
     let o = LIVE_C.bach; if(!o || Date.now() - o.at > 5*60e3) o = LIVE_C.bach = {at: Date.now(), j: await api("/bachlive")};
     const now = Date.now(), L = (o.j?.lifts || []).filter(x => isNum(x.tC) && !(x.at && now - new Date(x.at) > 3*3600e3));
     if(L.length < 2 || S.loc !== L0 || !$("#rnLive")) return false;
-    const t0 = L.map(x => x.at && new Date(x.at)).filter(d => d && !isNaN(d)).sort((a,b)=>b-a)[0], age = t0? (now - t0)/60e3 : null;
-    $("#rnLive").innerHTML = `<div class="lv"><div class="lv-h"><span class="np-live"></span><b>Live on the mountain</b><small>${isNum(age)? (age < 2? "just now" : age < 90? Math.round(age) + " min ago" : Math.round(age/60) + " hr ago") : "Mt. Bachelor"}</small></div>
-      ${L.map(x => { const big = isNum(x.g) && x.g >= 64; return `<div class="lv-r${big? " lv-hot" : ""}"><span>${esc(x.name)}</span><b class="num">${fmtT(x.tC)}</b><span class="num">${isNum(x.w)? `${isNum(x.dir)? `<i class="arr" style="transform:rotate(${x.dir+180}deg)">↑</i>` : ""}${fmtWind(x.w)}${isNum(x.g)? `<small> g${fmtWind(x.g)}</small>` : ""} <small>${windU()}</small>` : "—"}</span></div>`; }).join("")}
+    const t0 = L.map(x => x.at && new Date(x.at)).filter(d => d && !isNaN(d)).sort((a,b)=>b-a)[0];
+    $("#rnLive").innerHTML = `<div class="lv"><div class="lv-h"><span class="np-live"></span><b>Live on the mountain</b><small>${t0? "as of " + t0.toLocaleTimeString([], {hour:"numeric", minute: t0.getMinutes()? "2-digit" : undefined}) : "Mt. Bachelor"}</small></div>
+      ${L.map(x => { const big = isNum(x.g) && x.g >= 64; return `<div class="lv-r${big? " lv-hot" : ""}"><span>${esc(x.name)}</span><b class="num">${fmtT(x.tC)}</b><span class="num">${isNum(x.depthIn) && !isNum(x.w)? `${fmtSnow(x.depthIn, 0)} <small>deep</small>` : isNum(x.w)? `${isNum(x.dir)? `<i class="arr" style="transform:rotate(${x.dir+180}deg)">↑</i>` : ""}${fmtWind(x.w)}${isNum(x.g)? `<small> g${fmtWind(x.g)}</small>` : ""} <small>${windU()}</small>` : "—"}</span></div>`; }).join("")}
       ${L.some(x => isNum(x.g) && x.g >= 64)? `<div class="lv-n">💨 Gusts over 40 mph up top. Upper lifts may be on wind hold.</div>` : ""}</div>`;
     return true;
   }catch(e){ return false; }
