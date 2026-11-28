@@ -617,9 +617,11 @@ async function loadBachLive(L0){
     let o = LIVE_C.bach; if(!o || Date.now() - o.at > 5*60e3) o = LIVE_C.bach = {at: Date.now(), j: await api("/bachlive")};
     const now = Date.now(), L = (o.j?.lifts || []).filter(x => isNum(x.tC) && !(x.at && now - new Date(x.at) > 3*3600e3));
     if(L.length < 2 || S.loc !== L0 || !$("#rnLive")) return false;
+    const P = o.j?.plot;
     const t0 = L.map(x => x.at && new Date(x.at)).filter(d => d && !isNaN(d)).sort((a,b)=>b-a)[0];
     $("#rnLive").innerHTML = `<div class="lv"><div class="lv-h"><span class="np-live"></span><b>Live on the mountain</b><small>${t0? "as of " + t0.toLocaleTimeString([], {hour:"numeric", minute: t0.getMinutes()? "2-digit" : undefined}) : "Mt. Bachelor"}</small></div>
-      ${L.map(x => { const big = isNum(x.g) && x.g >= 64; return `<div class="lv-r${big? " lv-hot" : ""}"><span>${esc(x.name)}</span><b class="num">${fmtT(x.tC)}</b><span class="num">${isNum(x.depthIn) && !isNum(x.w)? `${fmtSnow(x.depthIn, 0)} <small>deep</small>` : isNum(x.w)? `${isNum(x.dir)? `<i class="arr" style="transform:rotate(${x.dir+180}deg)">↑</i>` : ""}${fmtWind(x.w)}${isNum(x.g)? `<small> g${fmtWind(x.g)}</small>` : ""} <small>${windU()}</small>` : "—"}</span></div>`; }).join("")}
+      ${L.map(x => { const big = isNum(x.g) && x.g >= 64; return `<div class="lv-r${big? " lv-hot" : ""}"><span>${esc(x.name)}${isNum(x.depthIn) && P && P.new24 >= 1? ` <small>${fmtSnow(x.depthIn, 0)} deep</small>` : ""}</span><b class="num">${fmtT(x.tC)}</b><span class="num">${isNum(x.depthIn) && !isNum(x.w)? (P && P.new24 >= 1? `+${fmtSnow(P.new24, 0)} <small>in 24 hr</small>` : `${fmtSnow(x.depthIn, 0)} <small>deep</small>`) : isNum(x.w)? `${isNum(x.dir)? `<i class="arr" style="transform:rotate(${x.dir+180}deg)">↑</i>` : ""}${fmtWind(x.w)}${isNum(x.g)? `<small> g${fmtWind(x.g)}</small>` : ""} <small>${windU()}</small>` : "—"}</span></div>`; }).join("")}
+      ${P && P.new3 >= 1? `<div class="lv-n lv-sn">❄️ Snow plot up ${fmtSnow(P.new3, 0)} in the last 3 hours. Piling up.</div>` : ""}
       ${L.some(x => isNum(x.g) && x.g >= 64)? `<div class="lv-n">💨 Gusts over 40 mph up top. Upper lifts may be on wind hold.</div>` : ""}</div>`;
     return true;
   }catch(e){ return false; }
@@ -3833,7 +3835,12 @@ addEventListener("online", ()=>{ updateOnline(); if(S.loc) load(S.loc); }); addE
 
 /* ---------- Storm recap card: what Snowline said vs what fell ---------- */
 function recapData(){
-  const v = extrasFor(S.loc).verify; const rs = (v?.resort?.storms||[]).find(x=>x.snowline!=null && !x.ongoing);
+  const v = extrasFor(S.loc).verify;
+  const ps = (v?.resort?.plot?.storms||[]).find(x=>x.snowline!=null && !x.ongoing);   // Bachelor's snow plot sensor: a real measurement, so it comes first
+  if(ps){ const said = ps.snowline, got = ps.measured, miss = said - got, close = Math.abs(miss) <= Math.max(2, .25*got), nailed = Math.abs(miss) <= Math.max(1, .1*got);
+    return {st:{obsSnow: got, start: ps.start, end: ps.end}, said, who:"Snowline said", fell:"Snow plot measured", verdict: nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "MORE THAN FORECAST" : "LESS THAN FORECAST",
+      nailed, close, range: ps.start===ps.end? `${dow(ps.start)} ${md(ps.start)}` : `${dow(ps.start)}–${dow(ps.end)} ${md(ps.start)}`, station: null, source: "Mt. Bachelor's snow plot sensor", record: v.resort.plot.record}; }
+  const rs = (v?.resort?.storms||[]).find(x=>x.snowline!=null && !x.ongoing);
   if(rs){ const said = rs.snowline, miss = said - rs.reported, close = Math.abs(miss) <= Math.max(2, .25*rs.reported), nailed = Math.abs(miss) <= Math.max(1, .1*rs.reported);
     return {st:{obsSnow: rs.reported, start: rs.start, end: rs.end}, said, who:"Snowline said", fell:`${v.resort.name} reported`, verdict: nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "MORE THAN FORECAST" : "LESS THAN FORECAST",
       nailed, close, range: rs.start===rs.end? `${dow(rs.start)} ${md(rs.start)}` : `${dow(rs.start)}–${dow(rs.end)} ${md(rs.start)}`, station: null, source: `${v.resort.name}'s own snow report`, record: v.resort.record}; }
@@ -4317,6 +4324,7 @@ try{ navigator.clearAppBadge?.().catch(()=>{}); }catch(e){}
    One line in Snow Summary once there are 3+ graded storms: "Snowline: 8 of 10 storms within 2″ of Mt. Bachelor's
    report". Tap → the full accuracy card. Graded against the resort's own report first, else the nearby snow gauge. */
 function trustRecord(){ const v = extrasFor(S.loc).verify; if(!v) return null;
+  const pr = v.resort?.plot?.record; if(pr?.storms >= 3) return {w: pr.within, n: pr.storms, vs: "Bachelor's snow plot"};
   const rr = v.resort?.record; if(rr?.storms >= 3) return {w: rr.within, n: rr.storms, vs: `${v.resort.name}'s report`};
   const R = v.record; if(R?.storms >= 3) return {w: R.within, n: R.storms, vs: "the snow gauge"};
   return null; }

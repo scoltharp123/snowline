@@ -1,18 +1,9 @@
 // GET /api/bachlive → Mt. Bachelor's own live lift-top weather (the same feed as its "Live 24 Hour Weather" page).
 // Cached at the edge for 5 minutes so every Snowline user shares one call. ?raw=1 shows the feed's first readings.
 import { json } from "../lib/shared.mjs";
+import { fetchFeed, pacific, logPlot, plotHours, newSnow, PLOT_FT } from "../lib/plot.mjs";
 
-const URL_ = "https://api.mtbachelor.com/api/v1/dor/24-hour-weather";
 const ORDER = [["summit", "Summit"], ["northwest", "Northwest"], ["pine", "Pine Marten"], ["cloud", "Cloudchaser"], ["sunrise", "Sunrise"], ["village", "West Village"], ["snowplot", "Snow plot"]];
-// Bachelor's feed writes local Pacific clock time but labels it "Z". Read it as Pacific.
-function pacific(ts) {
-  const m = String(ts || "").match(/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/); if (!m) return null;
-  const asUtc = Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]);
-  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(asUtc)).map(x => [x.type, x.value]));
-  const off = Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute) - asUtc;     // Pacific minus UTC (−8 h or −7 h)
-  const t = asUtc - off;
-  return t > Date.now() + 15 * 60e3 ? asUtc : t;                                        // if that lands in the future, trust the "Z"
-}
 const num = v => { const n = typeof v === "string" ? parseFloat(v) : v; return Number.isFinite(n) ? n : null; };
 const pick = (o, re, no) => { for (const [k, v] of Object.entries(o || {})) if (re.test(k) && !(no && no.test(k)) && num(v) != null) return { k, v: num(v) }; return null; };
 
@@ -34,9 +25,10 @@ function reading(r) {
 export default async (req) => {
   const raw = new URL(req.url).searchParams.has("raw");
   try {
-    const r = await fetch(URL_, { headers: { "User-Agent": "Mozilla/5.0 Snowline", Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const j = await r.json();
+    const j = await fetchFeed();
+    try { await logPlot(j); } catch (e) {}                                              // keep the snow plot history going
+    const h = plotHours(j), ks = Object.keys(h).sort(), last = ks.at(-1);
+    const plot = last && pacific(last + ":00") && Date.now() - pacific(last + ":00") < 3 * 3600e3 ? { depthIn: h[last], new24: newSnow(ks.map(k => h[k])), new3: newSnow(ks.slice(-4).map(k => h[k])), ft: PLOT_FT } : null;
     if (raw) return json({ keys: Object.keys(j || {}), sample: Object.fromEntries(Object.entries(j || {}).map(([k, v]) => [k, Array.isArray(v) ? v.slice(0, 2) : v])) }, { cache: 60 });
     const lifts = [], seen = new Set();
     for (const [key, v] of Object.entries(j || {})) {
@@ -48,7 +40,7 @@ export default async (req) => {
       seen.add(name); lifts.push({ name, rank: hit < 0 ? 99 : hit, ...x });
     }
     lifts.sort((a, b) => a.rank - b.rank);
-    return json({ lifts, at: Date.now(), link: "https://www.mtbachelor.com/the-mountain/live-24-hour-weather/" }, { cache: 300 });
+    return json({ lifts, plot, at: Date.now(), link: "https://www.mtbachelor.com/the-mountain/live-24-hour-weather/" }, { cache: 300 });
   } catch (e) {
     return json({ lifts: [], error: String(e.message || e) }, { cache: 120 });
   }

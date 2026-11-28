@@ -8,6 +8,7 @@
 // 3. Snowline's own record: the forecasts Snowline saved each morning (POST /api/score) graded against
 //    what fell, plus a snow-to-water calibration once enough storms are graded.
 import { json, nearestStations, awdbData, daysAgo, getJSON, store, FT } from "../lib/shared.mjs";
+import { readPlot, plotDays } from "../lib/plot.mjs";
 
 const MODELS = {
   ecmwf: ["ecmwf_ifs025"], aifs: ["ecmwf_aifs025_single"], gfs: ["gfs_seamless"],
@@ -84,7 +85,7 @@ export default async (req) => {
     const [st] = await nearestStations(lat, lon, 1, 40);
     if (!st) return json({ status: "no-station" }, { cache: 86400 });
     const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `verify-v9-${st.id}-${today}`;
+    const cacheKey = `verify-v10-${st.id}-${today}`;
     const s = store("snowline-cache");
     try { const c = await s.get(cacheKey, { type: "json" }); if (c) return json(c, { cache: 21600 }); } catch (e) {}
 
@@ -178,6 +179,17 @@ export default async (req) => {
             fix = r2(clamp(1 + (ratio - 1) * Math.min(1, gs.length / 6), 0.75, 1.25)); }
           resort = { name: "Mt. Bachelor", days: ds.length, since: ds[0] || null, storms: stormsR.slice(0, 6), record: rec, fix };
         }
+        // Bachelor's snow plot sensor: measured hourly, settles nothing into "new snow". Day D is compared with Snowline's forecast for D made on D-1.
+        const pd = plotDays(await readPlot()), pk = Object.keys(pd).sort(), pr = []; let c2 = null;
+        for (const d of pk) { if (pd[d] >= 1) { if (!c2 || minus(d, 1) !== c2.days.at(-1)) { c2 && pr.push(c2); c2 = { days: [] }; } c2.days.push(d); } else if (c2) { pr.push(c2); c2 = null; } }
+        if (c2) { c2.ongoing = minus(today, 0) === c2.days.at(-1); pr.push(c2); }
+        const stormsP = pr.map(x => { const got = x.days.reduce((a, d) => a + pd[d], 0); let s = 0, ok = !!rf;
+            for (const d of x.days) { const v = rf?.[minus(d, 1)]?.[d]; if (!v) { ok = false; break; } s += v[0]; }
+            return { start: x.days[0], end: x.days.at(-1), measured: r1(got), snowline: ok ? r1(s) : null, ongoing: !!x.ongoing }; })
+          .filter(x => x.measured >= 2).reverse();
+        const gp = stormsP.filter(x => x.snowline != null && !x.ongoing);
+        if (pk.length) (resort ||= { name: "Mt. Bachelor" }).plot = { days: pk.length, since: pk[0], storms: stormsP.slice(0, 6),
+          record: gp.length ? { storms: gp.length, within: gp.filter(x => Math.abs(x.snowline - x.measured) <= Math.max(2, 0.25 * x.measured)).length, avgErr: r1(gp.reduce((a, x) => a + Math.abs(x.snowline - x.measured), 0) / gp.length) } : null };
       } catch (e) {}
     }
     const out = {
