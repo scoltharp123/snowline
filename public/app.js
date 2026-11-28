@@ -635,12 +635,51 @@ function setLiveT(name, pts){ try{
 // the forecast with live corrections applied (a copy; the raw forecast stays untouched for comparisons)
 function liveAdj(C, name){ const L = S.liveT[name]; if(!L) return C;
   return {...C, cons: C.cons.map((c, i) => { const b = L.bias[C.time[i]]; return c && b? {...c, Te: c.Te + b} : c; })}; }
+/* Freezing-line chart: what a station measured over the last day, Snowline's forecast for that spot for the next 18 hours,
+   the 32°F line, and rain or snow marked under each hour. Shown when temperatures are near freezing, which is exactly
+   when people wonder why it isn't snowing (or when it will). */
+function renderTrend(st){ try{
+  const el = $("#rnTrend"), C0 = S.ctx?.C; if(!el || !C0 || !st?.hist?.length) return;
+  const F = liveAdj(cAt(st.ft), S.loc?.name), ix = idxOf(F), now = C0.nowIdx;
+  const meas = st.hist.map(([k,t]) => [ix.get(k), t]).filter(([i]) => i != null && i <= now && i > now - 26).sort((a,b)=>a[0]-b[0]);
+  if(meas.length < 4){ el.innerHTML = ""; return; }
+  // start the forecast from this station's latest reading, easing back to the forecast over 6 hours
+  const [li, lt] = meas.at(-1), off0 = isNum(F.cons[li]?.Te)? lt - F.cons[li].Te : 0;
+  const fut = []; for(let i = now; i <= now + 18; i++){ const c = F.cons[i]; if(c && isNum(c.Te)) fut.push([i, c.Te + off0*Math.max(0, 1 - (i - li)/6), c]); }
+  if(fut.length < 6){ el.innerHTML = ""; return; }
+  const all = [...meas.map(x=>x[1]), ...fut.map(x=>x[1])], lo = Math.min(...all), hi = Math.max(...all);
+  if(lo > 4 || hi < -4){ el.innerHTML = ""; return; }                                   // nowhere near freezing: not the question people are asking
+  const tNow = meas.at(-1)[1], fz = fut.find(x => (tNow > 0.3? x[1] <= 0 : x[1] > 0.5) && x[0] > now), clock = i => hl(+F.time[i].slice(11,13)).replace("a","am").replace("p","pm");
+  const wetAfter = fz && fut.some(x => x[0] >= fz[0] && x[2].P > 0.1), wetBefore = fut.some(x => x[0] < (fz?.[0] ?? 1e9) && x[2].P > 0.1 && (x[2].frac ?? 1) < 0.5);
+  const head = tNow > 0.3? (fz? `Below freezing by ${clock(fz[0])}${wetBefore && wetAfter? ". Rain turns to snow." : wetAfter? ". Snow on the way." : "."}` : `Stays above freezing${fut.some(x=>x[2].P>0.1)? ", so rain, not snow, here" : ""}.`)
+                         : (fz? `Above freezing by ${clock(fz[0])}.` : `Staying below freezing${fut.some(x=>x[2].P>0.1)? ": snow, not rain" : ""}.`);
+  // drawing
+  const W = 330, H = 118, padL = 30, padR = 6, top = 10, bot = 22, x0 = now - 24, x1 = now + 18;
+  const yl = Math.min(lo, -1) - 1, yh = Math.max(hi, 1) + 1, X = i => padL + (i - x0) / (x1 - x0) * (W - padL - padR), Y = t => top + (yh - t) / (yh - yl) * (H - top - bot);
+  const path = pts => pts.map(([i,t], k) => `${k? "L" : "M"}${X(i).toFixed(1)},${Y(t).toFixed(1)}`).join("");
+  const futPts = [[meas.at(-1)[0], meas.at(-1)[1]], ...fut.filter(x=>x[0] > meas.at(-1)[0]).map(x=>[x[0], x[1]])];
+  const bars = fut.filter(x => x[2].P > 0.05).map(([i,,c]) => { const snow = (c.frac ?? 1) >= 0.5; return `<rect x="${(X(i)-2.5).toFixed(1)}" y="${H-bot+4}" width="5" height="${Math.min(10, 3 + c.P*6).toFixed(1)}" rx="1.5" fill="${snow? "#60a5fa" : "#4ade80"}"/>`; }).join("");
+  const yTicks = [...new Set([0, Math.round(yl+1), Math.round(yh-1)])].filter(t => t >= yl && t <= yh && (t===0 || Math.abs(t) >= 2)).map(t => `<text x="${padL-5}" y="${(Y(t)+3.5).toFixed(1)}" text-anchor="end" class="tr-ax">${fmtT(t)}</text>`).join("");
+  const xT = [[now-24, "−24h"], [now-12, "−12h"], [now, "Now"], [now+12, "+12h"]].map(([i,l]) => `<text x="${X(i).toFixed(1)}" y="${H-3}" text-anchor="middle" class="tr-ax${i===now? " tr-now" : ""}">${l}</text>`).join("");
+  el.innerHTML = `<div class="tr"><div class="tr-h"><b>${head}</b><small>${esc(st.label)} · ${st.ft.toLocaleString()} ft</small></div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Temperature: measured past day and forecast next 18 hours">
+      <rect x="${padL}" y="${Y(0).toFixed(1)}" width="${W-padL-padR}" height="${(H-bot-Y(0)).toFixed(1)}" fill="rgba(96,165,250,.06)"/>
+      <line x1="${padL}" x2="${W-padR}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="#60a5fa" stroke-dasharray="3 3" stroke-width="1"/>
+      <line x1="${X(now).toFixed(1)}" x2="${X(now).toFixed(1)}" y1="${top}" y2="${H-bot}" stroke="#3a4352" stroke-width="1"/>
+      <path d="${path(meas)}" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linejoin="round"/>
+      <path d="${path(futPts)}" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-dasharray="4 3" opacity=".75"/>
+      <circle cx="${X(meas.at(-1)[0]).toFixed(1)}" cy="${Y(meas.at(-1)[1]).toFixed(1)}" r="3.5" fill="#fff"/>
+      ${yTicks}${xT}${bars}</svg>
+    <div class="tr-leg"><span><i class="tr-l"></i>Measured</span><span><i class="tr-l tr-d"></i>Forecast</span><span><i class="tr-b" style="background:#60a5fa"></i>Snow</span><span><i class="tr-b" style="background:#4ade80"></i>Rain</span></div></div>`;
+}catch(e){} }
 async function loadBachLive(L0){
   try{
     let o = LIVE_C.bach; if(!o || Date.now() - o.at > 5*60e3) o = LIVE_C.bach = {at: Date.now(), j: await api("/bachlive")};
     const now = Date.now(), L = (o.j?.lifts || []).filter(x => isNum(x.tC) && !(x.at && now - new Date(x.at) > 3*3600e3));
     if(L.length < 2 || S.loc !== L0 || !$("#rnLive")) return false;
     const P = o.j?.plot; setLiveT(L0.name, L.map(x => ({ft: BACH_FT[x.name], h: x.hist?.length? x.hist : []})));
+    { const ef = (S.ctx?.e || 0)*FT, pick = L.filter(x => x.hist?.length >= 6 && BACH_FT[x.name]).sort((a,b)=>Math.abs(BACH_FT[a.name]-ef) - Math.abs(BACH_FT[b.name]-ef))[0];
+      if(pick) renderTrend({label: pick.name, ft: BACH_FT[pick.name], hist: pick.hist}); }
     const t0 = L.map(x => x.at && new Date(x.at)).filter(d => d && !isNaN(d)).sort((a,b)=>b-a)[0];
     $("#rnLive").innerHTML = `<div class="lv"><div class="lv-h"><span class="np-live"></span><b>Live on the mountain</b><small>${t0? "as of " + t0.toLocaleTimeString([], {hour:"numeric", minute: t0.getMinutes()? "2-digit" : undefined}) : "Mt. Bachelor"}</small></div>
       ${L.map(x => { const big = isNum(x.g) && x.g >= 64; return `<div class="lv-r${big? " lv-hot" : ""}"><span>${esc(x.name)}${isNum(x.depthIn) && P && P.new24 >= 1? ` <small>${fmtSnow(x.depthIn, 0)} deep</small>` : ""}</span><b class="num">${fmtT(x.tC)}</b><span class="num">${isNum(x.depthIn) && !isNum(x.w)? (P && P.new24 >= 1? `+${fmtSnow(P.new24, 0)} <small>in 24 hr</small>` : `${fmtSnow(x.depthIn, 0)} <small>deep</small>`) : isNum(x.w)? `${isNum(x.dir)? `<i class="arr" style="transform:rotate(${x.dir+180}deg)">↑</i>` : ""}${fmtWind(x.w)}${isNum(x.g)? `<small> g${fmtWind(x.g)}</small>` : ""} <small>${windU()}</small>` : "—"}</span></div>`; }).join("")}
@@ -654,14 +693,16 @@ async function loadLiveStn(){
   if(L0?.name === "Mt. Bachelor, OR" && await loadBachLive(L0)) return;
   try{
     let o = LIVE_C[st.id]; if(!o || Date.now() - o.at > 10*60e3){
-      const j = await (await fetch(`https://api.weather.gov/stations/${st.id}/observations/latest`, {headers:{Accept:"application/geo+json"}})).json();
-      o = LIVE_C[st.id] = {at: Date.now(), p: j.properties || {}}; }
+      const j = await (await fetch(`https://api.weather.gov/stations/${st.id}/observations?limit=36`, {headers:{Accept:"application/geo+json"}})).json();
+      const ps = (j.features || []).map(f => f.properties).filter(Boolean);
+      o = LIVE_C[st.id] = {at: Date.now(), p: ps[0] || {}, ps}; }
     if(S.loc !== L0 || !$("#rnLive")) return; const p = o.p, age = (Date.now() - new Date(p.timestamp)) / 60e3, T = p.temperature?.value;
     if(!isNum(T) || !(age < 120)) return;
     const kmh = v => !v || !isNum(v.value)? null : /m_s/.test(v.unitCode||"")? v.value*3.6 : v.value;   // NWS sends km/h or m/s
     const w = kmh(p.windSpeed), g = kmh(p.windGust);
-    { const d = new Date(p.timestamp), k = new Intl.DateTimeFormat("sv-SE", {timeZone:"America/Los_Angeles", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", hourCycle:"h23"}).format(d).replace(" ", "T") + ":00";
-      setLiveT(L0.name, [{ft: st.ft, h: [[k, T]]}]); }
+    { const hk = new Intl.DateTimeFormat("sv-SE", {timeZone:"America/Los_Angeles", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", hourCycle:"h23"}), seen = new Set(), h = [];
+      for(const q of o.ps || [p]){ const t = q.temperature?.value; if(!isNum(t) || !q.timestamp) continue; const k = hk.format(new Date(q.timestamp)).replace(" ", "T") + ":00"; if(seen.has(k)) continue; seen.add(k); h.push([k, t]); }
+      setLiveT(L0.name, [{ft: st.ft, h}]); renderTrend({label: st.name, ft: st.ft, hist: h}); }
     $("#rnLive").innerHTML = `<div class="rn-live"><span class="np-live"></span><span><b>Measured ${fmtT(T)}</b>${isNum(w)? ` · wind ${fmtWind(w)}${isNum(g)? `, gusts ${fmtWind(g)}` : ""} ${windU()}` : ""}</span><small>${st.name} · ${st.ft.toLocaleString()} ft · ${age < 2? "just now" : Math.round(age) + " min ago"}</small></div>`;
   }catch(e){}
 }
@@ -686,7 +727,7 @@ function renderRightNow(C, SIM, e){
       `${(()=>{ const cn = coldNote(c, now); return cn? `<div class="full"><div class="l">Dress for it</div><div class="v">🧤 ${cn}</div></div>` : ""; })()}`,
       `${!isAlp()? (()=>{ const k = fromKit(c, now); return k && (k.glide||k.kick)? `<div class="full"><div class="l">From your wax box</div><div class="v">🧰 ${[k.glide?.name, k.kick?.name].filter(Boolean).join(" + ")}</div></div>` : ""; })() : ""}`,
       `${!isAlp()? (()=>{ const sg = waxSuggest(c, now); return sg?.text? `<div class="full"><div class="l">Your wax log</div><div class="v">🧠 ${sg.text}</div></div>` : ""; })() : ""}`].join("").trim(); return more? `<details class="more-today"><summary>More for today</summary><div class="kv">${more}</div></details>` : ""; })()}
-<div id="rnLive"></div>`; loadLiveStn();
+<div id="rnTrend"></div><div id="rnLive"></div>`; loadLiveStn();
 }
 
 /* ---------- Hourly strip ---------- */
