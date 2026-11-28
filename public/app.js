@@ -510,8 +510,8 @@ function render(){
   $("#app").innerHTML = `
   ${modelNote}
   <div id="nwsAlerts"></div>${verdict? "" : `<div id="ncStrip"></div>`}
-  ${(()=>{ const notes = callouts.slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length).replace(/^\s*(\S+?)\s+/, '<span class="vn-i">$1</span>') : h; });
-     return verdict? verdict.replace(/<\/div>$/, (notes.length? `<div class="v-notes">${notes.join("")}</div>` : "") + "</div>") : callouts.slice(0,2).join(""); })()}<div id="rateStrip"></div><div id="chgStrip"></div><div id="rcptStrip"></div>
+  ${(()=>{ const notes = (verdict? [] : callouts).slice(0,2).map(h=>{ const m = h.match(/^<div class="callout ?([a-z]*)">/); return m? `<div class="v-note ${m[1]}">`+h.slice(m[0].length).replace(/^\s*(\S+?)\s+/, '<span class="vn-i">$1</span>') : h; });
+     return verdict || callouts.slice(0,1).join(""); })()}<div id="rateStrip"></div><div id="chgStrip"></div><div id="rcptStrip"></div>
   ${S.mode==="bc"? `<section class="card bc-card" id="bcCard"></section>`:""}
   <section class="card" id="snowCard">
     <div class="card-h"><h2>Snow Summary</h2>${D.ensPending? `<span class="muted pend" title="Loading the ensemble runs"><span class="spin"></span></span>` : (()=>{ const old = S.usedOld && Date.now()-S.usedOld > 30*60e3, at = old? S.usedOld : +D.fetched, t2 = new Date(at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
@@ -2358,12 +2358,10 @@ function renderNowcast(){
   const el = $("#ncStrip"); if(!el || !S.ctx) return; const c = S.nc?.[S.loc.name+"|"+Math.round(S.ctx.e)]; if(!c){ el.innerHTML = ""; return; }
   const n = ncAnalyze(c.m, c.off); const hard = r => r >= 1? "heavy" : r >= 0.4? "steady" : "light";
   let h = "";
-  if(n?.state==="soon" && (n.totIn >= 0.3)) h = `<div class="nc nc-soon"><div class="nc-i">❄️</div><div><div class="nc-t">Snow in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
-      <div class="nc-s">Starts around ${ncClock(n.startMs)}${n.totIn >= 0.5? ` · about ${fmtSnow(n.totIn, n.totIn<1?1:0)}${n.endMs? ` by ${ncClock(n.endMs)}` : ""}` : ""}${n.peakRate >= 0.4? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
-  else if(n?.state==="now") h = `<div class="nc nc-now"><div class="nc-i"><span class="nc-dot"></span>❄️</div><div><div class="nc-t">Snowing now · ${hard(n.nowRate)}</div>
-      <div class="nc-s">${n.totIn >= 0.3? `About ${fmtSnow(n.totIn, n.totIn<1?1:0)} more` : "Light"}${n.endMs? ` · lets up around ${ncClock(n.endMs)}` : ""}${n.peakRate >= 0.8 && n.peakMs > Date.now()+20*60e3? ` · heaviest around ${ncClock(n.peakMs)}` : ""}</div></div></div>`;
-  else if(n?.state==="rain") h = `<div class="nc nc-rain"><div class="nc-i">🌧️</div><div><div class="nc-t">Rain in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b></div>
-      <div class="nc-s">Starts around ${ncClock(n.startMs)} at ${fmtEl(S.ctx.e)}${n.snowMs? ` · turns to snow around ${ncClock(n.snowMs)}` : ""}</div></div></div>`;
+  const line = (cls, ic, t, x) => `<div class="nc ${cls}"><div class="nc-i">${ic}</div><div class="nc-t">${t}${x? `<span class="nc-x"> · ${x}</span>` : ""}</div></div>`;
+  if(n?.state==="soon" && (n.totIn >= 0.3)) h = line("nc-soon", "❄️", `Snow in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b>`, n.totIn >= 0.5? `about ${fmtSnow(n.totIn, n.totIn<1?1:0)}${n.endMs? ` by ${ncClock(n.endMs)}` : ""}` : "");
+  else if(n?.state==="now") h = line("nc-now", "❄️", `Snowing now`, n.totIn >= 0.3? `${fmtSnow(n.totIn, n.totIn<1?1:0)} more${n.endMs? ` by ${ncClock(n.endMs)}` : ""}` : hard(n.nowRate));
+  else if(n?.state==="rain") h = line("nc-rain", "🌧️", `Rain in <b class="num" data-nc="${n.startMs}">${ncIn(n.startMs)}</b>`, n.snowMs? `snow by ${ncClock(n.snowMs)}` : "");
   el.innerHTML = h; fallFromForecast();
   clearInterval(S.ncTick); if(h.includes("data-nc")) S.ncTick = setInterval(()=>{ const b = $("#ncStrip [data-nc]"); if(!b){ clearInterval(S.ncTick); return; } const ms = +b.dataset.nc; if(ms <= Date.now()) { clearInterval(S.ncTick); renderNowcast(); } else b.textContent = ncIn(ms); }, 30e3);
 }
@@ -4333,12 +4331,11 @@ function renderChange(C, complete){
   const was = new Date(base.t), when = (now - base.t < 20*3600e3 && was.getDate() === new Date().getDate()? "" : was.toLocaleDateString(undefined, { weekday: "short" }) + " ") + was.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(":00", "").replace(" ", "").toLowerCase();
   const total = days.reduce((s, d) => s + cur[d], 0), dayW = d => d === today? "today" : d === dateAdd(today, 1)? "tomorrow" : dow(d);
   let icon, msg, cls = "";
-  if(Math.abs(tot) >= 1 && Math.abs(big[1]) >= 0.8){
+  if(Math.abs(tot) >= 2 && Math.abs(big[1]) >= 1){
     const up = tot > 0; icon = up? "📈" : "📉"; cls = up? "ok" : "";
-    msg = `<b>${up? "+" : "−"}${fmtSnow(Math.abs(tot), 1)}</b> ${up? "more" : "less"} snow in the forecast, mostly ${dayW(big[0])}${up && Math.abs(big[1]) >= 3? " 🎉" : ""}.`;
-  } else if(total >= 2 && now - base.t >= 6*3600e3){ icon = "🎯"; cls = "ok"; msg = `Forecast holding steady: still about <b>${fmtSnow(total, 0)}</b> this week.`; }
-  else return;
-  el.innerHTML = `<div class="rc chg"><span class="chg-i">${icon}</span><div class="rc-b"><div class="rc-h">Since you looked ${when}</div><div class="rc-n"><span class="${cls? "chg-ok" : ""}">${msg}</span></div></div><button class="rc-x" aria-label="Hide">✕</button></div>`;
+    msg = `<b>${up? "+" : "−"}${fmtSnow(Math.abs(tot), 0)}</b> ${up? "more" : "less"} snow since ${when.trim()}, mostly ${dayW(big[0])}`;
+  } else return;
+  el.innerHTML = `<div class="chg-line"><span>${icon}</span><span class="${cls? "chg-ok" : ""}">${msg}</span><button class="rc-x" aria-label="Hide">✕</button></div>`;
   el.querySelector(".rc-x").onclick = () => { delete S.chgBase[key]; el.innerHTML = ""; };
 }
 
