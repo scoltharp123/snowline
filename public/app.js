@@ -1920,11 +1920,11 @@ function saveScore(loc){
     const fc = Object.entries(tot).filter(([d,o])=>o[2]>=22).sort().slice(0,5).map(([d,o])=>[d, Math.round(o[0]*10)/10, Math.round(o[1]*100)/100]);
     if(!fc.length) return;
     fetch(API+"/score", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({station: st.id, issued, fc})}).then(r=>{ if(r.ok) store.set(key, issued); }).catch(()=>{});
-    if(/^Mt\. Bachelor/.test(loc.name) && store.get("score-resort-bachelor") !== issued){
-      const B = PRESETS.find(p=>p.name==="Mt. Bachelor, OR"); const Cm = computeAt((B.base+B.top)/2/FT), tm = {};
+    if(/^Mt\. Bachelor/.test(loc.name) && store.get("score-resort-bachelor2") !== issued){
+      const Cm = computeAt(6400/FT), tm = {};   // Bachelor's daily report reads its snow stake near West Village (~6,400 ft)
       Cm.time.forEach((t,i)=>{ const c = Cm.cons[i]; if(!c || i < Cm.nowIdx) return; const d = t.slice(0,10); if(d <= issued) return; const o = tm[d] ||= [0,0,0]; o[0] += c.snow; o[1] += (c.P||0)/25.4; o[2]++; });
       const fr = Object.entries(tm).filter(([d,o])=>o[2]>=22).sort().slice(0,5).map(([d,o])=>[d, Math.round(o[0]*10)/10, Math.round(o[1]*100)/100]);
-      if(fr.length) fetch(API+"/score", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({station:"resort:bachelor", issued, fc:fr})}).then(r=>{ if(r.ok) store.set("score-resort-bachelor", issued); }).catch(()=>{});
+      if(fr.length) fetch(API+"/score", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({station:"resort:bachelor2", issued, fc:fr})}).then(r=>{ if(r.ok) store.set("score-resort-bachelor2", issued); }).catch(()=>{});
     }
   }catch(e){}
 }
@@ -2333,7 +2333,7 @@ function renderReceipt(){
   const el = $("#rcptStrip"); if(!el || !S.loc) return; const R = recapData(); if(!R){ el.innerHTML = ""; return; }
   const end = R.st.end || R.st.start; const key = S.loc.name+"|"+end;
   if(!end || end < dateAdd(todayStr(), -3) || store.get("rcptHide","")===key){ el.innerHTML = ""; return; }
-  const got = R.st.obsSnow, mark = R.nailed? "✓ Nailed it" : R.close? "✓ On target" : got > R.said? "Overdelivered" : "Came up short";
+  const got = R.st.obsSnow, mark = R.nailed? "✓ Nailed it" : R.close? "✓ On target" : got > R.said? "More than forecast" : "Less than forecast";
   el.innerHTML = `<div class="rc"><div class="rc-b"><div class="rc-h">🧾 Storm receipt · ${esc(R.range)}</div>
       <div class="rc-n"><span>Snowline said <b>${fmtSnow(R.said,0)}</b></span><span>${esc((R.fell||"Measured").replace(" reported",""))} got <b>${fmtSnow(got,0)}</b></span><span class="rc-v ${R.close? "ok" : ""}">${mark}</span>${(r=>r? `<span>Season <b>${r.w}/${r.n}</b> on target</span>` : "")(trustRecord())}</div></div>
     <button class="rc-sh" onclick="openRecapSheet()">Share</button><button class="rc-x" aria-label="Hide">✕</button></div>`;
@@ -3821,12 +3821,12 @@ addEventListener("online", ()=>{ updateOnline(); if(S.loc) load(S.loc); }); addE
 function recapData(){
   const v = extrasFor(S.loc).verify; const rs = (v?.resort?.storms||[]).find(x=>x.snowline!=null && !x.ongoing);
   if(rs){ const said = rs.snowline, miss = said - rs.reported, close = Math.abs(miss) <= Math.max(2, .25*rs.reported), nailed = Math.abs(miss) <= Math.max(1, .1*rs.reported);
-    return {st:{obsSnow: rs.reported, start: rs.start, end: rs.end}, said, who:"Snowline said", fell:`${v.resort.name} reported`, verdict: nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "IT OVERDELIVERED" : "IT CAME UP SHORT",
+    return {st:{obsSnow: rs.reported, start: rs.start, end: rs.end}, said, who:"Snowline said", fell:`${v.resort.name} reported`, verdict: nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "MORE THAN FORECAST" : "LESS THAN FORECAST",
       nailed, close, range: rs.start===rs.end? `${dow(rs.start)} ${md(rs.start)}` : `${dow(rs.start)}–${dow(rs.end)} ${md(rs.start)}`, station: null, source: `${v.resort.name}'s own snow report`, record: v.resort.record}; }
   const st = (v?.storms||[]).filter(x=>!x.ongoing)[0]; if(!st) return null;
   const said = isNum(st.snowline?.s)? st.snowline.s : st.fcstSnow, who = isNum(st.snowline?.s)? "Snowline said" : "Forecast said";
   const miss = said - st.obsSnow, close = Math.abs(miss) <= Math.max(2, .25*st.obsSnow), nailed = Math.abs(miss) <= Math.max(1, .1*st.obsSnow);
-  const verdict = nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "IT OVERDELIVERED" : "IT CAME UP SHORT";
+  const verdict = nailed? "NAILED IT" : close? "RIGHT ON TARGET" : miss < 0? "MORE THAN FORECAST" : "LESS THAN FORECAST";
   const range = st.start===st.end? `${dow(st.start)} ${md(st.start)}` : `${dow(st.start)}–${dow(st.end)} ${md(st.start)}`;
   return {st, said, who, verdict, nailed, close, range, station: v.station.name, record: v.record};
 }

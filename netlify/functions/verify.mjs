@@ -159,7 +159,7 @@ export default async (req) => {
     if (Math.hypot(lat - 43.979, (lon + 121.688) * 0.72) < 0.15) {
       try {
         const sc = store("snowline-score");
-        const [log, rf] = await Promise.all([sc.get("resort-bachelor", { type: "json" }), sc.get("fc-resort:bachelor", { type: "json" })]);
+        const [log, rf] = await Promise.all([sc.get("resort-bachelor", { type: "json" }), sc.get("fc-resort:bachelor2", { type: "json" })]);
         if (log) {
           const ds = Object.keys(log).sort(), rs = []; let c = null;
           for (const d of ds) { const v = log[d].h24 ?? log[d].overnight ?? 0; if (v >= 1) { if (!c || minus(d, 1) !== c.days.at(-1)) { c && rs.push(c); c = { days: [] }; } c.days.push(d); } else if (c) { rs.push(c); c = null; } }
